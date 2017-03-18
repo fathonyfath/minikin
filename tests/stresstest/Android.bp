@@ -38,6 +38,7 @@ cc_test {
     ],
 
     srcs: [
+	"FontFamilyTest.cpp",
         "MultithreadTest.cpp",
     ],
 
