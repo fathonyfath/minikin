@@ -44,6 +44,7 @@ LOCAL_STATIC_LIBRARIES += \
 LOCAL_SRC_FILES += \
     ../util/FontTestUtils.cpp \
     ../util/MinikinFontForTest.cpp \
+    FontFamilyTest.cpp \
     MultithreadTest.cpp \
 
 LOCAL_C_INCLUDES := \

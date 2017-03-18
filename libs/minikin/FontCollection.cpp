@@ -320,10 +320,6 @@ static bool isStickyWhitelisted(uint32_t c) {
     return false;
 }
 
-static bool isVariationSelector(uint32_t c) {
-    return (0xFE00 <= c && c <= 0xFE0F) || (0xE0100 <= c && c <= 0xE01EF);
-}
-
 bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
         uint32_t variationSelector) const {
     if (!isVariationSelector(variationSelector)) {
@@ -333,14 +329,15 @@ bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
         return false;
     }
 
-    android::AutoMutex _l(gMinikinLock);
-
     // Currently mRanges can not be used here since it isn't aware of the variation sequence.
     for (size_t i = 0; i < mVSFamilyVec.size(); i++) {
         if (mVSFamilyVec[i]->hasGlyph(baseCodepoint, variationSelector)) {
             return true;
         }
     }
+
+    // TODO: We can remove this lock by precomputing color emoji information.
+    android::AutoMutex _l(gMinikinLock);
 
     // Even if there is no cmap format 14 subtable entry for the given sequence, should return true
     // for <char, text presentation selector> case since we have special fallback rule for the
