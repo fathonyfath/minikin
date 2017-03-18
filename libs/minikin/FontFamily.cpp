@@ -105,7 +105,7 @@ FontFamily::FontFamily(int variant, std::vector<Font>&& fonts)
 }
 
 FontFamily::FontFamily(uint32_t langId, int variant, std::vector<Font>&& fonts)
-    : mLangId(langId), mVariant(variant), mFonts(std::move(fonts)), mHasVSTable(false) {
+    : mLangId(langId), mVariant(variant), mFonts(std::move(fonts)) {
     computeCoverage();
 }
 
@@ -175,7 +175,7 @@ void FontFamily::computeCoverage() {
         ALOGE("Could not get cmap table size!\n");
         return;
     }
-    mCoverage = CmapCoverage::getCoverage(cmapTable.get(), cmapTable.size(), &mHasVSTable);
+    mCoverage = CmapCoverage::getCoverage(cmapTable.get(), cmapTable.size(), &mCmapFmt14Coverage);
 
     for (size_t i = 0; i < mFonts.size(); ++i) {
         std::unordered_set<AxisTag> supportedAxes = mFonts[i].getSupportedAxesLocked();
@@ -184,19 +184,28 @@ void FontFamily::computeCoverage() {
 }
 
 bool FontFamily::hasGlyph(uint32_t codepoint, uint32_t variationSelector) const {
-    assertMinikinLocked();
-    if (variationSelector != 0 && !mHasVSTable) {
-        // Early exit if the variation selector is specified but the font doesn't have a cmap format
-        // 14 subtable.
+    if (variationSelector == 0) {
+        return mCoverage.get(codepoint);
+    }
+
+    if (mCmapFmt14Coverage.empty()) {
         return false;
     }
 
-    const FontStyle defaultStyle;
-    hb_font_t* font = getHbFontLocked(getClosestMatch(defaultStyle).font);
-    uint32_t unusedGlyph;
-    bool result = hb_font_get_glyph(font, codepoint, variationSelector, &unusedGlyph);
-    hb_font_destroy(font);
-    return result;
+    const uint16_t vsIndex = getVsIndex(variationSelector);
+
+    if (vsIndex >= mCmapFmt14Coverage.size()) {
+        // Even if vsIndex is INVALID_VS_INDEX, we reach here since INVALID_VS_INDEX is defined to
+        // be at the maximum end of the range.
+        return false;
+    }
+
+    const std::unique_ptr<SparseBitSet>& bitset = mCmapFmt14Coverage[vsIndex];
+    if (bitset.get() == nullptr) {
+        return false;
+    }
+
+    return bitset->get(codepoint);
 }
 
 std::shared_ptr<FontFamily> FontFamily::createFamilyWithVariation(

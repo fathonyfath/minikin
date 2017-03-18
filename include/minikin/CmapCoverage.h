@@ -19,12 +19,15 @@
 
 #include <minikin/SparseBitSet.h>
 
+#include <memory>
+#include <vector>
+
 namespace minikin {
 
 class CmapCoverage {
 public:
     static SparseBitSet getCoverage(const uint8_t* cmap_data, size_t cmap_size,
-            bool* has_cmap_format14_subtable);
+            std::vector<std::unique_ptr<SparseBitSet>>* out);
 };
 
 }  // namespace minikin

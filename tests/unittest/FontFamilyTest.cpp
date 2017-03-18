@@ -539,8 +539,6 @@ TEST_F(FontFamilyTest, hasVariationSelectorTest) {
     std::shared_ptr<FontFamily> family(
             new FontFamily(std::vector<Font>{ Font(minikinFont, FontStyle()) }));
 
-    android::AutoMutex _l(gMinikinLock);
-
     const uint32_t kVS1 = 0xFE00;
     const uint32_t kVS2 = 0xFE01;
     const uint32_t kVS3 = 0xFE02;
@@ -592,7 +590,6 @@ TEST_F(FontFamilyTest, hasVSTableTest) {
                 new MinikinFontForTest(testCase.fontPath));
         std::shared_ptr<FontFamily> family(new FontFamily(
                 std::vector<Font>{ Font(minikinFont, FontStyle()) }));
-        android::AutoMutex _l(gMinikinLock);
         EXPECT_EQ(testCase.hasVSTable, family->hasVSTable());
     }
 }
