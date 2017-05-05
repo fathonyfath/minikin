@@ -41,4 +41,26 @@ hb_blob_t* getFontTable(const MinikinFont* minikinFont, uint32_t tag) {
     return blob;
 }
 
+inline static bool isBMPVariationSelector(uint32_t codePoint) {
+    return VS1 <= codePoint && codePoint <= VS16;
+}
+
+inline static bool isVariationSelectorSupplement(uint32_t codePoint) {
+    return VS17 <= codePoint && codePoint <= VS256;
+}
+
+uint16_t getVsIndex(uint32_t codePoint) {
+    if (isBMPVariationSelector(codePoint)) {
+        return codePoint - VS1;
+    } else if (isVariationSelectorSupplement(codePoint)) {
+        return codePoint - VS17 + 16;
+    } else {
+        return INVALID_VS_INDEX;
+    }
+}
+
+bool isVariationSelector(uint32_t codePoint) {
+    return isBMPVariationSelector(codePoint) || isVariationSelectorSupplement(codePoint);
+}
+
 }  // namespace minikin

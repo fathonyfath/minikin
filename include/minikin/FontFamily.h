@@ -151,7 +151,7 @@ public:
     bool hasGlyph(uint32_t codepoint, uint32_t variationSelector) const;
 
     // Returns true if this font family has a variaion sequence table (cmap format 14 subtable).
-    bool hasVSTable() const { return mHasVSTable; }
+    bool hasVSTable() const { return !mCmapFmt14Coverage.empty(); }
 
     // Creates new FontFamily based on this family while applying font variations. Returns nullptr
     // if none of variations apply to this family.
@@ -167,7 +167,7 @@ private:
     std::unordered_set<AxisTag> mSupportedAxes;
 
     SparseBitSet mCoverage;
-    bool mHasVSTable;
+    std::vector<std::unique_ptr<SparseBitSet>> mCmapFmt14Coverage;
 
     // Forbid copying and assignment.
     FontFamily(const FontFamily&) = delete;

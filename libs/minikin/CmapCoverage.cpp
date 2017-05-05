@@ -18,6 +18,7 @@
 
 #define LOG_TAG "Minikin"
 
+#include <algorithm>
 #include <vector>
 using std::vector;
 
@@ -27,11 +28,20 @@ using std::vector;
 #include <minikin/CmapCoverage.h>
 #include "MinikinInternal.h"
 
+#include <MinikinInternal.h>
+
 namespace minikin {
+
+constexpr uint32_t U32MAX = std::numeric_limits<uint32_t>::max();
 
 // These could perhaps be optimized to use __builtin_bswap16 and friends.
 static uint32_t readU16(const uint8_t* data, size_t offset) {
     return ((uint32_t)data[offset]) << 8 | ((uint32_t)data[offset + 1]);
+}
+
+static uint32_t readU24(const uint8_t* data, size_t offset) {
+    return ((uint32_t)data[offset]) << 16 | ((uint32_t)data[offset + 1]) << 8 |
+        ((uint32_t)data[offset + 2]);
 }
 
 static uint32_t readU32(const uint8_t* data, size_t offset) {
@@ -49,6 +59,99 @@ static void addRange(vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
     } else {
         coverage.back() = end;
     }
+}
+
+struct Range {
+    uint32_t start;  // inclusive
+    uint32_t end;  // exclusive
+
+    static Range InvalidRange() {
+        return Range({ U32MAX, U32MAX });
+    }
+
+    inline bool isValid() const {
+        return start != U32MAX && end != U32MAX;
+    }
+
+    // Returns true if left and right intersect.
+    inline static bool intersects(const Range& left, const Range& right) {
+        return left.isValid() && right.isValid() &&
+                left.start < right.end && right.start < left.end;
+    }
+
+    // Returns merged range. This method assumes left and right are not invalid ranges and they have
+    // an intersection.
+    static Range merge(const Range& left, const Range& right) {
+        return Range({ std::min(left.start, right.start), std::max(left.end, right.end) });
+    }
+};
+
+// Returns Range from given ranges vector. Returns InvalidRange if i is out of range.
+static inline Range getRange(const std::vector<uint32_t>& r, size_t i) {
+    return i + 1 < r.size() ? Range({ r[i], r[i + 1] }) : Range::InvalidRange();
+}
+
+// Merge two sorted lists of ranges into one sorted list.
+static std::vector<uint32_t> mergeRanges(
+        const std::vector<uint32_t>& lRanges, const std::vector<uint32_t>& rRanges) {
+    std::vector<uint32_t> out;
+
+    const size_t lsize = lRanges.size();
+    const size_t rsize = rRanges.size();
+    out.reserve(lsize + rsize);
+    size_t ri = 0;
+    size_t li = 0;
+    while (li < lsize || ri < rsize) {
+        Range left = getRange(lRanges, li);
+        Range right = getRange(rRanges, ri);
+
+        if (!right.isValid()) {
+            // No ranges left in rRanges. Just put all remaining ranges in lRanges.
+            do {
+                Range r = getRange(lRanges, li);
+                addRange(out, r.start, r.end);
+                li += 2;
+            } while (li < lsize);
+            break;
+        } else if (!left.isValid()) {
+            // No ranges left in lRanges. Just put all remaining ranges in rRanges.
+            do {
+                Range r = getRange(rRanges, ri);
+                addRange(out, r.start, r.end);
+                ri += 2;
+            } while (ri < rsize);
+            break;
+        } else if (!Range::intersects(left, right)) {
+            // No intersection. Add smaller range.
+            if (left.start < right.start) {
+                addRange(out, left.start, left.end);
+                li += 2;
+            } else {
+                addRange(out, right.start, right.end);
+                ri += 2;
+            }
+        } else {
+            Range merged = Range::merge(left, right);
+            li += 2;
+            ri += 2;
+            left = getRange(lRanges, li);
+            right = getRange(rRanges, ri);
+            while (Range::intersects(merged, left) || Range::intersects(merged, right)) {
+                if (Range::intersects(merged, left)) {
+                    merged = Range::merge(merged, left);
+                    li += 2;
+                    left = getRange(lRanges, li);
+                } else {
+                    merged = Range::merge(merged, right);
+                    ri += 2;
+                    right = getRange(rRanges, ri);
+                }
+            }
+            addRange(out, merged.start, merged.end);
+        }
+    }
+
+    return out;
 }
 
 // Get the coverage information out of a Format 4 subtable, storing it in the coverage vector
@@ -176,8 +279,130 @@ uint8_t getTablePriority(uint16_t platformId, uint16_t encodingId) {
     return kLowestPriority;
 }
 
+// Get merged coverage information from default UVS Table and non-default UVS Table. Note that this
+// function assumes code points in both default UVS Table and non-default UVS table are stored in
+// ascending order. This is required by the standard.
+static bool getVSCoverage(std::vector<uint32_t>* out_ranges, const uint8_t* data, size_t size,
+        uint32_t defaultUVSTableOffset, uint32_t nonDefaultUVSTableOffset,
+        const SparseBitSet& baseCoverage) {
+    // Need to merge supported ranges from default UVS Table and non-default UVS Table.
+    // First, collect all supported code points from non default UVS table.
+    std::vector<uint32_t> rangesFromNonDefaultUVSTable;
+    if (nonDefaultUVSTableOffset != 0) {
+        constexpr size_t kHeaderSize = 4;
+        constexpr size_t kUVSMappingRecordSize = 5;
+
+        const uint8_t* nonDefaultUVSTable = data + nonDefaultUVSTableOffset;
+        // This subtraction doesn't underflow since the caller already checked
+        // size > nonDefaultUVSTableOffset.
+        const size_t nonDefaultUVSTableRemaining = size - nonDefaultUVSTableOffset;
+        if (nonDefaultUVSTableRemaining < kHeaderSize) {
+            return false;
+        }
+        const uint32_t numRecords = readU32(nonDefaultUVSTable, 0);
+        if (numRecords * kUVSMappingRecordSize + kHeaderSize > nonDefaultUVSTableRemaining) {
+            return false;
+        }
+        for (uint32_t i = 0; i < numRecords; ++i) {
+            const size_t recordOffset = kHeaderSize + kUVSMappingRecordSize * i;
+            const uint32_t codePoint = readU24(nonDefaultUVSTable, recordOffset);
+            addRange(rangesFromNonDefaultUVSTable, codePoint, codePoint + 1);
+        }
+    }
+
+    // Then, construct range from default UVS Table with merging code points from non default UVS
+    // table.
+    std::vector<uint32_t> rangesFromDefaultUVSTable;
+    if (defaultUVSTableOffset != 0) {
+        constexpr size_t kHeaderSize = 4;
+        constexpr size_t kUnicodeRangeRecordSize = 4;
+
+        const uint8_t* defaultUVSTable = data + defaultUVSTableOffset;
+        // This subtraction doesn't underflow since the caller already checked
+        // size > defaultUVSTableOffset.
+        const size_t defaultUVSTableRemaining = size - defaultUVSTableOffset;
+
+        if (defaultUVSTableRemaining < kHeaderSize) {
+            return false;
+        }
+        const uint32_t numRecords = readU32(defaultUVSTable, 0);
+        if (numRecords * kUnicodeRangeRecordSize + kHeaderSize > defaultUVSTableRemaining) {
+            return false;
+        }
+
+        for (uint32_t i = 0; i < numRecords; ++i) {
+            const size_t recordOffset = kHeaderSize + kUnicodeRangeRecordSize * i;
+            const uint32_t startCp = readU24(defaultUVSTable, recordOffset);
+            const uint8_t rangeLength = defaultUVSTable[recordOffset + 3];
+
+            // Then insert range from default UVS Table, but exclude if the base codepoint is not
+            // supported.
+            for (uint32_t cp = startCp; cp <= startCp + rangeLength; ++cp) {
+                // All codepoints in default UVS table should go to the glyphs of the codepoints
+                // without variation selectors. We need to check the default glyph availability and
+                // exclude the codepoint if it is not supported by defualt cmap table.
+                if (baseCoverage.get(cp)) {
+                    addRange(rangesFromDefaultUVSTable, cp, cp + 1 /* exclusive */);
+                }
+            }
+        }
+    }
+    *out_ranges = mergeRanges(rangesFromDefaultUVSTable, rangesFromNonDefaultUVSTable);
+    return true;
+}
+
+static void getCoverageFormat14(std::vector<std::unique_ptr<SparseBitSet>>* out,
+        const uint8_t* data, size_t size, const SparseBitSet& baseCoverage) {
+    constexpr size_t kHeaderSize = 10;
+    constexpr size_t kRecordSize = 11;
+    constexpr size_t kLengthOffset = 2;
+    constexpr size_t kNumRecordOffset = 6;
+
+    out->clear();
+    if (size < kHeaderSize) {
+        return;
+    }
+
+    const uint32_t length = readU32(data, kLengthOffset);
+    if (size < length) {
+        return;
+    }
+
+    uint32_t numRecords = readU32(data, kNumRecordOffset);
+    if (numRecords == 0 || kHeaderSize + kRecordSize * numRecords > length) {
+        return;
+    }
+
+    for (uint32_t i = 0; i < numRecords; ++i) {
+        // Insert from the largest code points since it determines the size of the output vector.
+        const uint32_t recordHeadOffset = kHeaderSize + kRecordSize * (numRecords - i - 1);
+        const uint32_t vsCodePoint = readU24(data, recordHeadOffset);
+        const uint32_t defaultUVSOffset = readU32(data, recordHeadOffset + 3);
+        const uint32_t nonDefaultUVSOffset = readU32(data, recordHeadOffset + 7);
+        if (defaultUVSOffset > length || nonDefaultUVSOffset > length) {
+            continue;
+        }
+
+        const uint16_t vsIndex = getVsIndex(vsCodePoint);
+        if (vsIndex == INVALID_VS_INDEX) {
+            continue;
+        }
+        std::vector<uint32_t> ranges;
+        if (!getVSCoverage(&ranges, data, length, defaultUVSOffset, nonDefaultUVSOffset,
+                baseCoverage)) {
+            continue;
+        }
+        if (out->size() < vsIndex + 1) {
+            out->resize(vsIndex + 1);
+        }
+        (*out)[vsIndex].reset(new SparseBitSet(ranges.data(), ranges.size() >> 1));
+    }
+
+    out->shrink_to_fit();
+}
+
 SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_size,
-        bool* has_cmap_format14_subtable) {
+        std::vector<std::unique_ptr<SparseBitSet>>* out) {
     constexpr size_t kHeaderSize = 4;
     constexpr size_t kNumTablesOffset = 2;
     constexpr size_t kTableSize = 8;
@@ -185,7 +410,7 @@ SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_siz
     constexpr size_t kEncodingIdOffset = 2;
     constexpr size_t kOffsetOffset = 4;
     constexpr size_t kFormatOffset = 0;
-    constexpr uint32_t kInvalidOffset = UINT32_MAX;
+    constexpr uint32_t kNoTable = UINT32_MAX;
 
     if (kHeaderSize > cmap_size) {
         return SparseBitSet();
@@ -195,10 +420,10 @@ SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_siz
         return SparseBitSet();
     }
 
-    uint32_t bestTableOffset = kInvalidOffset;
+    uint32_t bestTableOffset = kNoTable;
     uint16_t bestTableFormat = 0;
     uint8_t bestTablePriority = kLowestPriority;
-    *has_cmap_format14_subtable = false;
+    uint32_t vsTableOffset = kNoTable;
     for (uint32_t i = 0; i < numTables; ++i) {
         const uint32_t tableHeadOffset = kHeaderSize + i * kTableSize;
         const uint16_t platformId = readU16(cmap_data, tableHeadOffset + kPlatformIdOffset);
@@ -211,8 +436,8 @@ SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_siz
         const uint16_t format = readU16(cmap_data, offset + kFormatOffset);
 
         if (platformId == 0 /* Unicode */ && encodingId == 5 /* Variation Sequences */) {
-            if (!(*has_cmap_format14_subtable) && format == 14) {
-                *has_cmap_format14_subtable = true;
+            if (vsTableOffset == kNoTable && format == 14) {
+                vsTableOffset = offset;
             } else {
                 // Ignore the (0, 5) table if we have already seen another valid one or it's in a
                 // format we don't understand.
@@ -259,30 +484,37 @@ SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_siz
                 bestTableFormat = format;
             }
         }
-        if (*has_cmap_format14_subtable && bestTablePriority == 0 /* highest priority */) {
+        if (vsTableOffset != kNoTable && bestTablePriority == 0 /* highest priority */) {
             // Already found the highest priority table and variation sequences table. No need to
             // look at remaining tables.
             break;
         }
     }
-    if (bestTableOffset == kInvalidOffset) {
-        return SparseBitSet();
-    }
-    const uint8_t* tableData = cmap_data + bestTableOffset;
-    const size_t tableSize = cmap_size - bestTableOffset;
-    vector<uint32_t> coverageVec;
-    bool success;
-    if (bestTableFormat == 4) {
-        success = getCoverageFormat4(coverageVec, tableData, tableSize);
-    } else {
-        success = getCoverageFormat12(coverageVec, tableData, tableSize);
-    }
-    if (success) {
-        return SparseBitSet(&coverageVec.front(), coverageVec.size() >> 1);
-    } else {
-        return SparseBitSet();
+
+    SparseBitSet coverage;
+
+    if (bestTableOffset != kNoTable) {
+        const uint8_t* tableData = cmap_data + bestTableOffset;
+        const size_t tableSize = cmap_size - bestTableOffset;
+        bool success;
+        vector<uint32_t> coverageVec;
+        if (bestTableFormat == 4) {
+            success = getCoverageFormat4(coverageVec, tableData, tableSize);
+        } else {
+            success = getCoverageFormat12(coverageVec, tableData, tableSize);
+        }
+
+        if (success) {
+            coverage = SparseBitSet(&coverageVec.front(), coverageVec.size() >> 1);
+        }
     }
 
+    if (vsTableOffset != kNoTable) {
+        const uint8_t* tableData = cmap_data + vsTableOffset;
+        const size_t tableSize = cmap_size - vsTableOffset;
+        getCoverageFormat14(out, tableData, tableSize, coverage);
+    }
+    return coverage;
 }
 
 }  // namespace minikin
