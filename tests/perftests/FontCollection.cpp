@@ -78,7 +78,7 @@ static void BM_FontCollection_itemize(benchmark::State& state) {
             getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
 
     size_t testIndex = state.range(0);
-    state.SetLabel("Itemize: " + ITEMIZE_TEST_CASES[testIndex].labelText);
+    state.SetLabel(("Itemize: " + ITEMIZE_TEST_CASES[testIndex].labelText).c_str());
 
     uint16_t buffer[64];
     size_t utf16_length = 0;
