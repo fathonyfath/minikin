@@ -54,6 +54,14 @@ cc_library {
             ],
             // TODO: clean up Minikin so it doesn't need the freetype include
             export_shared_lib_headers: ["libft2"],
+
+            sanitize: {
+                misc_undefined: [
+                    "signed-integer-overflow",
+                    // b/26432628.
+                    //"unsigned-integer-overflow",
+                ],
+            },
         },
     },
     cppflags: [
@@ -76,11 +84,4 @@ cc_library {
     export_shared_lib_headers: ["libicuuc"],
 
     clang: true,
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-            // b/26432628.
-            //"unsigned-integer-overflow",
-        ],
-    },
 }
