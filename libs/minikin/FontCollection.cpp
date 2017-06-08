@@ -296,16 +296,18 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
     return vs == 0 ? mFamilies[mFamilyVec[bestFamilyIndex]] : mFamilies[bestFamilyIndex];
 }
 
-const uint32_t NBSP = 0x00A0;
-const uint32_t SOFT_HYPHEN = 0x00AD;
-const uint32_t ZWJ = 0x200C;
-const uint32_t ZWNJ = 0x200D;
-const uint32_t HYPHEN = 0x2010;
-const uint32_t NB_HYPHEN = 0x2011;
-const uint32_t NNBSP = 0x202F;
-const uint32_t FEMALE_SIGN = 0x2640;
-const uint32_t MALE_SIGN = 0x2642;
-const uint32_t STAFF_OF_AESCULAPIUS = 0x2695;
+constexpr uint32_t NBSP = 0x00A0;
+constexpr uint32_t SOFT_HYPHEN = 0x00AD;
+constexpr uint32_t ZWJ = 0x200C;
+constexpr uint32_t ZWNJ = 0x200D;
+constexpr uint32_t HYPHEN = 0x2010;
+constexpr uint32_t NB_HYPHEN = 0x2011;
+constexpr uint32_t NNBSP = 0x202F;
+constexpr uint32_t FEMALE_SIGN = 0x2640;
+constexpr uint32_t MALE_SIGN = 0x2642;
+constexpr uint32_t STAFF_OF_AESCULAPIUS = 0x2695;
+constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
+
 
 // Characters where we want to continue using existing font run instead of
 // recomputing the best match in the fallback list.
@@ -373,6 +375,9 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, FontSty
     size_t nextUtf16Pos = 0;
     size_t readLength = 0;
     U16_NEXT(string, readLength, string_size, nextCh);
+    if (U_IS_SURROGATE(nextCh)) {
+        nextCh = REPLACEMENT_CHARACTER;
+    }
 
     do {
         const uint32_t ch = nextCh;
@@ -380,6 +385,9 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, FontSty
         nextUtf16Pos = readLength;
         if (readLength < string_size) {
             U16_NEXT(string, readLength, string_size, nextCh);
+            if (U_IS_SURROGATE(nextCh)) {
+                nextCh = REPLACEMENT_CHARACTER;
+            }
         } else {
             nextCh = kEndOfString;
         }
