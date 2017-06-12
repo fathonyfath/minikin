@@ -691,6 +691,73 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
     EXPECT_EQ(kVSTestFont, getFontPath(runs[0]));
 }
 
+TEST_F(FontCollectionItemizeTest, itemize_format_chars) {
+    std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
+    std::vector<FontCollection::Run> runs;
+
+    const FontStyle kDefaultFontStyle;
+
+    itemize(collection, "'a' U+061C 'b'", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(3, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "'a' U+200D 'b'", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(3, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+3042 U+061C U+3042", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(3, runs[0].end);
+    EXPECT_EQ(kJAFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+061C 'b'", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(2, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+061C U+3042", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(2, runs[0].end);
+    EXPECT_EQ(kJAFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+061C", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(1, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+061C U+061C U+061C", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(3, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+200D U+20E3", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(2, runs[0].end);
+    EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+200D", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(1, runs[0].end);
+    EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
+
+    itemize(collection, "U+20E3", kDefaultFontStyle, &runs);
+    ASSERT_EQ(1U, runs.size());
+    EXPECT_EQ(0, runs[0].start);
+    EXPECT_EQ(1, runs[0].end);
+    EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
+}
+
 TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
     struct TestCase {
         std::string userPreferredLanguages;
