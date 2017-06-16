@@ -51,6 +51,7 @@ cc_test {
         "GraphemeBreakTests.cpp",
         "LayoutTest.cpp",
         "LayoutUtilsTest.cpp",
+        "LineBreakerTest.cpp",
         "MeasurementTests.cpp",
         "SparseBitSetTest.cpp",
         "UnicodeUtilsTest.cpp",
