@@ -37,15 +37,25 @@ static uint32_t readU32(const uint8_t* data, size_t offset) {
         ((uint32_t)data[offset + 2]) << 8 | ((uint32_t)data[offset + 3]);
 }
 
-static void addRange(vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
+// The start must be larger than or equal to coverage.back() if coverage is not empty.
+// Returns true if the range is appended. Otherwise returns false as an error.
+static bool addRange(vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
 #ifdef VERBOSE_DEBUG
     ALOGD("adding range %d-%d\n", start, end);
 #endif
     if (coverage.empty() || coverage.back() < start) {
         coverage.push_back(start);
         coverage.push_back(end);
-    } else {
+        return true;
+    } else if (coverage.back() == start) {
         coverage.back() = end;
+        return true;
+    } else {
+        // Reject unordered range input since SparseBitSet assumes that the given range vector is
+        // sorted. OpenType specification says cmap entries are sorted in order of code point
+        // values, thus for OpenType compliant font files, we don't reach here.
+        android_errorWriteLog(0x534e4554, "32178311");
+        return false;
     }
 }
 
@@ -74,11 +84,15 @@ static bool getCoverageFormat4(vector<uint32_t>& coverage, const uint8_t* data, 
         if (rangeOffset == 0) {
             uint32_t delta = readU16(data, kHeaderSize + 2 * (2 * segCount + i));
             if (((end + delta) & 0xffff) > end - start) {
-                addRange(coverage, start, end + 1);
+                if (!addRange(coverage, start, end + 1)) {
+                    return false;
+                }
             } else {
                 for (uint32_t j = start; j < end + 1; j++) {
                     if (((j + delta) & 0xffff) != 0) {
-                        addRange(coverage, j, j + 1);
+                        if (!addRange(coverage, j, j + 1)) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -92,7 +106,9 @@ static bool getCoverageFormat4(vector<uint32_t>& coverage, const uint8_t* data, 
                 }
                 uint32_t glyphId = readU16(data, actualRangeOffset);
                 if (glyphId != 0) {
-                    addRange(coverage, j, j + 1);
+                    if (!addRange(coverage, j, j + 1)) {
+                        return false;
+                    }
                 }
             }
         }
@@ -126,7 +142,9 @@ static bool getCoverageFormat12(vector<uint32_t>& coverage, const uint8_t* data,
             android_errorWriteLog(0x534e4554, "26413177");
             return false;
         }
-        addRange(coverage, start, end + 1);  // file is inclusive, vector is exclusive
+        if (!addRange(coverage, start, end + 1)) {  // file is inclusive, vector is exclusive
+            return false;
+        }
     }
     return true;
 }
