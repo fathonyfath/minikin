@@ -400,7 +400,6 @@ void LineBreaker::computeBreaksOptimal(bool isRectangle) {
     size_t active = 0;
     size_t nCand = mCandidates.size();
     float width = mLineWidths.getLineWidth(0);
-    float shortLineFactor = mJustified ? 0.75f : 0.5f;
     float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth() : 0.0f;
 
     // "i" iterates through candidates for the end of the line.
@@ -447,9 +446,6 @@ void LineBreaker::computeBreaksOptimal(bool isRectangle) {
             } else if (atEnd && mStrategy != kBreakStrategy_Balanced) {
                 // increase penalty for hyphen on last line
                 additionalPenalty = LAST_LINE_PENALTY_MULTIPLIER * mCandidates[j].penalty;
-                // Penalize very short (< 1 - shortLineFactor of total width) lines.
-                float underfill = delta - shortLineFactor * width;
-                widthScore = underfill > 0 ? underfill * underfill : 0;
             } else {
                 widthScore = delta * delta;
                 if (delta < 0) {
