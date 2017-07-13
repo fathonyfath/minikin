@@ -121,7 +121,7 @@ int runMinikinTest() {
     MinikinPaint minikinPaint;
     minikinPaint.size = 32;
     icu::UnicodeString icuText = icu::UnicodeString::fromUTF8(text);
-    layout.doLayout(icuText.getBuffer(), 0, icuText.length(), icuText.length(), bidiFlags, fontStyle, minikinPaint);
+    layout.doLayout(reinterpret_cast<const uint16_t*>(icuText.getBuffer()), 0, icuText.length(), icuText.length(), bidiFlags, fontStyle, minikinPaint);
     layout.dump();
 
     SkAutoGraphics ag;

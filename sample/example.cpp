@@ -89,7 +89,7 @@ int runMinikinTest() {
     MinikinPaint paint;
     paint.size = 32;
     icu::UnicodeString icuText = icu::UnicodeString::fromUTF8(text);
-    layout.doLayout(icuText.getBuffer(), 0, icuText.length(), icuText.length(), bidiFlags, fontStyle, paint);
+    layout.doLayout(reinterpret_cast<const uint16_t*>(icuText.getBuffer()), 0, icuText.length(), icuText.length(), bidiFlags, fontStyle, paint);
     layout.dump();
     Bitmap bitmap(250, 50);
     layout.draw(&bitmap, 10, 40, 32);
