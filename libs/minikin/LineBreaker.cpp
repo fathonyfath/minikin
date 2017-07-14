@@ -30,7 +30,8 @@ using std::vector;
 
 namespace minikin {
 
-const int CHAR_TAB = 0x0009;
+constexpr uint16_t CHAR_TAB = 0x0009;
+constexpr uint16_t CHAR_NBSP = 0x00A0;
 
 // Large scores in a hierarchy; we prefer desperate breaks to an overfull line. All these
 // constants are larger than any reasonable actual width score.
@@ -135,6 +136,45 @@ static bool isLineEndSpace(uint16_t c) {
             c == 0x205F || c == 0x3000;
 }
 
+// Hyphenates a string potentially containing non-breaking spaces. The result would be saved
+// in mHyphBuf.
+void LineBreaker::hyphenate(const uint16_t* str, size_t len) {
+    mHyphBuf.clear();
+    mHyphBuf.reserve(len);
+
+    // A word here is any consecutive string of non-NBSP characters.
+    bool inWord = false;
+    size_t wordStart = 0; // The initial value will never be accessed, but just in case.
+    for (size_t i = 0; i <= len; i++) {
+        if (i == len || str[i] == CHAR_NBSP) {
+            if (inWord) {
+                // A word just ended. Hyphenate it.
+                const size_t wordLen = i - wordStart;
+                if (wordLen <= LONGEST_HYPHENATED_WORD) {
+                    if (wordStart == 0) {
+                        // The string starts with a word. Use mHyphBuf directly.
+                        mHyphenator->hyphenate(&mHyphBuf, str, wordLen, mLocale);
+                    } else {
+                        std::vector<HyphenationType> wordVec;
+                        mHyphenator->hyphenate(&wordVec, str + wordStart, wordLen, mLocale);
+                        mHyphBuf.insert(mHyphBuf.end(), wordVec.cbegin(), wordVec.cend());
+                    }
+                } else { // Word is too long. Inefficient to hyphenate.
+                    mHyphBuf.insert(mHyphBuf.end(), wordLen, HyphenationType::DONT_BREAK);
+                }
+                inWord = false;
+            }
+            if (i < len) {
+                // Insert one DONT_BREAK for the NBSP.
+                mHyphBuf.push_back(HyphenationType::DONT_BREAK);
+            }
+        } else if (!inWord) {
+            inWord = true;
+            wordStart = i;
+        }
+    }
+}
+
 // Ordinarily, this method measures the text in the range given. However, when paint
 // is nullptr, it assumes the widths have already been calculated and stored in the
 // width buffer.
@@ -195,12 +235,8 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             size_t wordEnd = mWordBreaker.wordEnd();
             if (paint != nullptr && mHyphenator != nullptr &&
                     mHyphenationFrequency != kHyphenationFrequency_None &&
-                    wordStart >= start && wordEnd > wordStart &&
-                    wordEnd - wordStart <= LONGEST_HYPHENATED_WORD) {
-                mHyphenator->hyphenate(&mHyphBuf,
-                        &mTextBuf[wordStart],
-                        wordEnd - wordStart,
-                        mLocale);
+                    wordStart >= start && wordEnd > wordStart) {
+                hyphenate(&mTextBuf[wordStart], wordEnd - wordStart);
 #if VERBOSE_DEBUG
                 std::string hyphenatedString;
                 for (size_t j = wordStart; j < wordEnd; j++) {

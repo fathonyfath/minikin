@@ -35,7 +35,7 @@ bool isWordSpace(uint16_t code_unit) {
  * heuristic, but should be accurate most of the time.
  */
 static bool isWordBreakAfter(uint16_t c) {
-    if (isWordSpace(c) || (c >= 0x2000 && c <= 0x200a) || c == 0x3000) {
+    if (c == ' ' || (0x2000 <= c && c <= 0x200A) || c == 0x3000) {
         // spaces
         return true;
     }
@@ -45,7 +45,7 @@ static bool isWordBreakAfter(uint16_t c) {
 
 static bool isWordBreakBefore(uint16_t c) {
     // CJK ideographs (and yijing hexagram symbols)
-    return isWordBreakAfter(c) || (c >= 0x3400 && c <= 0x9fff);
+    return isWordBreakAfter(c) || (0x3400 <= c && c <= 0x9FFF);
 }
 
 /**

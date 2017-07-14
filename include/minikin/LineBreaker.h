@@ -215,6 +215,8 @@ class LineBreaker {
         // push an actual break to the output. Takes care of setting flags for tab
         void pushBreak(int offset, float width, uint8_t hyphenEdit);
 
+        void hyphenate(const uint16_t* word, size_t len);
+
         float getSpaceWidth() const;
 
         void computeBreaksGreedy();
