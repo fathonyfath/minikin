@@ -422,6 +422,23 @@ TEST_F(LayoutTest, hyphenationTest) {
     }
 }
 
+TEST_F(LayoutTest, verticalExtentTest) {
+    MinikinPaint paint;
+
+    std::vector<uint16_t> text = utf8ToUtf16("ab");
+
+    Layout layout;
+    layout.doLayout(text.data(), 0, text.size(), text.size(), kBidi_LTR, FontStyle(), paint,
+            mCollection);
+    MinikinExtent extents[text.size()];
+    layout.getExtents(extents);
+    for (size_t i = 0; i < text.size(); i++) {
+        EXPECT_EQ(-10.0f, extents[i].ascent);
+        EXPECT_EQ(20.0f, extents[i].descent);
+        EXPECT_EQ(0.0f, extents[i].line_gap);
+    }
+}
+
 // TODO: Add more test cases, e.g. measure text, letter spacing.
 
 }  // namespace minikin
