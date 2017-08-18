@@ -532,8 +532,13 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
     if (!U_SUCCESS(status) || rc < 0) {
         ALOGW("error counting bidi runs, status = %d", status);
     }
-    if (!U_SUCCESS(status) || rc <= 1) {
+    if (!U_SUCCESS(status) || rc <= 0) {
         mIsRtl = (paraDir == kBidi_RTL);
+        return;
+    }
+    if (rc == 1) {
+        const UBiDiDirection runDir = ubidi_getVisualRun(mBidi, 0, nullptr, nullptr);
+        mIsRtl = (runDir == UBIDI_RTL);
         return;
     }
     mRunCount = rc;
