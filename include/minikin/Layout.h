@@ -59,7 +59,7 @@ enum {
 class Layout {
 public:
 
-    Layout() : mGlyphs(), mAdvances(), mFaces(), mAdvance(0), mBounds() {
+    Layout() : mGlyphs(), mAdvances(), mExtents(), mFaces(), mAdvance(0), mBounds() {
         mBounds.setEmpty();
     }
 
@@ -77,7 +77,8 @@ public:
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
-        const std::shared_ptr<FontCollection>& collection, float* advances);
+        const std::shared_ptr<FontCollection>& collection, float* advances,
+        MinikinExtent* extents);
 
     // public accessors
     size_t nGlyphs() const;
@@ -92,6 +93,10 @@ public:
     // Get advances, copying into caller-provided buffer. The size of this
     // buffer must match the length of the string (count arg to doLayout).
     void getAdvances(float* advances);
+
+    // Get vertical extents, copying into caller-provided buffer. The size of this
+    // buffer must match the length of the string (count arg to doLayout).
+    void getExtents(MinikinExtent* extents);
 
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
@@ -116,12 +121,14 @@ private:
     // When advances is not null, measurement results will be stored in the array.
     static float doLayoutRunCached(const uint16_t* buf, size_t runStart, size_t runLength,
         size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
-        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances);
+        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
+        MinikinExtent* extents);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, size_t bufStart,
-        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances);
+        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
+        MinikinExtent* extents);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
@@ -132,6 +139,7 @@ private:
 
     std::vector<LayoutGlyph> mGlyphs;
     std::vector<float> mAdvances;
+    std::vector<MinikinExtent> mExtents;
 
     std::vector<FakedFont> mFaces;
     float mAdvance;
