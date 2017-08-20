@@ -36,6 +36,7 @@ public:
     float GetHorizontalAdvance(uint32_t glyph_id, const MinikinPaint &paint) const;
     void GetBounds(MinikinRect* bounds, uint32_t glyph_id,
             const MinikinPaint& paint) const;
+    void GetFontExtent(MinikinExtent* extent, const MinikinPaint &paint) const;
 
     const std::string& fontPath() const { return mFontPath; }
 

@@ -121,6 +121,7 @@ class LineBreaker {
         void resize(size_t size) {
             mTextBuf.resize(size);
             mCharWidths.resize(size);
+            mCharExtents.resize(size);
         }
 
         size_t size() const {
@@ -133,6 +134,10 @@ class LineBreaker {
 
         float* charWidths() {
             return mCharWidths.data();
+        }
+
+        MinikinExtent* charExtents() {
+            return mCharExtents.data();
         }
 
         // set text to current contents of buffer
@@ -177,6 +182,14 @@ class LineBreaker {
             return mWidths.data();
         }
 
+        const float* getAscents() const {
+            return mAscents.data();
+        }
+
+        const float* getDescents() const {
+            return mDescents.data();
+        }
+
         const int* getFlags() const {
             return mFlags.data();
         }
@@ -201,19 +214,23 @@ class LineBreaker {
             size_t lineNumber;  // only updated for non-constant line widths
             size_t preSpaceCount;  // preceding space count before breaking
             size_t postSpaceCount;  // preceding space count after breaking
+            MinikinExtent extent; // the largest extent between last candidate and this candidate
             HyphenationType hyphenType;
         };
 
         float currentLineWidth() const;
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
-                size_t preSpaceCount, size_t postSpaceCount, float penalty, HyphenationType hyph);
+                size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
+                float penalty, HyphenationType hyph);
 
         void addCandidate(Candidate cand);
         void pushGreedyBreak();
 
+        MinikinExtent computeMaxExtent(size_t start, size_t end) const;
+
         // push an actual break to the output. Takes care of setting flags for tab
-        void pushBreak(int offset, float width, uint8_t hyphenEdit);
+        void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
 
         void hyphenate(const uint16_t* word, size_t len);
 
@@ -227,8 +244,9 @@ class LineBreaker {
 
         WordBreaker mWordBreaker;
         icu::Locale mLocale;
-        std::vector<uint16_t>mTextBuf;
-        std::vector<float>mCharWidths;
+        std::vector<uint16_t> mTextBuf;
+        std::vector<float> mCharWidths;
+        std::vector<MinikinExtent> mCharExtents;
 
         Hyphenator* mHyphenator;
         std::vector<HyphenationType> mHyphBuf;
@@ -243,6 +261,8 @@ class LineBreaker {
         // result of line breaking
         std::vector<int> mBreaks;
         std::vector<float> mWidths;
+        std::vector<float> mAscents;
+        std::vector<float> mDescents;
         std::vector<int> mFlags;
 
         ParaWidth mWidth = 0;

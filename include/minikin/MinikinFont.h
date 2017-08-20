@@ -81,6 +81,25 @@ struct MinikinRect {
     void join(const MinikinRect& r);
 };
 
+// For holding vertical extents.
+struct MinikinExtent {
+    float ascent = 0.0; // negative
+    float descent = 0.0; // positive
+    float line_gap = 0.0; // positive
+
+    void reset() {
+        ascent = 0.0;
+        descent = 0.0;
+        line_gap = 0.0;
+    }
+
+    void extendBy(const MinikinExtent& e) {
+        ascent = std::min(ascent, e.ascent);
+        descent = std::max(descent, e.descent);
+        line_gap = std::max(line_gap, e.line_gap);
+    }
+};
+
 // Callback for freeing data
 typedef void (*MinikinDestroyFunc) (void* data);
 
@@ -95,6 +114,8 @@ public:
 
     virtual void GetBounds(MinikinRect* bounds, uint32_t glyph_id,
         const MinikinPaint &paint) const = 0;
+
+    virtual void GetFontExtent(MinikinExtent* extent, const MinikinPaint &paint) const = 0;
 
     // Override if font can provide access to raw data
     virtual const void* GetFontData() const {
