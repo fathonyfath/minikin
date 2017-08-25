@@ -339,6 +339,10 @@ static bool isStickyWhitelisted(uint32_t c) {
     return false;
 }
 
+static inline bool isCombining(uint32_t c) {
+    return (U_GET_GC_MASK(c) & U_GC_M_MASK) != 0;
+}
+
 bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
         uint32_t variationSelector) const {
     if (!isVariationSelector(variationSelector)) {
@@ -415,7 +419,7 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, FontSty
         if (doesNotNeedFontSupport(ch)) {
             // Always continue if the character is a format character not needed to be in the font.
             shouldContinueRun = true;
-        } else if (lastFamily != nullptr && isStickyWhitelisted(ch)) {
+        } else if (lastFamily != nullptr && (isStickyWhitelisted(ch) || isCombining(ch))) {
             // Continue using existing font as long as it has coverage and is whitelisted.
             shouldContinueRun = lastFamily->getCoverage().get(ch);
         }
@@ -431,8 +435,7 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, FontSty
                 // character to the new run. U+20E3 COMBINING ENCLOSING KEYCAP, used in emoji, is
                 // handled properly by this since it's a combining mark too.
                 if (utf16Pos != 0 &&
-                        ((U_GET_GC_MASK(ch) & U_GC_M_MASK) != 0 ||
-                         (isEmojiModifier(ch) && isEmojiBase(prevCh))) &&
+                        (isCombining(ch) || (isEmojiModifier(ch) && isEmojiBase(prevCh))) &&
                         family != nullptr && family->getCoverage().get(prevCh)) {
                     const size_t prevChLength = U16_LENGTH(prevCh);
                     if (run != nullptr) {
