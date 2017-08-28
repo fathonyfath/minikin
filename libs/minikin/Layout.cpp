@@ -124,7 +124,7 @@ private:
 
 class LayoutCache : private android::OnEntryRemoved<LayoutCacheKey, Layout*> {
 public:
-    LayoutCache() : mCache(kMaxEntries) {
+    LayoutCache() : mCache(kMaxEntries), mRequestCount(0), mCacheHitCount(0) {
         mCache.setOnEntryRemovedListener(this);
     }
 
@@ -135,13 +135,23 @@ public:
     Layout* get(LayoutCacheKey& key, LayoutContext* ctx,
             const std::shared_ptr<FontCollection>& collection) {
         Layout* layout = mCache.get(key);
+        mRequestCount++;
         if (layout == NULL) {
             key.copyText();
             layout = new Layout();
             key.doLayout(layout, ctx, collection);
             mCache.put(key, layout);
+        } else {
+            mCacheHitCount++;
         }
         return layout;
+    }
+
+    void dumpStats(int fd) {
+        dprintf(fd, "\nLayout Cache Info:\n");
+        dprintf(fd, "  Usage: %zd/%zd entries\n", mCache.size(), kMaxEntries);
+        float ratio = (mRequestCount == 0) ? 0 : mCacheHitCount / (float) mRequestCount;
+        dprintf(fd, "  Hit ratio: %d/%d (%f)\n", mCacheHitCount, mRequestCount, ratio);
     }
 
 private:
@@ -152,6 +162,9 @@ private:
     }
 
     android::LruCache<LayoutCacheKey, Layout*> mCache;
+
+    int32_t mRequestCount;
+    int32_t mCacheHitCount;
 
     //static const size_t kMaxEntries = LruCache<LayoutCacheKey, Layout*>::kUnlimitedCapacity;
 
@@ -1126,6 +1139,11 @@ void Layout::purgeCaches() {
     LayoutCache& layoutCache = LayoutEngine::getInstance().layoutCache;
     layoutCache.clear();
     purgeHbFontCacheLocked();
+}
+
+void Layout::dumpMinikinStats(int fd) {
+    android::AutoMutex _l(gMinikinLock);
+    LayoutEngine::getInstance().layoutCache.dumpStats(fd);
 }
 
 }  // namespace minikin

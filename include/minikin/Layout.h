@@ -107,6 +107,9 @@ public:
     // Purge all caches, useful in low memory conditions
     static void purgeCaches();
 
+    // Dump minikin internal statistics, cache usage, cache hit ratio, etc.
+    static void dumpMinikinStats(int fd);
+
 private:
     friend class LayoutCacheKey;
 
