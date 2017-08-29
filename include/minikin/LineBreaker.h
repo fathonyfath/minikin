@@ -232,7 +232,8 @@ class LineBreaker {
         // push an actual break to the output. Takes care of setting flags for tab
         void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
 
-        void hyphenate(const uint16_t* word, size_t len);
+        // Hyphenates a string potentially containing non-breaking spaces.
+        std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
 
         float getSpaceWidth() const;
 
@@ -249,7 +250,6 @@ class LineBreaker {
         std::vector<MinikinExtent> mCharExtents;
 
         Hyphenator* mHyphenator;
-        std::vector<HyphenationType> mHyphBuf;
 
         // layout parameters
         BreakStrategy mStrategy = kBreakStrategy_Greedy;
