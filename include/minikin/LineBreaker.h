@@ -46,42 +46,6 @@ enum HyphenationFrequency {
     kHyphenationFrequency_Full = 2
 };
 
-// TODO: want to generalize to be able to handle array of line widths
-class LineWidths {
-    public:
-        void setWidths(float firstWidth, int firstWidthLineCount, float restWidth) {
-            mFirstWidth = firstWidth;
-            mFirstWidthLineCount = firstWidthLineCount;
-            mRestWidth = restWidth;
-        }
-        void setIndents(const std::vector<float>& indents) {
-            mIndents = indents;
-        }
-        bool isConstant() const {
-            // technically mFirstWidthLineCount == 0 would count too, but doesn't actually happen
-            return mRestWidth == mFirstWidth && mIndents.empty();
-        }
-        float getLineWidth(int line) const {
-            float width = (line < mFirstWidthLineCount) ? mFirstWidth : mRestWidth;
-            if (!mIndents.empty()) {
-                if ((size_t)line < mIndents.size()) {
-                    width -= mIndents[line];
-                } else {
-                    width -= mIndents.back();
-                }
-            }
-            return width;
-        }
-        void clear() {
-            mIndents.clear();
-        }
-    private:
-        float mFirstWidth;
-        int mFirstWidthLineCount;
-        float mRestWidth;
-        std::vector<float> mIndents;
-};
-
 class TabStops {
     public:
         void set(const int* stops, size_t nStops, int tabWidth) {
@@ -107,6 +71,17 @@ class TabStops {
 
 class LineBreaker {
     public:
+        // Implement this for the additional information during line breaking.
+        class LineWidthDelegate {
+            public:
+                virtual ~LineWidthDelegate() {}
+
+                // Called to find out the width for the line.
+                // This function may be called several times. The implementation must return the
+                // same value for the same input.
+                virtual float getLineWidth(size_t lineNo) = 0;
+        };
+
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
         // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
@@ -140,12 +115,12 @@ class LineBreaker {
             return mCharExtents.data();
         }
 
+        void setLineWidthDelegate(std::unique_ptr<LineWidthDelegate>&& lineWidths) {
+            mLineWidthDelegate = std::move(lineWidths);
+        }
+
         // set text to current contents of buffer
         void setText();
-
-        void setLineWidths(float firstWidth, int firstWidthLineCount, float restWidth);
-
-        void setIndents(const std::vector<float>& indents);
 
         void setTabStops(const int* stops, size_t nStops, int tabWidth) {
             mTabStops.set(stops, nStops, tabWidth);
@@ -211,7 +186,6 @@ class LineBreaker {
             ParaWidth postBreak;  // width of text until this point, if we decide to break here
             float penalty;  // penalty of this break (for example, hyphen penalty)
             float score;  // best score found for this break
-            size_t lineNumber;  // only updated for non-constant line widths
             size_t preSpaceCount;  // preceding space count before breaking
             size_t postSpaceCount;  // preceding space count after breaking
             MinikinExtent extent; // the largest extent between last candidate and this candidate
@@ -238,7 +212,7 @@ class LineBreaker {
 
         void computeBreaksGreedy();
 
-        void computeBreaksOptimal(bool isRectangular);
+        void computeBreaksOptimal();
 
         void finishBreaksOptimal();
 
@@ -255,7 +229,6 @@ class LineBreaker {
         BreakStrategy mStrategy = kBreakStrategy_Greedy;
         HyphenationFrequency mHyphenationFrequency = kHyphenationFrequency_Normal;
         bool mJustified;
-        LineWidths mLineWidths;
         TabStops mTabStops;
 
         // result of line breaking
@@ -277,6 +250,8 @@ class LineBreaker {
         uint32_t mLastHyphenation;  // hyphen edit of last break kept for next line
         int mFirstTabIndex;
         size_t mSpaceCount;
+
+        std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
 
         FRIEND_TEST(LineBreakerTest, setLocales);
 };

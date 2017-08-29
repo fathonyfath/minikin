@@ -103,7 +103,7 @@ void LineBreaker::setText() {
     mWordBreaker.next();
     mCandidates.clear();
     Candidate cand = {
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
+            0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
     mCandidates.push_back(cand);
 
     // reset greedy breaker state
@@ -119,15 +119,6 @@ void LineBreaker::setText() {
     mLastHyphenation = HyphenEdit::NO_EDIT;
     mFirstTabIndex = INT_MAX;
     mSpaceCount = 0;
-}
-
-void LineBreaker::setLineWidths(float firstWidth, int firstWidthLineCount, float restWidth) {
-    mLineWidths.setWidths(firstWidth, firstWidthLineCount, restWidth);
-}
-
-
-void LineBreaker::setIndents(const std::vector<float>& indents) {
-    mLineWidths.setIndents(indents);
 }
 
 // This function determines whether a character is a space that disappears at end of line.
@@ -195,7 +186,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
                 style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start);
 
         // a heuristic that seems to perform well
-        hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidths.getLineWidth(0);
+        hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidthDelegate->getLineWidth(0);
         if (mHyphenationFrequency == kHyphenationFrequency_Normal) {
             hyphenPenalty *= 4.0; // TODO: Replace with a better value after some testing
         }
@@ -446,7 +437,7 @@ float LineBreaker::getSpaceWidth() const {
 }
 
 float LineBreaker::currentLineWidth() const {
-    return mLineWidths.getLineWidth(mBreaks.size());
+    return mLineWidthDelegate->getLineWidth(mBreaks.size());
 }
 
 void LineBreaker::computeBreaksGreedy() {
@@ -492,39 +483,38 @@ void LineBreaker::finishBreaksOptimal() {
     std::reverse(mFlags.begin(), mFlags.end());
 }
 
-void LineBreaker::computeBreaksOptimal(bool isRectangle) {
+void LineBreaker::computeBreaksOptimal() {
     size_t active = 0;
     size_t nCand = mCandidates.size();
-    float width = mLineWidths.getLineWidth(0);
+    float width = mLineWidthDelegate->getLineWidth(0);
     float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth() : 0.0f;
+    std::vector<size_t> lineNumbers;
+    lineNumbers.reserve(nCand);
+    lineNumbers.push_back(0);  // The first candidate is always at the first line.
 
     // "i" iterates through candidates for the end of the line.
     for (size_t i = 1; i < nCand; i++) {
         bool atEnd = i == nCand - 1;
         float best = SCORE_INFTY;
         size_t bestPrev = 0;
-        size_t lineNumberLast = 0;
 
-        if (!isRectangle) {
-            size_t lineNumberLast = mCandidates[active].lineNumber;
-            width = mLineWidths.getLineWidth(lineNumberLast);
-        }
+        size_t lineNumberLast = lineNumbers[active];
+        width = mLineWidthDelegate->getLineWidth(lineNumberLast);
+
         ParaWidth leftEdge = mCandidates[i].postBreak - width;
         float bestHope = 0;
 
         // "j" iterates through candidates for the beginning of the line.
         for (size_t j = active; j < i; j++) {
-            if (!isRectangle) {
-                size_t lineNumber = mCandidates[j].lineNumber;
-                if (lineNumber != lineNumberLast) {
-                    float widthNew = mLineWidths.getLineWidth(lineNumber);
-                    if (widthNew != width) {
-                        leftEdge = mCandidates[i].postBreak - width;
-                        bestHope = 0;
-                        width = widthNew;
-                    }
-                    lineNumberLast = lineNumber;
+            size_t lineNumber = lineNumbers[j];
+            if (lineNumber != lineNumberLast) {
+                float widthNew = mLineWidthDelegate->getLineWidth(lineNumber);
+                if (widthNew != width) {
+                    leftEdge = mCandidates[i].postBreak - width;
+                    bestHope = 0;
+                    width = widthNew;
                 }
+                lineNumberLast = lineNumber;
             }
             float jScore = mCandidates[j].score;
             if (jScore + bestHope >= best) continue;
@@ -568,7 +558,7 @@ void LineBreaker::computeBreaksOptimal(bool isRectangle) {
         }
         mCandidates[i].score = best + mCandidates[i].penalty + mLinePenalty;
         mCandidates[i].prev = bestPrev;
-        mCandidates[i].lineNumber = mCandidates[bestPrev].lineNumber + 1;
+        lineNumbers.push_back(lineNumbers[bestPrev] + 1);
 #if VERBOSE_DEBUG
         ALOGD("break %zd: score=%g, prev=%zd", i, mCandidates[i].score, mCandidates[i].prev);
 #endif
@@ -580,7 +570,7 @@ size_t LineBreaker::computeBreaks() {
     if (mStrategy == kBreakStrategy_Greedy) {
         computeBreaksGreedy();
     } else {
-        computeBreaksOptimal(mLineWidths.isConstant());
+        computeBreaksOptimal();
     }
     return mBreaks.size();
 }
@@ -588,7 +578,6 @@ size_t LineBreaker::computeBreaks() {
 void LineBreaker::finish() {
     mWordBreaker.finish();
     mWidth = 0;
-    mLineWidths.clear();
     mCandidates.clear();
     mBreaks.clear();
     mWidths.clear();
@@ -615,6 +604,7 @@ void LineBreaker::finish() {
     mHyphenationFrequency = kHyphenationFrequency_Normal;
     mLinePenalty = 0.0f;
     mJustified = false;
+    mLineWidthDelegate.reset();
 }
 
 }  // namespace minikin
