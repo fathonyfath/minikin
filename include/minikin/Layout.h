@@ -39,6 +39,12 @@ struct LayoutGlyph {
     float y;
 };
 
+struct LayoutOverhang {
+    // The amount of space needed to draw a glyph or glyph cluster beyond its advance box.
+    float left = 0.0;
+    float right = 0.0;
+};
+
 // Internal state used during layout operation
 struct LayoutContext;
 
@@ -59,7 +65,8 @@ enum {
 class Layout {
 public:
 
-    Layout() : mGlyphs(), mAdvances(), mExtents(), mFaces(), mAdvance(0), mBounds() {
+    Layout() : mGlyphs(), mAdvances(), mExtents(), mClusterBounds(), mFaces(), mAdvance(0),
+            mBounds() {
         mBounds.setEmpty();
     }
 
@@ -78,7 +85,7 @@ public:
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection, float* advances,
-        MinikinExtent* extents);
+        MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // public accessors
     size_t nGlyphs() const;
@@ -94,9 +101,13 @@ public:
     // buffer must match the length of the string (count arg to doLayout).
     void getAdvances(float* advances);
 
-    // Get vertical extents, copying into caller-provided buffer. The size of this
-    // buffer must match the length of the string (count arg to doLayout).
+    // Get extents, copying into caller-provided buffer. The size of this buffer must match the
+    // length of the string (count arg to doLayout).
     void getExtents(MinikinExtent* extents);
+
+    // Get overhangs, copying into caller-provided buffer. The size of this buffer must match the
+    // length of the string (count arg to doLayout).
+    void getOverhangs(LayoutOverhang* overhangs);
 
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
@@ -125,13 +136,13 @@ private:
     static float doLayoutRunCached(const uint16_t* buf, size_t runStart, size_t runLength,
         size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
         const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
-        MinikinExtent* extents);
+        MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, size_t bufStart,
         const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
-        MinikinExtent* extents);
+        MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
@@ -141,8 +152,13 @@ private:
     void appendLayout(Layout* src, size_t start, float extraAdvance);
 
     std::vector<LayoutGlyph> mGlyphs;
+
+    // The following three vectors are defined per code unit, so their length is identical to the
+    // input text.
     std::vector<float> mAdvances;
     std::vector<MinikinExtent> mExtents;
+    std::vector<MinikinRect> mClusterBounds; // per-cluster bounds, without a shift based on
+                                             // previously-shaped text. Used to calculate overhangs.
 
     std::vector<FakedFont> mFaces;
     float mAdvance;

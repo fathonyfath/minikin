@@ -178,21 +178,22 @@ void LineBreaker::hyphenate(const uint16_t* str, size_t len) {
     }
 }
 
-// Ordinarily, this method measures the text in the range given. However, when paint
-// is nullptr, it assumes the character widths and extents have already been calculated and stored
-// in the mCharWidths and mCharExtents buffers.
+// Ordinarily, this method measures the text in the range given. However, when paint is nullptr, it
+// assumes the character widths and extents have already been calculated and stored in the
+// mCharWidths and mCharExtents buffers.
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addCandidate.
 float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
         FontStyle style, size_t start, size_t end, bool isRtl) {
     float width = 0.0f;
-    int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
+    const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {
         width = Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
-                style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start);
+                style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
+                nullptr);
 
         // a heuristic that seems to perform well
         hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidths.getLineWidth(0);
@@ -218,7 +219,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     size_t postSpaceCount = mSpaceCount;
     MinikinExtent extent = {0.0, 0.0, 0.0};
     for (size_t i = start; i < end; i++) {
-        uint16_t c = mTextBuf[i];
+        const uint16_t c = mTextBuf[i];
         if (c == CHAR_TAB) {
             mWidth = mPreBreak + mTabStops.nextTab(mWidth - mPreBreak);
             if (mFirstTabIndex == INT_MAX) {
@@ -237,8 +238,8 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             }
         }
         if (i + 1 == current) {
-            size_t wordStart = mWordBreaker.wordStart();
-            size_t wordEnd = mWordBreaker.wordEnd();
+            const size_t wordStart = mWordBreaker.wordStart();
+            const size_t wordEnd = mWordBreaker.wordEnd();
             if (paint != nullptr && mHyphenator != nullptr &&
                     mHyphenationFrequency != kHyphenationFrequency_None &&
                     wordStart >= start && wordEnd > wordStart) {
@@ -262,13 +263,14 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
                         paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
                         const float firstPartWidth = Layout::measureText(mTextBuf.data(),
                                 lastBreak, j - lastBreak, mTextBuf.size(), bidiFlags, style,
-                                *paint, typeface, nullptr, nullptr /* extent */);
+                                *paint, typeface, nullptr, nullptr /* extent */,
+                                nullptr /* overhangs */);
                         ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
 
                         paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
                         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j,
                                 afterWord - j, mTextBuf.size(), bidiFlags, style, *paint,
-                                typeface, nullptr, nullptr /* extent */);
+                                typeface, nullptr, nullptr /* extent */, nullptr /* overhangs */);
                         ParaWidth hyphPreBreak = postBreak - secondPartWidth;
 
                         addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount, postSpaceCount,
@@ -375,8 +377,8 @@ void LineBreaker::addCandidate(Candidate cand) {
     mCandidates.push_back(cand);
 
     // mLastBreak is the index of the last line break we decided to do in mCandidates,
-    // and mPreBreak is its preBreak value. mBestBreak is the index of the best line breaking candidate
-    // we have found since then, and mBestScore is its penalty.
+    // and mPreBreak is its preBreak value. mBestBreak is the index of the best line breaking
+    // candidate we have found since then, and mBestScore is its penalty.
     if (cand.postBreak - mPreBreak > currentLineWidth()) {
         // This break would create an overfull line, pick the best break and break there (greedy)
         if (mBestBreak == mLastBreak) {
