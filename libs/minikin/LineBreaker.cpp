@@ -139,11 +139,10 @@ static bool isLineEndSpace(uint16_t c) {
             c == 0x205F || c == 0x3000;
 }
 
-// Hyphenates a string potentially containing non-breaking spaces. The result would be saved
-// in mHyphBuf.
-void LineBreaker::hyphenate(const uint16_t* str, size_t len) {
-    mHyphBuf.clear();
-    mHyphBuf.reserve(len);
+// Hyphenates a string potentially containing non-breaking spaces.
+std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t len) {
+    std::vector<HyphenationType> out;
+    out.reserve(len);
 
     // A word here is any consecutive string of non-NBSP characters.
     bool inWord = false;
@@ -156,26 +155,27 @@ void LineBreaker::hyphenate(const uint16_t* str, size_t len) {
                 if (wordLen <= LONGEST_HYPHENATED_WORD) {
                     if (wordStart == 0) {
                         // The string starts with a word. Use mHyphBuf directly.
-                        mHyphenator->hyphenate(&mHyphBuf, str, wordLen, mLocale);
+                        mHyphenator->hyphenate(&out, str, wordLen, mLocale);
                     } else {
                         std::vector<HyphenationType> wordVec;
                         mHyphenator->hyphenate(&wordVec, str + wordStart, wordLen, mLocale);
-                        mHyphBuf.insert(mHyphBuf.end(), wordVec.cbegin(), wordVec.cend());
+                        out.insert(out.end(), wordVec.cbegin(), wordVec.cend());
                     }
                 } else { // Word is too long. Inefficient to hyphenate.
-                    mHyphBuf.insert(mHyphBuf.end(), wordLen, HyphenationType::DONT_BREAK);
+                    out.insert(out.end(), wordLen, HyphenationType::DONT_BREAK);
                 }
                 inWord = false;
             }
             if (i < len) {
                 // Insert one DONT_BREAK for the NBSP.
-                mHyphBuf.push_back(HyphenationType::DONT_BREAK);
+                out.push_back(HyphenationType::DONT_BREAK);
             }
         } else if (!inWord) {
             inWord = true;
             wordStart = i;
         }
     }
+    return out;
 }
 
 // Ordinarily, this method measures the text in the range given. However, when paint
@@ -242,11 +242,12 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             if (paint != nullptr && mHyphenator != nullptr &&
                     mHyphenationFrequency != kHyphenationFrequency_None &&
                     wordStart >= start && wordEnd > wordStart) {
-                hyphenate(&mTextBuf[wordStart], wordEnd - wordStart);
+              std::vector<HyphenationType> hyphenResult =
+                      hyphenate(&mTextBuf[wordStart], wordEnd - wordStart);
 #if VERBOSE_DEBUG
                 std::string hyphenatedString;
                 for (size_t j = wordStart; j < wordEnd; j++) {
-                    if (mHyphBuf[j - wordStart] == HyphenationType::BREAK_AND_INSERT_HYPHEN) {
+                    if (hyphenResult[j - wordStart] == HyphenationType::BREAK_AND_INSERT_HYPHEN) {
                         hyphenatedString.push_back('-');
                     }
                     // Note: only works with ASCII, should do UTF-8 conversion here
@@ -257,7 +258,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
 
                 // measure hyphenated substrings
                 for (size_t j = wordStart; j < wordEnd; j++) {
-                    HyphenationType hyph = mHyphBuf[j - wordStart];
+                    HyphenationType hyph = hyphenResult[j - wordStart];
                     if (hyph != HyphenationType::DONT_BREAK) {
                         paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
                         const float firstPartWidth = Layout::measureText(mTextBuf.data(),
@@ -602,8 +603,6 @@ void LineBreaker::finish() {
         mCharWidths.shrink_to_fit();
         mCharExtents.clear();
         mCharExtents.shrink_to_fit();
-        mHyphBuf.clear();
-        mHyphBuf.shrink_to_fit();
         mCandidates.shrink_to_fit();
         mBreaks.shrink_to_fit();
         mWidths.shrink_to_fit();
