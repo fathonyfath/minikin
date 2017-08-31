@@ -21,7 +21,7 @@
 
 #include "ICUTestBase.h"
 #include "UnicodeUtils.h"
-#include <minikin/WordBreaker.h>
+#include "WordBreaker.h"
 #include <unicode/locid.h>
 #include <unicode/uclean.h>
 #include <unicode/udata.h>

@@ -23,6 +23,7 @@
 #include <log/log.h>
 
 #include "LayoutUtils.h"
+#include "WordBreaker.h"
 #include <minikin/Layout.h>
 #include <minikin/LineBreaker.h>
 
@@ -62,6 +63,13 @@ const size_t MAX_TEXT_BUF_RETAIN = 32678;
 // Maximum amount that spaces can shrink, in justified text.
 const float SHRINKABILITY = 1.0 / 3.0;
 
+LineBreaker::LineBreaker() : mWordBreaker(std::make_unique<WordBreaker>()) { }
+
+LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker)
+        : mWordBreaker(std::move(breaker)) { }
+
+LineBreaker::~LineBreaker() {}
+
 void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators) {
     bool goodLocaleFound = false;
     const ssize_t numLocales = hyphenators.size();
@@ -93,14 +101,14 @@ void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>
             mHyphenator = numLocales == 0 ? nullptr : hyphenators[numLocales - 1];
         }
     }
-    mWordBreaker.setLocale(mLocale);
+    mWordBreaker->setLocale(mLocale);
 }
 
 void LineBreaker::setText() {
-    mWordBreaker.setText(mTextBuf.data(), mTextBuf.size());
+    mWordBreaker->setText(mTextBuf.data(), mTextBuf.size());
 
     // handle initial break here because addStyleRun may never be called
-    mWordBreaker.next();
+    mWordBreaker->next();
     mCandidates.clear();
     Candidate cand = {
             0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
@@ -220,8 +228,8 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
         size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags) {
     const bool isRtl = (bidiFlags == kBidi_Force_RTL);
-    const size_t wordStart = mWordBreaker.wordStart();
-    const size_t wordEnd = mWordBreaker.wordEnd();
+    const size_t wordStart = mWordBreaker->wordStart();
+    const size_t wordEnd = mWordBreaker->wordEnd();
     if (wordStart < runStart || wordEnd <= wordStart) {
         return;
     }
@@ -299,7 +307,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
         }
     }
 
-    size_t current = (size_t) mWordBreaker.current();
+    size_t current = (size_t) mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
     size_t afterWord = start;
@@ -344,14 +352,14 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
 
             // Skip break for zero-width characters inside replacement span
             if (paint != nullptr || current == end || mCharWidths[current] > 0) {
-                const float penalty = hyphenPenalty * mWordBreaker.breakBadness();
+                const float penalty = hyphenPenalty * mWordBreaker->breakBadness();
                 addWordBreak(current, mWidth, postBreak, mSpaceCount, postSpaceCount, extent,
                         penalty, HyphenationType::DONT_BREAK);
                 extent.reset();
             }
             lastBreak = current;
             lastBreakWidth = mWidth;
-            current = (size_t)mWordBreaker.next();
+            current = (size_t)mWordBreaker->next();
         }
     }
 
@@ -647,7 +655,7 @@ size_t LineBreaker::computeBreaks() {
 }
 
 void LineBreaker::finish() {
-    mWordBreaker.finish();
+    mWordBreaker->finish();
     mWidth = 0;
     mCandidates.clear();
     mBreaks.clear();

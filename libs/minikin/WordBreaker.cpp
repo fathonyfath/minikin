@@ -20,8 +20,8 @@
 
 #include <minikin/Emoji.h>
 #include <minikin/Hyphenator.h>
-#include <minikin/WordBreaker.h>
 #include "MinikinInternal.h"
+#include "WordBreaker.h"
 
 #include <unicode/uchar.h>
 #include <unicode/utf16.h>
@@ -31,11 +31,18 @@ namespace minikin {
 const uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
 const uint32_t CHAR_ZWJ = 0x200D;
 
-void WordBreaker::setLocale(const icu::Locale& locale) {
-    UErrorCode status = U_ZERO_ERROR;
-    mBreakIterator.reset(icu::BreakIterator::createLineInstance(locale, status));
+std::unique_ptr<icu::BreakIterator> WordBreaker::createBreakIterator(const icu::Locale& locale) {
     // TODO: handle failure status
+    UErrorCode status = U_ZERO_ERROR;
+    return std::unique_ptr<icu::BreakIterator>(
+            icu::BreakIterator::createLineInstance(locale, status));
+}
+
+void WordBreaker::setLocale(const icu::Locale& locale) {
+    mBreakIterator = createBreakIterator(locale);
     if (mText != nullptr) {
+        // TODO: handle failure status
+        UErrorCode status = U_ZERO_ERROR;
         mBreakIterator->setText(&mUText, status);
     }
     mIteratorWasReset = true;

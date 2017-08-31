@@ -15,7 +15,7 @@
  */
 #include <benchmark/benchmark.h>
 
-#include "minikin/WordBreaker.h"
+#include "WordBreaker.h"
 #include "UnicodeUtils.h"
 
 namespace minikin {

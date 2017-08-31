@@ -31,7 +31,6 @@
 #include "minikin/Hyphenator.h"
 #include "minikin/Layout.h"
 #include "minikin/MinikinFont.h"
-#include "minikin/WordBreaker.h"
 
 namespace minikin {
 
@@ -46,6 +45,8 @@ enum HyphenationFrequency {
     kHyphenationFrequency_Normal = 1,
     kHyphenationFrequency_Full = 2
 };
+
+class WordBreaker;
 
 class TabStops {
     public:
@@ -82,6 +83,10 @@ class LineBreaker {
                 // same value for the same input.
                 virtual float getLineWidth(size_t lineNo) = 0;
         };
+
+        LineBreaker();
+
+        virtual ~LineBreaker();
 
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
@@ -176,6 +181,9 @@ class LineBreaker {
         }
 
         void finish();
+    protected:
+        // For testing purpose.
+        LineBreaker(std::unique_ptr<WordBreaker>&& breaker);
 
     private:
         // ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for
@@ -232,7 +240,7 @@ class LineBreaker {
 
         void finishBreaksOptimal();
 
-        WordBreaker mWordBreaker;
+        std::unique_ptr<WordBreaker> mWordBreaker;
         icu::Locale mLocale;
         std::vector<uint16_t> mTextBuf;
         std::vector<float> mCharWidths;
