@@ -103,7 +103,7 @@ void LineBreaker::setText() {
     mWordBreaker.next();
     mCandidates.clear();
     Candidate cand = {
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
+            0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
     mCandidates.push_back(cand);
 
     // reset greedy breaker state
@@ -119,15 +119,6 @@ void LineBreaker::setText() {
     mLastHyphenation = HyphenEdit::NO_EDIT;
     mFirstTabIndex = INT_MAX;
     mSpaceCount = 0;
-}
-
-void LineBreaker::setLineWidths(float firstWidth, int firstWidthLineCount, float restWidth) {
-    mLineWidths.setWidths(firstWidth, firstWidthLineCount, restWidth);
-}
-
-
-void LineBreaker::setIndents(const std::vector<float>& indents) {
-    mLineWidths.setIndents(indents);
 }
 
 // This function determines whether a character is a space that disappears at end of line.
@@ -178,24 +169,25 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
     return out;
 }
 
-// Ordinarily, this method measures the text in the range given. However, when paint
-// is nullptr, it assumes the character widths and extents have already been calculated and stored
-// in the mCharWidths and mCharExtents buffers.
+// Ordinarily, this method measures the text in the range given. However, when paint is nullptr, it
+// assumes the character widths and extents have already been calculated and stored in the
+// mCharWidths and mCharExtents buffers.
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addCandidate.
 float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
         FontStyle style, size_t start, size_t end, bool isRtl) {
     float width = 0.0f;
-    int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
+    const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {
         width = Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
-                style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start);
+                style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
+                nullptr);
 
         // a heuristic that seems to perform well
-        hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidths.getLineWidth(0);
+        hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidthDelegate->getLineWidth(0);
         if (mHyphenationFrequency == kHyphenationFrequency_Normal) {
             hyphenPenalty *= 4.0; // TODO: Replace with a better value after some testing
         }
@@ -218,7 +210,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     size_t postSpaceCount = mSpaceCount;
     MinikinExtent extent = {0.0, 0.0, 0.0};
     for (size_t i = start; i < end; i++) {
-        uint16_t c = mTextBuf[i];
+        const uint16_t c = mTextBuf[i];
         if (c == CHAR_TAB) {
             mWidth = mPreBreak + mTabStops.nextTab(mWidth - mPreBreak);
             if (mFirstTabIndex == INT_MAX) {
@@ -237,8 +229,8 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             }
         }
         if (i + 1 == current) {
-            size_t wordStart = mWordBreaker.wordStart();
-            size_t wordEnd = mWordBreaker.wordEnd();
+            const size_t wordStart = mWordBreaker.wordStart();
+            const size_t wordEnd = mWordBreaker.wordEnd();
             if (paint != nullptr && mHyphenator != nullptr &&
                     mHyphenationFrequency != kHyphenationFrequency_None &&
                     wordStart >= start && wordEnd > wordStart) {
@@ -263,13 +255,14 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
                         paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
                         const float firstPartWidth = Layout::measureText(mTextBuf.data(),
                                 lastBreak, j - lastBreak, mTextBuf.size(), bidiFlags, style,
-                                *paint, typeface, nullptr, nullptr /* extent */);
+                                *paint, typeface, nullptr, nullptr /* extent */,
+                                nullptr /* overhangs */);
                         ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
 
                         paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
                         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j,
                                 afterWord - j, mTextBuf.size(), bidiFlags, style, *paint,
-                                typeface, nullptr, nullptr /* extent */);
+                                typeface, nullptr, nullptr /* extent */, nullptr /* overhangs */);
                         ParaWidth hyphPreBreak = postBreak - secondPartWidth;
 
                         addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount, postSpaceCount,
@@ -376,8 +369,8 @@ void LineBreaker::addCandidate(Candidate cand) {
     mCandidates.push_back(cand);
 
     // mLastBreak is the index of the last line break we decided to do in mCandidates,
-    // and mPreBreak is its preBreak value. mBestBreak is the index of the best line breaking candidate
-    // we have found since then, and mBestScore is its penalty.
+    // and mPreBreak is its preBreak value. mBestBreak is the index of the best line breaking
+    // candidate we have found since then, and mBestScore is its penalty.
     if (cand.postBreak - mPreBreak > currentLineWidth()) {
         // This break would create an overfull line, pick the best break and break there (greedy)
         if (mBestBreak == mLastBreak) {
@@ -447,7 +440,7 @@ float LineBreaker::getSpaceWidth() const {
 }
 
 float LineBreaker::currentLineWidth() const {
-    return mLineWidths.getLineWidth(mBreaks.size());
+    return mLineWidthDelegate->getLineWidth(mBreaks.size());
 }
 
 void LineBreaker::computeBreaksGreedy() {
@@ -493,39 +486,38 @@ void LineBreaker::finishBreaksOptimal() {
     std::reverse(mFlags.begin(), mFlags.end());
 }
 
-void LineBreaker::computeBreaksOptimal(bool isRectangle) {
+void LineBreaker::computeBreaksOptimal() {
     size_t active = 0;
     size_t nCand = mCandidates.size();
-    float width = mLineWidths.getLineWidth(0);
+    float width = mLineWidthDelegate->getLineWidth(0);
     float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth() : 0.0f;
+    std::vector<size_t> lineNumbers;
+    lineNumbers.reserve(nCand);
+    lineNumbers.push_back(0);  // The first candidate is always at the first line.
 
     // "i" iterates through candidates for the end of the line.
     for (size_t i = 1; i < nCand; i++) {
         bool atEnd = i == nCand - 1;
         float best = SCORE_INFTY;
         size_t bestPrev = 0;
-        size_t lineNumberLast = 0;
 
-        if (!isRectangle) {
-            size_t lineNumberLast = mCandidates[active].lineNumber;
-            width = mLineWidths.getLineWidth(lineNumberLast);
-        }
+        size_t lineNumberLast = lineNumbers[active];
+        width = mLineWidthDelegate->getLineWidth(lineNumberLast);
+
         ParaWidth leftEdge = mCandidates[i].postBreak - width;
         float bestHope = 0;
 
         // "j" iterates through candidates for the beginning of the line.
         for (size_t j = active; j < i; j++) {
-            if (!isRectangle) {
-                size_t lineNumber = mCandidates[j].lineNumber;
-                if (lineNumber != lineNumberLast) {
-                    float widthNew = mLineWidths.getLineWidth(lineNumber);
-                    if (widthNew != width) {
-                        leftEdge = mCandidates[i].postBreak - width;
-                        bestHope = 0;
-                        width = widthNew;
-                    }
-                    lineNumberLast = lineNumber;
+            size_t lineNumber = lineNumbers[j];
+            if (lineNumber != lineNumberLast) {
+                float widthNew = mLineWidthDelegate->getLineWidth(lineNumber);
+                if (widthNew != width) {
+                    leftEdge = mCandidates[i].postBreak - width;
+                    bestHope = 0;
+                    width = widthNew;
                 }
+                lineNumberLast = lineNumber;
             }
             float jScore = mCandidates[j].score;
             if (jScore + bestHope >= best) continue;
@@ -569,7 +561,7 @@ void LineBreaker::computeBreaksOptimal(bool isRectangle) {
         }
         mCandidates[i].score = best + mCandidates[i].penalty + mLinePenalty;
         mCandidates[i].prev = bestPrev;
-        mCandidates[i].lineNumber = mCandidates[bestPrev].lineNumber + 1;
+        lineNumbers.push_back(lineNumbers[bestPrev] + 1);
 #if VERBOSE_DEBUG
         ALOGD("break %zd: score=%g, prev=%zd", i, mCandidates[i].score, mCandidates[i].prev);
 #endif
@@ -581,7 +573,7 @@ size_t LineBreaker::computeBreaks() {
     if (mStrategy == kBreakStrategy_Greedy) {
         computeBreaksGreedy();
     } else {
-        computeBreaksOptimal(mLineWidths.isConstant());
+        computeBreaksOptimal();
     }
     return mBreaks.size();
 }
@@ -589,7 +581,6 @@ size_t LineBreaker::computeBreaks() {
 void LineBreaker::finish() {
     mWordBreaker.finish();
     mWidth = 0;
-    mLineWidths.clear();
     mCandidates.clear();
     mBreaks.clear();
     mWidths.clear();
@@ -614,6 +605,7 @@ void LineBreaker::finish() {
     mHyphenationFrequency = kHyphenationFrequency_Normal;
     mLinePenalty = 0.0f;
     mJustified = false;
+    mLineWidthDelegate.reset();
 }
 
 }  // namespace minikin
