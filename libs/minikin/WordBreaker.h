@@ -34,12 +34,15 @@ public:
         finish();
     }
 
-    void setLocale(const icu::Locale& locale);
 
     void setText(const uint16_t* data, size_t size);
 
-    // Advance iterator to next word break. Return offset, or -1 if EOT
+    // Advance iterator to next word break with current locale. Return offset, or -1 if EOT
     ssize_t next();
+
+    // Advance iterator to the break just after "from" with using the new provided locale.
+    // Return offset, or -1 if EOT
+    ssize_t followingWithLocale(const icu::Locale& locale, size_t from);
 
     // Current offset of iterator, equal to 0 at BOT or last return from next()
     ssize_t current() const;
@@ -69,7 +72,6 @@ private:
     size_t mTextSize;
     ssize_t mLast;
     ssize_t mCurrent;
-    bool mIteratorWasReset;
 
     // state for the email address / url detector
     ssize_t mScanOffset;

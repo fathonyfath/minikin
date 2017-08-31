@@ -90,15 +90,6 @@ class LineBreaker {
 
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
-        // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
-        // explicitly to avoid the cost of creating ICU BreakIterator objects. It should always
-        // be set on the first invocation, but callers are encouraged not to call again unless
-        // locale has actually changed.
-        // That logic could be here but it's better for performance that it's upstream because of
-        // the cost of constructing and comparing the ICU Locale object.
-        // Note: caller is responsible for managing lifetime of hyphenator
-        void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators);
-
         void resize(size_t size) {
             mTextBuf.resize(size);
             mCharWidths.resize(size);
@@ -149,12 +140,9 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        // TODO: this class is actually fairly close to being general and not tied to using
-        // Minikin to do the shaping of the strings. The main thing that would need to be changed
-        // is having some kind of callback (or virtual class, or maybe even template), which could
-        // easily be instantiated with Minikin's Layout. Future work for when needed.
         float addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-                FontStyle style, size_t start, size_t end, bool isRtl);
+                FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
+                const std::vector<Hyphenator*>& hyphenators);
 
         void addReplacement(size_t start, size_t end, float width);
 
@@ -205,6 +193,16 @@ class LineBreaker {
             MinikinExtent extent; // the largest extent between last candidate and this candidate
             HyphenationType hyphenType;
         };
+
+        // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
+        // explicitly to avoid the cost of creating ICU BreakIterator objects. It should always
+        // be set on the first invocation, but callers are encouraged not to call again unless
+        // locale has actually changed.
+        // That logic could be here but it's better for performance that it's upstream because of
+        // the cost of constructing and comparing the ICU Locale object.
+        // Note: caller is responsible for managing lifetime of hyphenator
+        void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
+                        size_t restartFrom);
 
         float currentLineWidth() const;
 

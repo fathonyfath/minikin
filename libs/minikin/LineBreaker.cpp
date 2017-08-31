@@ -70,7 +70,8 @@ LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker)
 
 LineBreaker::~LineBreaker() {}
 
-void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators) {
+void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
+        size_t restartFrom) {
     bool goodLocaleFound = false;
     const ssize_t numLocales = hyphenators.size();
     // For now, we ignore all locales except the first valid one.
@@ -101,14 +102,13 @@ void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>
             mHyphenator = numLocales == 0 ? nullptr : hyphenators[numLocales - 1];
         }
     }
-    mWordBreaker->setLocale(mLocale);
+    mWordBreaker->followingWithLocale(mLocale, restartFrom);
 }
 
 void LineBreaker::setText() {
     mWordBreaker->setText(mTextBuf.data(), mTextBuf.size());
 
     // handle initial break here because addStyleRun may never be called
-    mWordBreaker->next();
     mCandidates.clear();
     Candidate cand = {
             0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
@@ -281,7 +281,8 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addCandidate.
 float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-        FontStyle style, size_t start, size_t end, bool isRtl) {
+        FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
+        const std::vector<Hyphenator*>& hyphenators) {
     float width = 0.0f;
     const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
 
@@ -307,6 +308,10 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
         }
     }
 
+    // Caller passes nullptr for langTag if language is not changed.
+    if (langTags != nullptr) {
+        setLocales(langTags, hyphenators, start);
+    }
     size_t current = (size_t) mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
@@ -500,7 +505,8 @@ void LineBreaker::addReplacement(size_t start, size_t end, float width) {
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRun(nullptr, nullptr, FontStyle(), start, end, false);
+    addStyleRun(nullptr, nullptr, FontStyle(), start, end, false, nullptr,
+            std::vector<Hyphenator*>());
 }
 
 // Get the width of a space. May return 0 if there are no spaces.
