@@ -29,6 +29,7 @@ namespace android {
 
 extern Mutex gMinikinLock;
 
+constexpr uint32_t MAX_UNICODE_CODE_POINT = 0x10FFFF;
 }
 
 #endif  // MINIKIN_INTERNAL_H
