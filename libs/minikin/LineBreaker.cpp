@@ -145,7 +145,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
                 const size_t wordLen = i - wordStart;
                 if (wordLen <= LONGEST_HYPHENATED_WORD) {
                     if (wordStart == 0) {
-                        // The string starts with a word. Use mHyphBuf directly.
+                        // The string starts with a word. Use out directly.
                         mHyphenator->hyphenate(&out, str, wordLen, mLocale);
                     } else {
                         std::vector<HyphenationType> wordVec;
@@ -169,9 +169,106 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
     return out;
 }
 
+// Compute the total overhang of text based on per-cluster advances and overhangs.
+// The two input vectors are expected to be of the same size.
+/* static */ LayoutOverhang LineBreaker::computeOverhang(float totalAdvance,
+        const std::vector<float>& advances, const std::vector<LayoutOverhang>& overhangs,
+        bool isRtl) {
+    ParaWidth left = 0.0;
+    ParaWidth right = 0.0;
+    ParaWidth seenAdvance = 0.0;
+    const size_t len = advances.size();
+    if (isRtl) {
+        for (size_t i = 0; i < len; i++) {
+            right = std::max(right, overhangs[i].right - seenAdvance);
+            seenAdvance += advances[i];
+            left = std::max(left, overhangs[i].left - (totalAdvance - seenAdvance));
+        }
+    } else {
+        for (size_t i = 0; i < len; i++) {
+            left = std::max(left, overhangs[i].left - seenAdvance);
+            seenAdvance += advances[i];
+            right = std::max(right, overhangs[i].right - (totalAdvance - seenAdvance));
+        }
+    }
+    return {static_cast<float>(left), static_cast<float>(right)};
+}
+
+// This adds all the hyphenation candidates for a given word by first finding all the hyphenation
+// points and then calling addWordBreak for each.
+//
+// paint and typeface will be used for measuring the text and paint must not be null.
+// runStart is the beginning of the whole run, and is used for making sure we don't hyphenated words
+//     that go outside the run.
+// afterWord is the index of last code unit seen that's not a line-ending space, plus one. In other
+//     words, the index of the first code unit after a word.
+// lastBreak is the index of the previous break point and lastBreakWidth is the width seen until
+//     that point.
+// extent is a pointer to the variable that keeps track of the maximum vertical extents seen since
+//     the last time addWordBreak() was called. It will be reset to 0 after every call.
+// bidiFlags keep the bidi flags to determine the direction of text for layout and other
+//     calculations. It may only be kBidi_Force_RTL or kBidi_Force_LTR.
+//
+// The following parameters are needed to be passed to addWordBreak:
+// postBreak is the width that would be seen if we decide to break at the end of the word (so it
+//     doesn't count any line-ending space after the word).
+// postSpaceCount is the number of spaces that would be seen if we decide to break at the end of the
+//     word (and like postBreak it doesn't count any line-ending space after the word).
+// hyphenPenalty is the amount of penalty for hyphenation.
+void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
+        const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
+        size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
+        size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags) {
+    const bool isRtl = (bidiFlags == kBidi_Force_RTL);
+    const size_t wordStart = mWordBreaker.wordStart();
+    const size_t wordEnd = mWordBreaker.wordEnd();
+    if (wordStart < runStart || wordEnd <= wordStart) {
+        return;
+    }
+    std::vector<HyphenationType> hyphenResult =
+            hyphenate(&mTextBuf[wordStart], wordEnd - wordStart);
+
+    std::vector<float> advances;
+    std::vector<LayoutOverhang> overhangs;
+    const size_t bufferSize = std::max(wordEnd - 1 - lastBreak, afterWord - wordStart);
+    advances.reserve(bufferSize);
+    overhangs.reserve(bufferSize);
+    // measure hyphenated substrings
+    for (size_t j = wordStart; j < wordEnd; j++) {
+        HyphenationType hyph = hyphenResult[j - wordStart];
+        if (hyph == HyphenationType::DONT_BREAK) {
+            continue;
+        }
+
+        paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
+        const size_t firstPartLen = j - lastBreak;
+        advances.resize(firstPartLen);
+        overhangs.resize(firstPartLen);
+        const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
+                mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
+                nullptr /* extent */, overhangs.data());
+        const LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtl);
+        const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth
+                + (isRtl ? overhang.left : overhang.right);
+
+        paint->hyphenEdit = HyphenEdit::editForNextLine(hyph); // XXX may need to be NO_EDIT.
+        const size_t secondPartLen = afterWord - j;
+        const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
+                mTextBuf.size(), bidiFlags, style, *paint, typeface, nullptr /* advances */,
+                nullptr /* extent */, nullptr /* overhangs */);
+        const ParaWidth hyphPreBreak = postBreak - secondPartWidth;
+
+        addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount,
+                postSpaceCount, *extent, hyphenPenalty, hyph);
+        extent->reset();
+
+        paint->hyphenEdit = HyphenEdit::NO_EDIT;
+    }
+}
+
 // Ordinarily, this method measures the text in the range given. However, when paint is nullptr, it
-// assumes the character widths and extents have already been calculated and stored in the
-// mCharWidths and mCharExtents buffers.
+// assumes the character widths, extents, and overhangs have already been calculated and stored in
+// the mCharWidths, mCharExtents, and mCharOverhangs buffers.
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addCandidate.
@@ -184,7 +281,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     if (paint != nullptr) {
         width = Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
                 style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
-                nullptr);
+                mCharOverhangs.data() + start);
 
         // a heuristic that seems to perform well
         hyphenPenalty = 0.5 * paint->size * paint->scaleX * mLineWidthDelegate->getLineWidth(0);
@@ -203,10 +300,13 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     }
 
     size_t current = (size_t) mWordBreaker.current();
+    // This will keep the index of last code unit seen that's not a line-ending space, plus one.
+    // In other words, the index of the first code unit after a word.
     size_t afterWord = start;
-    size_t lastBreak = start;
-    ParaWidth lastBreakWidth = mWidth;
-    ParaWidth postBreak = mWidth;
+
+    size_t lastBreak = start; // The index of the previous break point.
+    ParaWidth lastBreakWidth = mWidth; // The width of the text as of the previous break point.
+    ParaWidth postBreak = mWidth; // The width of text seen if we decide to break here
     size_t postSpaceCount = mSpaceCount;
     MinikinExtent extent = {0.0, 0.0, 0.0};
     for (size_t i = start; i < end; i++) {
@@ -219,64 +319,32 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             // fall back to greedy; other modes don't know how to deal with tabs
             mStrategy = kBreakStrategy_Greedy;
         } else {
-            if (isWordSpace(c)) mSpaceCount += 1;
+            if (isWordSpace(c)) {
+                mSpaceCount += 1;
+            }
             mWidth += mCharWidths[i];
             extent.extendBy(mCharExtents[i]);
-            if (!isLineEndSpace(c)) {
+            if (isLineEndSpace(c)) {
+                // If we break a line on a line-ending space, that space goes away. So postBreak
+                // and postSpaceCount, which keep the width and number of spaces if we decide to
+                // break at this point, don't need to get adjusted.
+            } else {
                 postBreak = mWidth;
                 postSpaceCount = mSpaceCount;
                 afterWord = i + 1;
             }
         }
-        if (i + 1 == current) {
-            const size_t wordStart = mWordBreaker.wordStart();
-            const size_t wordEnd = mWordBreaker.wordEnd();
+        if (i + 1 == current) { // We are at the end of a word.
             if (paint != nullptr && mHyphenator != nullptr &&
-                    mHyphenationFrequency != kHyphenationFrequency_None &&
-                    wordStart >= start && wordEnd > wordStart) {
-              std::vector<HyphenationType> hyphenResult =
-                      hyphenate(&mTextBuf[wordStart], wordEnd - wordStart);
-#if VERBOSE_DEBUG
-                std::string hyphenatedString;
-                for (size_t j = wordStart; j < wordEnd; j++) {
-                    if (hyphenResult[j - wordStart] == HyphenationType::BREAK_AND_INSERT_HYPHEN) {
-                        hyphenatedString.push_back('-');
-                    }
-                    // Note: only works with ASCII, should do UTF-8 conversion here
-                    hyphenatedString.push_back(buffer()[j]);
-                }
-                ALOGD("hyphenated string: %s", hyphenatedString.c_str());
-#endif
-
-                // measure hyphenated substrings
-                for (size_t j = wordStart; j < wordEnd; j++) {
-                    HyphenationType hyph = hyphenResult[j - wordStart];
-                    if (hyph != HyphenationType::DONT_BREAK) {
-                        paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
-                        const float firstPartWidth = Layout::measureText(mTextBuf.data(),
-                                lastBreak, j - lastBreak, mTextBuf.size(), bidiFlags, style,
-                                *paint, typeface, nullptr, nullptr /* extent */,
-                                nullptr /* overhangs */);
-                        ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
-
-                        paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
-                        const float secondPartWidth = Layout::measureText(mTextBuf.data(), j,
-                                afterWord - j, mTextBuf.size(), bidiFlags, style, *paint,
-                                typeface, nullptr, nullptr /* extent */, nullptr /* overhangs */);
-                        ParaWidth hyphPreBreak = postBreak - secondPartWidth;
-
-                        addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount, postSpaceCount,
-                                extent, hyphenPenalty, hyph);
-                        extent.reset();
-
-                        paint->hyphenEdit = HyphenEdit::NO_EDIT;
-                    }
-                }
+                    mHyphenationFrequency != kHyphenationFrequency_None) {
+                addHyphenationCandidates(paint, typeface, style, start, afterWord, lastBreak,
+                        lastBreakWidth, postBreak, postSpaceCount, &extent, hyphenPenalty,
+                        bidiFlags);
             }
 
             // Skip break for zero-width characters inside replacement span
             if (paint != nullptr || current == end || mCharWidths[current] > 0) {
-                float penalty = hyphenPenalty * mWordBreaker.breakBadness();
+                const float penalty = hyphenPenalty * mWordBreaker.breakBadness();
                 addWordBreak(current, mWidth, postBreak, mSpaceCount, postSpaceCount, extent,
                         penalty, HyphenationType::DONT_BREAK);
                 extent.reset();
