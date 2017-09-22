@@ -29,8 +29,8 @@
 #include <vector>
 #include "minikin/FontCollection.h"
 #include "minikin/Hyphenator.h"
+#include "minikin/Layout.h"
 #include "minikin/MinikinFont.h"
-#include "minikin/WordBreaker.h"
 
 namespace minikin {
 
@@ -45,6 +45,8 @@ enum HyphenationFrequency {
     kHyphenationFrequency_Normal = 1,
     kHyphenationFrequency_Full = 2
 };
+
+class WordBreaker;
 
 class TabStops {
     public:
@@ -82,6 +84,10 @@ class LineBreaker {
                 virtual float getLineWidth(size_t lineNo) = 0;
         };
 
+        LineBreaker();
+
+        virtual ~LineBreaker();
+
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
         // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
@@ -97,6 +103,7 @@ class LineBreaker {
             mTextBuf.resize(size);
             mCharWidths.resize(size);
             mCharExtents.resize(size);
+            mCharOverhangs.resize(size);
         }
 
         size_t size() const {
@@ -113,6 +120,10 @@ class LineBreaker {
 
         MinikinExtent* charExtents() {
             return mCharExtents.data();
+        }
+
+        LayoutOverhang* charOverhangs() {
+            return mCharOverhangs.data();
         }
 
         void setLineWidthDelegate(std::unique_ptr<LineWidthDelegate>&& lineWidths) {
@@ -170,6 +181,9 @@ class LineBreaker {
         }
 
         void finish();
+    protected:
+        // For testing purpose.
+        LineBreaker(std::unique_ptr<WordBreaker>&& breaker);
 
     private:
         // ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for
@@ -194,6 +208,11 @@ class LineBreaker {
 
         float currentLineWidth() const;
 
+        void addHyphenationCandidates(MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
+                size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
+                size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags);
+
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
                 float penalty, HyphenationType hyph);
@@ -202,6 +221,10 @@ class LineBreaker {
         void pushGreedyBreak();
 
         MinikinExtent computeMaxExtent(size_t start, size_t end) const;
+
+        static LayoutOverhang computeOverhang(float totalAdvance,
+                const std::vector<float>& advances, const std::vector<LayoutOverhang>& overhangs,
+                bool isRtl);
 
         // push an actual break to the output. Takes care of setting flags for tab
         void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
@@ -217,11 +240,12 @@ class LineBreaker {
 
         void finishBreaksOptimal();
 
-        WordBreaker mWordBreaker;
+        std::unique_ptr<WordBreaker> mWordBreaker;
         icu::Locale mLocale;
         std::vector<uint16_t> mTextBuf;
         std::vector<float> mCharWidths;
         std::vector<MinikinExtent> mCharExtents;
+        std::vector<LayoutOverhang> mCharOverhangs;
 
         Hyphenator* mHyphenator;
 
@@ -238,7 +262,7 @@ class LineBreaker {
         std::vector<float> mDescents;
         std::vector<int> mFlags;
 
-        ParaWidth mWidth = 0;
+        ParaWidth mWidth = 0; // Total width of text seen, assuming no line breaks
         std::vector<Candidate> mCandidates;
         float mLinePenalty = 0.0f;
 
@@ -248,8 +272,8 @@ class LineBreaker {
         float mBestScore;
         ParaWidth mPreBreak;  // prebreak of last break
         uint32_t mLastHyphenation;  // hyphen edit of last break kept for next line
-        int mFirstTabIndex;
-        size_t mSpaceCount;
+        int mFirstTabIndex; // The index of the first tab character seen in input text
+        size_t mSpaceCount; // Number of word spaces seen in the input text
 
         std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
 

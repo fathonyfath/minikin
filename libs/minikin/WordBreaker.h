@@ -30,7 +30,7 @@ namespace minikin {
 
 class WordBreaker {
 public:
-    ~WordBreaker() {
+    virtual ~WordBreaker() {
         finish();
     }
 
@@ -53,6 +53,10 @@ public:
     int breakBadness() const;
 
     void finish();
+
+protected:
+    // protected virtual for testing purpose.
+    virtual std::unique_ptr<icu::BreakIterator> createBreakIterator(const icu::Locale& locale);
 
 private:
     int32_t iteratorNext();
