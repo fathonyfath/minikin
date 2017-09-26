@@ -44,6 +44,6 @@ cc_benchmark {
         "libharfbuzz_ng",
         "libicuuc",
         "liblog",
-        "libskia",
+
     ],
 }
