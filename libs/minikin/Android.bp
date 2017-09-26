@@ -44,6 +44,7 @@ cc_library {
                 "MinikinInternal.cpp",
                 "MinikinFont.cpp",
                 "SparseBitSet.cpp",
+                "StringPiece.cpp",
                 "WordBreaker.cpp",
             ],
             shared_libs: [

@@ -53,6 +53,7 @@ cc_test {
         "LineBreakerTest.cpp",
         "MeasurementTests.cpp",
         "SparseBitSetTest.cpp",
+        "StringPieceTest.cpp",
         "UnicodeUtilsTest.cpp",
         "WordBreakerTests.cpp",
     ],
