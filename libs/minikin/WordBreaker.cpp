@@ -22,6 +22,7 @@
 #include <minikin/Hyphenator.h>
 #include "MinikinInternal.h"
 #include "WordBreaker.h"
+#include "cutils/log.h"
 
 #include <unicode/uchar.h>
 #include <unicode/utf16.h>
@@ -38,28 +39,35 @@ std::unique_ptr<icu::BreakIterator> WordBreaker::createBreakIterator(const icu::
             icu::BreakIterator::createLineInstance(locale, status));
 }
 
-void WordBreaker::setLocale(const icu::Locale& locale) {
+ssize_t WordBreaker::followingWithLocale(const icu::Locale& locale, size_t from) {
     mBreakIterator = createBreakIterator(locale);
-    if (mText != nullptr) {
-        // TODO: handle failure status
-        UErrorCode status = U_ZERO_ERROR;
-        mBreakIterator->setText(&mUText, status);
+    UErrorCode status = U_ZERO_ERROR;
+    LOG_ALWAYS_FATAL_IF(mText == nullptr, "setText must be called first");
+    // TODO: handle failure status
+    mBreakIterator->setText(&mUText, status);
+    if (mInEmailOrUrl) {
+        // Note:
+        // Don't reset mCurrent, mLast, or mScanOffset for keeping email/URL context.
+        // The email/URL detection doesn't support following() functionality, so that we can't
+        // restart from the specific position. This means following() can not be supported in
+        // general, but keeping old email/URL context works for LineBreaker since it just wants to
+        // re-calculate the next break point with the new locale.
+    } else {
+        mCurrent = mLast = mScanOffset = from;
+        next();
     }
-    mIteratorWasReset = true;
+    return mCurrent;
 }
 
 void WordBreaker::setText(const uint16_t* data, size_t size) {
     mText = data;
     mTextSize = size;
-    mIteratorWasReset = false;
     mLast = 0;
     mCurrent = 0;
     mScanOffset = 0;
     mInEmailOrUrl = false;
     UErrorCode status = U_ZERO_ERROR;
     utext_openUChars(&mUText, reinterpret_cast<const UChar*>(data), size, &status);
-    mBreakIterator->setText(&mUText, status);
-    mBreakIterator->first();
 }
 
 ssize_t WordBreaker::current() const {
@@ -71,9 +79,14 @@ ssize_t WordBreaker::current() const {
  * represents customization beyond the ICU behavior, because plain ICU provides some
  * line break opportunities that we don't want.
  **/
-static bool isBreakValid(const uint16_t* buf, size_t bufEnd, size_t i) {
+static bool isValidBreak(const uint16_t* buf, size_t bufEnd, int32_t i) {
+    const size_t position = static_cast<size_t>(i);
+    if (i == icu::BreakIterator::DONE || position == bufEnd) {
+        // If the iterator reaches the end, treat as break.
+        return true;
+    }
     uint32_t codePoint;
-    size_t prev_offset = i;
+    size_t prev_offset = position;
     U16_PREV(buf, 0, prev_offset, codePoint);
     // Do not break on hard or soft hyphens. These are handled by automatic hyphenation.
     if (Hyphenator::isLineBreakingHyphen(codePoint) || codePoint == CHAR_SOFT_HYPHEN) {
@@ -88,7 +101,7 @@ static bool isBreakValid(const uint16_t* buf, size_t bufEnd, size_t i) {
     }
 
     uint32_t next_codepoint;
-    size_t next_offset = i;
+    size_t next_offset = position;
     U16_NEXT(buf, next_offset, bufEnd, next_codepoint);
 
     // Rule LB8 for Emoji ZWJ sequences. We need to do this ourselves since we may have fresher
@@ -113,16 +126,10 @@ static bool isBreakValid(const uint16_t* buf, size_t bufEnd, size_t i) {
 // Customized iteratorNext that takes care of both resets and our modifications
 // to ICU's behavior.
 int32_t WordBreaker::iteratorNext() {
-    int32_t result;
-    do {
-        if (mIteratorWasReset) {
-            result = mBreakIterator->following(mCurrent);
-            mIteratorWasReset = false;
-        } else {
-            result = mBreakIterator->next();
-        }
-    } while (!(result == icu::BreakIterator::DONE || (size_t)result == mTextSize
-            || isBreakValid(mText, mTextSize, result)));
+    int32_t result = mBreakIterator->following(mCurrent);
+    while (!isValidBreak(mText, mTextSize, result)) {
+        result = mBreakIterator->next();
+    }
     return result;
 }
 
@@ -176,7 +183,6 @@ void WordBreaker::detectEmailOrUrl() {
                 i = mBreakIterator->following(i);
             }
             mInEmailOrUrl = true;
-            mIteratorWasReset = true;
         } else {
             mInEmailOrUrl = false;
         }
