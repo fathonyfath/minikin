@@ -19,15 +19,15 @@
 #include "FontLanguage.h"
 
 #include <algorithm>
+#include <cutils/log.h>
 #include <hb.h>
 #include <string.h>
 #include <unicode/uloc.h>
+#include "StringPiece.h"
 
 namespace minikin {
 
-#define SCRIPT_TAG(c1, c2, c3, c4) \
-        (((uint32_t)(c1)) << 24 | ((uint32_t)(c2)) << 16 | ((uint32_t)(c3)) <<  8 | \
-         ((uint32_t)(c4)))
+constexpr uint32_t FIVE_BITS = 0x1f;
 
 // Check if a language code supports emoji according to its subtag
 static bool isEmojiSubtag(const char* buf, size_t bufLen, const char* subtag, size_t subtagLen) {
@@ -48,24 +48,24 @@ static bool isEmojiSubtag(const char* buf, size_t bufLen, const char* subtag, si
 // three letter language code or region code to 15 bits.
 //
 // In case of two letter code, use fullbit(0x1f) for the first letter instead.
-static uint16_t packLanguageOrRegion(const char* c, size_t length, uint8_t twoLetterBase,
+static uint16_t packLanguageOrRegion(const StringPiece& in, uint8_t twoLetterBase,
         uint8_t threeLetterBase) {
-    if (length == 2) {
+    if (in.length() == 2) {
         return 0x7c00u |  // 0x1fu << 10
-                (uint16_t)(c[0] - twoLetterBase) << 5 |
-                (uint16_t)(c[1] - twoLetterBase);
+                (uint16_t)(in[0] - twoLetterBase) << 5 |
+                (uint16_t)(in[1] - twoLetterBase);
     } else {
-        return ((uint16_t)(c[0] - threeLetterBase) << 10) |
-                (uint16_t)(c[1] - threeLetterBase) << 5 |
-                (uint16_t)(c[2] - threeLetterBase);
+        return ((uint16_t)(in[0] - threeLetterBase) << 10) |
+                (uint16_t)(in[1] - threeLetterBase) << 5 |
+                (uint16_t)(in[2] - threeLetterBase);
     }
 }
 
 static size_t unpackLanguageOrRegion(uint16_t in, char* out, uint8_t twoLetterBase,
         uint8_t threeLetterBase) {
-    uint8_t first = (in >> 10) & 0x1f;
-    uint8_t second = (in >> 5) & 0x1f;
-    uint8_t third = in & 0x1f;
+    uint8_t first = (in >> 10) & FIVE_BITS;
+    uint8_t second = (in >> 5) & FIVE_BITS;
+    uint8_t third = in & FIVE_BITS;
 
     if (first == 0x1f) {
         out[0] = second + twoLetterBase;
@@ -79,14 +79,42 @@ static size_t unpackLanguageOrRegion(uint16_t in, char* out, uint8_t twoLetterBa
     }
 }
 
-// Find the next '-' or '_' index from startOffset position. If not found, returns bufferLength.
-static size_t nextDelimiterIndex(const char* buffer, size_t bufferLength, size_t startOffset) {
-    for (size_t i = startOffset; i < bufferLength; ++i) {
-        if (buffer[i] == '-' || buffer[i] == '_') {
-            return i;
-        }
-    }
-    return bufferLength;
+static uint16_t packLanguage(const StringPiece& in) {
+    return packLanguageOrRegion(in, 'a', 'a');
+}
+
+static size_t unpackLanguage(uint16_t in, char* out) {
+    return unpackLanguageOrRegion(in, out, 'a', 'a');
+}
+
+constexpr uint32_t packScript(char c1, char c2, char c3, char c4) {
+    constexpr char FIRST_LETTER_BASE = 'A';
+    constexpr char REST_LETTER_BASE = 'a';
+    return ((uint32_t)(c1 - FIRST_LETTER_BASE) << 15) | (uint32_t)(c2 - REST_LETTER_BASE) << 10 |
+            ((uint32_t)(c3 - REST_LETTER_BASE) << 5) | (uint32_t)(c4 - REST_LETTER_BASE);
+}
+
+constexpr uint32_t packScript(uint32_t script) {
+    return packScript(script >> 24, (script >> 16) & 0xff, (script >> 8) & 0xff, script & 0xff);
+}
+
+constexpr uint32_t unpackScript(uint32_t packedScript) {
+    constexpr char FIRST_LETTER_BASE = 'A';
+    constexpr char REST_LETTER_BASE = 'a';
+    const uint32_t first = (packedScript >> 15) + FIRST_LETTER_BASE;
+    const uint32_t second = ((packedScript >> 10) & FIVE_BITS) + REST_LETTER_BASE;
+    const uint32_t third = ((packedScript >> 5) & FIVE_BITS) + REST_LETTER_BASE;
+    const uint32_t fourth = (packedScript & FIVE_BITS) + REST_LETTER_BASE;
+
+    return first << 24 | second << 16 | third << 8 | fourth;
+}
+
+static uint16_t packRegion(const StringPiece& in) {
+    return packLanguageOrRegion(in, 'A', '0');
+}
+
+static size_t unpackRegion(uint16_t in, char* out) {
+    return unpackLanguageOrRegion(in, out, 'A', '0');
 }
 
 static inline bool isLowercase(char c) {
@@ -102,80 +130,91 @@ static inline bool isDigit(char c) {
 }
 
 // Returns true if the buffer is valid for language code.
-static inline bool isValidLanguageCode(const char* buffer, size_t length) {
-    if (length != 2 && length != 3) return false;
+static inline bool isValidLanguageCode(const StringPiece& buffer) {
+    if (buffer.length() != 2 && buffer.length() != 3) return false;
     if (!isLowercase(buffer[0])) return false;
     if (!isLowercase(buffer[1])) return false;
-    if (length == 3 && !isLowercase(buffer[2])) return false;
+    if (buffer.length() == 3 && !isLowercase(buffer[2])) return false;
     return true;
 }
 
 // Returns true if buffer is valid for script code. The length of buffer must be 4.
-static inline bool isValidScriptCode(const char* buffer) {
-    return isUppercase(buffer[0]) && isLowercase(buffer[1]) && isLowercase(buffer[2]) &&
-        isLowercase(buffer[3]);
+static inline bool isValidScriptCode(const StringPiece& buffer) {
+    return buffer.size() == 4 && isUppercase(buffer[0]) && isLowercase(buffer[1]) &&
+            isLowercase(buffer[2]) && isLowercase(buffer[3]);
 }
 
 // Returns true if the buffer is valid for region code.
-static inline bool isValidRegionCode(const char* buffer, size_t length) {
-    return (length == 2 && isUppercase(buffer[0]) && isUppercase(buffer[1])) ||
-            (length == 3 && isDigit(buffer[0]) && isDigit(buffer[1]) && isDigit(buffer[2]));
+static inline bool isValidRegionCode(const StringPiece& buffer) {
+    return (buffer.size() == 2 && isUppercase(buffer[0]) && isUppercase(buffer[1])) ||
+            (buffer.size() == 3 && isDigit(buffer[0]) && isDigit(buffer[1]) && isDigit(buffer[2]));
 }
 
 // Parse BCP 47 language identifier into internal structure
-FontLanguage::FontLanguage(const char* buf, size_t length) : FontLanguage() {
-    size_t firstDelimiterPos = nextDelimiterIndex(buf, length, 0);
-    if (isValidLanguageCode(buf, firstDelimiterPos)) {
-        mLanguage = packLanguageOrRegion(buf, firstDelimiterPos, 'a', 'a');
+FontLanguage::FontLanguage(const StringPiece& input) : FontLanguage() {
+    SplitIterator it(input, '-');
+
+    StringPiece language = it.next();
+    if (isValidLanguageCode(language)) {
+        mLanguage = packLanguage(language);
     } else {
         // We don't understand anything other than two-letter or three-letter
         // language codes, so we skip parsing the rest of the string.
         return;
     }
 
-    if (firstDelimiterPos == length) {
+    if (!it.hasNext()) {
         mHbLanguage = hb_language_from_string(getString().c_str(), -1);
         return;  // Language code only.
     }
+    StringPiece token = it.next();
 
-    size_t nextComponentStartPos = firstDelimiterPos + 1;
-    size_t nextDelimiterPos = nextDelimiterIndex(buf, length, nextComponentStartPos);
-    size_t componentLength = nextDelimiterPos - nextComponentStartPos;
+    if (isValidScriptCode(token)) {
+        mScript = packScript(token[0], token[1], token[2], token[3]);
+        mSubScriptBits = scriptToSubScriptBits(mScript);
 
-    if (componentLength == 4) {
-        // Possibly script code.
-        const char* p = buf + nextComponentStartPos;
-        if (isValidScriptCode(p)) {
-            mScript = SCRIPT_TAG(p[0], p[1], p[2], p[3]);
-            mSubScriptBits = scriptToSubScriptBits(mScript);
+        if (!it.hasNext()) {
+            goto finalize;  // No variant, emoji subtag and region code.
         }
-
-        if (nextDelimiterPos == length) {
-            mHbLanguage = hb_language_from_string(getString().c_str(), -1);
-            mEmojiStyle = resolveEmojiStyle(buf, length, mScript);
-            return;  // No region code.
-        }
-
-        nextComponentStartPos = nextDelimiterPos + 1;
-        nextDelimiterPos = nextDelimiterIndex(buf, length, nextComponentStartPos);
-        componentLength = nextDelimiterPos - nextComponentStartPos;
+        token = it.next();
     }
 
-    if (componentLength == 2 || componentLength == 3) {
-        // Possibly region code.
-        const char* p = buf + nextComponentStartPos;
-        if (isValidRegionCode(p, componentLength)) {
-            mRegion = packLanguageOrRegion(p, componentLength, 'A', '0');
+    if (isValidRegionCode(token)) {
+        mRegion = packRegion(token);
+
+        if (!it.hasNext()) {
+            goto finalize;  // No variant or emoji subtag.
+        }
+        token = it.next();
+    }
+
+    if (language == "de") {  // We are only interested in German variants.
+        if (token == "1901") {
+            mVariant = Variant::GERMAN_1901_ORTHOGRAPHY;
+        } else if (token == "1996") {
+            mVariant = Variant::GERMAN_1996_ORTHOGRAPHY;
+        }
+
+        if (mVariant != Variant::NO_VARIANT) {
+            if (!it.hasNext()) {
+                goto finalize;  // No emoji subtag.
+            }
+
+            token = it.next();
         }
     }
 
+    mEmojiStyle = resolveEmojiStyle(input.data(), input.length());
+
+finalize:
     mHbLanguage = hb_language_from_string(getString().c_str(), -1);
-    mEmojiStyle = resolveEmojiStyle(buf, length, mScript);
+    if (mEmojiStyle == EMSTYLE_EMPTY) {
+        mEmojiStyle = scriptToEmojiStyle(mScript);
+    }
 }
 
 // static
-FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t length,
-        uint32_t script) {
+FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t length) {
     // First, lookup emoji subtag.
     // 10 is the length of "-u-em-text", which is the shortest emoji subtag,
     // unnecessary comparison can be avoided if total length is smaller than 10.
@@ -195,14 +234,16 @@ FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t
             }
         }
     }
+    return EMSTYLE_EMPTY;
+}
 
+FontLanguage::EmojiStyle FontLanguage::scriptToEmojiStyle(uint32_t script) {
     // If no emoji subtag was provided, resolve the emoji style from script code.
-    if (script == SCRIPT_TAG('Z', 's', 'y', 'e')) {
+    if (script == packScript('Z', 's', 'y', 'e')) {
         return EMSTYLE_EMOJI;
-    } else if (script == SCRIPT_TAG('Z', 's', 'y', 'm')) {
+    } else if (script == packScript('Z', 's', 'y', 'm')) {
         return EMSTYLE_TEXT;
     }
-
     return EMSTYLE_EMPTY;
 }
 
@@ -210,38 +251,38 @@ FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t
 uint8_t FontLanguage::scriptToSubScriptBits(uint32_t script) {
     uint8_t subScriptBits = 0u;
     switch (script) {
-        case SCRIPT_TAG('B', 'o', 'p', 'o'):
+        case packScript('B', 'o', 'p', 'o'):
             subScriptBits = kBopomofoFlag;
             break;
-        case SCRIPT_TAG('H', 'a', 'n', 'g'):
+        case packScript('H', 'a', 'n', 'g'):
             subScriptBits = kHangulFlag;
             break;
-        case SCRIPT_TAG('H', 'a', 'n', 'b'):
+        case packScript('H', 'a', 'n', 'b'):
             // Bopomofo is almost exclusively used in Taiwan.
             subScriptBits = kHanFlag | kBopomofoFlag;
             break;
-        case SCRIPT_TAG('H', 'a', 'n', 'i'):
+        case packScript('H', 'a', 'n', 'i'):
             subScriptBits = kHanFlag;
             break;
-        case SCRIPT_TAG('H', 'a', 'n', 's'):
+        case packScript('H', 'a', 'n', 's'):
             subScriptBits = kHanFlag | kSimplifiedChineseFlag;
             break;
-        case SCRIPT_TAG('H', 'a', 'n', 't'):
+        case packScript('H', 'a', 'n', 't'):
             subScriptBits = kHanFlag | kTraditionalChineseFlag;
             break;
-        case SCRIPT_TAG('H', 'i', 'r', 'a'):
+        case packScript('H', 'i', 'r', 'a'):
             subScriptBits = kHiraganaFlag;
             break;
-        case SCRIPT_TAG('H', 'r', 'k', 't'):
+        case packScript('H', 'r', 'k', 't'):
             subScriptBits = kKatakanaFlag | kHiraganaFlag;
             break;
-        case SCRIPT_TAG('J', 'p', 'a', 'n'):
+        case packScript('J', 'p', 'a', 'n'):
             subScriptBits = kHanFlag | kKatakanaFlag | kHiraganaFlag;
             break;
-        case SCRIPT_TAG('K', 'a', 'n', 'a'):
+        case packScript('K', 'a', 'n', 'a'):
             subScriptBits = kKatakanaFlag;
             break;
-        case SCRIPT_TAG('K', 'o', 'r', 'e'):
+        case packScript('K', 'o', 'r', 'e'):
             subScriptBits = kHanFlag | kHangulFlag;
             break;
     }
@@ -252,18 +293,36 @@ std::string FontLanguage::getString() const {
     if (isUnsupported()) {
         return "und";
     }
-    char buf[16];
-    size_t i = unpackLanguageOrRegion(mLanguage, buf, 'a', 'a');
-    if (mScript != 0) {
+    char buf[24];
+    size_t i = unpackLanguage(mLanguage, buf);
+    if (mScript != INVALID_SCRIPT) {
+        uint32_t rawScript = unpackScript(mScript);
         buf[i++] = '-';
-        buf[i++] = (mScript >> 24) & 0xFFu;
-        buf[i++] = (mScript >> 16) & 0xFFu;
-        buf[i++] = (mScript >> 8) & 0xFFu;
-        buf[i++] = mScript & 0xFFu;
+        buf[i++] = (rawScript >> 24) & 0xFFu;
+        buf[i++] = (rawScript >> 16) & 0xFFu;
+        buf[i++] = (rawScript >> 8) & 0xFFu;
+        buf[i++] = rawScript & 0xFFu;
     }
     if (mRegion != INVALID_CODE) {
         buf[i++] = '-';
-        i += unpackLanguageOrRegion(mRegion, buf + i, 'A', '0');
+        i += unpackRegion(mRegion, buf + i);
+    }
+    if (mVariant != Variant::NO_VARIANT) {
+        buf[i++] = '-';
+        buf[i++] = '1';
+        buf[i++] = '9';
+        switch (mVariant) {
+            case Variant::GERMAN_1901_ORTHOGRAPHY:
+                buf[i++] = '0';
+                buf[i++] = '1';
+                break;
+            case Variant::GERMAN_1996_ORTHOGRAPHY:
+                buf[i++] = '9';
+                buf[i++] = '6';
+                break;
+            default:
+                LOG_ALWAYS_FATAL("Must not reached.");
+        }
     }
     return std::string(buf, i);
 }
@@ -278,10 +337,11 @@ bool FontLanguage::supportsScript(uint8_t providedBits, uint8_t requestedBits) {
 }
 
 bool FontLanguage::supportsHbScript(hb_script_t script) const {
-    static_assert(SCRIPT_TAG('J', 'p', 'a', 'n') == HB_TAG('J', 'p', 'a', 'n'),
+    static_assert(unpackScript(packScript('J', 'p', 'a', 'n')) == HB_TAG('J', 'p', 'a', 'n'),
                   "The Minikin script and HarfBuzz hb_script_t have different encodings.");
-    if (script == mScript) return true;
-    return supportsScript(mSubScriptBits, scriptToSubScriptBits(script));
+    uint32_t packedScript = packScript(script);
+    if (packedScript == mScript) return true;
+    return supportsScript(mSubScriptBits, scriptToSubScriptBits(packedScript));
 }
 
 int FontLanguage::calcScoreFor(const FontLanguages& supported) const {
@@ -341,5 +401,4 @@ FontLanguages::FontLanguages(std::vector<FontLanguage>&& languages)
     }
 }
 
-#undef SCRIPT_TAG
 }  // namespace minikin

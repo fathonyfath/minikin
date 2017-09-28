@@ -21,21 +21,21 @@ namespace minikin {
 
 static void BM_FontLanguage_en_US(benchmark::State& state) {
     while (state.KeepRunning()) {
-        FontLanguage language("en-US", 5);
+        FontLanguage language(StringPiece("en-US", 5));
     }
 }
 BENCHMARK(BM_FontLanguage_en_US);
 
 static void BM_FontLanguage_en_Latn_US(benchmark::State& state) {
     while (state.KeepRunning()) {
-        FontLanguage language("en-Latn-US", 10);
+        FontLanguage language(StringPiece("en-Latn-US", 10));
     }
 }
 BENCHMARK(BM_FontLanguage_en_Latn_US);
 
 static void BM_FontLanguage_en_Latn_US_u_em_emoji(benchmark::State& state) {
     while (state.KeepRunning()) {
-        FontLanguage language("en-Latn-US-u-em-emoji", 21);
+        FontLanguage language(StringPiece("en-Latn-US-u-em-emoji", 21));
     }
 }
 BENCHMARK(BM_FontLanguage_en_Latn_US_u_em_emoji);
