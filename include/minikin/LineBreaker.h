@@ -144,7 +144,8 @@ class LineBreaker {
                 FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
                 const std::vector<Hyphenator*>& hyphenators);
 
-        void addReplacement(size_t start, size_t end, float width);
+        void addReplacement(size_t start, size_t end, float width, const char* langTags,
+                const std::vector<Hyphenator*>& hyphenators);
 
         size_t computeBreaks();
 
