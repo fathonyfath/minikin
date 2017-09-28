@@ -77,14 +77,15 @@ void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>
     // For now, we ignore all locales except the first valid one.
     // TODO: Support selecting the locale based on the script of the text.
     const char* localeStart = locales;
+    icu::Locale locale;
     for (ssize_t i = 0; i < numLocales - 1; i++) { // Loop over all locales, except the last one.
         const char* localeEnd = strchr(localeStart, ',');
         const size_t localeNameLength = localeEnd - localeStart;
         char localeName[localeNameLength + 1];
         strncpy(localeName, localeStart, localeNameLength);
         localeName[localeNameLength] = '\0';
-        mLocale = icu::Locale::createFromName(localeName);
-        goodLocaleFound = !mLocale.isBogus();
+        locale = icu::Locale::createFromName(localeName);
+        goodLocaleFound = !locale.isBogus();
         if (goodLocaleFound) {
             mHyphenator = hyphenators[i];
             break;
@@ -93,16 +94,16 @@ void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>
         }
     }
     if (!goodLocaleFound) { // Try the last locale.
-        mLocale = icu::Locale::createFromName(localeStart);
-        if (mLocale.isBogus()) {
+        locale = icu::Locale::createFromName(localeStart);
+        if (locale.isBogus()) {
             // No good locale.
-            mLocale = icu::Locale::getRoot();
+            locale = icu::Locale::getRoot();
             mHyphenator = nullptr;
         } else {
             mHyphenator = numLocales == 0 ? nullptr : hyphenators[numLocales - 1];
         }
     }
-    mWordBreaker->followingWithLocale(mLocale, restartFrom);
+    mWordBreaker->followingWithLocale(locale, restartFrom);
 }
 
 void LineBreaker::setText() {
@@ -154,10 +155,10 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
                 if (wordLen <= LONGEST_HYPHENATED_WORD) {
                     if (wordStart == 0) {
                         // The string starts with a word. Use out directly.
-                        mHyphenator->hyphenate(&out, str, wordLen, mLocale);
+                        mHyphenator->hyphenate(&out, str, wordLen);
                     } else {
                         std::vector<HyphenationType> wordVec;
-                        mHyphenator->hyphenate(&wordVec, str + wordStart, wordLen, mLocale);
+                        mHyphenator->hyphenate(&wordVec, str + wordStart, wordLen);
                         out.insert(out.end(), wordVec.cbegin(), wordVec.cend());
                     }
                 } else { // Word is too long. Inefficient to hyphenate.

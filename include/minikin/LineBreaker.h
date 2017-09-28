@@ -239,7 +239,6 @@ class LineBreaker {
         void finishBreaksOptimal();
 
         std::unique_ptr<WordBreaker> mWordBreaker;
-        icu::Locale mLocale;
         std::vector<uint16_t> mTextBuf;
         std::vector<float> mCharWidths;
         std::vector<MinikinExtent> mCharExtents;
