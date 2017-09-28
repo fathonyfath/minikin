@@ -74,14 +74,20 @@ class TabStops {
 class LineBreaker {
     public:
         // Implement this for the additional information during line breaking.
+        // The functions in this class's interface may be called several times. The implementation
+        // must return the same value for the same input.
         class LineWidthDelegate {
             public:
                 virtual ~LineWidthDelegate() {}
 
                 // Called to find out the width for the line.
-                // This function may be called several times. The implementation must return the
-                // same value for the same input.
                 virtual float getLineWidth(size_t lineNo) = 0;
+
+                // Called to find out the available left-side padding for the line.
+                virtual float getLeftPadding(size_t lineNo) = 0;
+
+                // Called to find out the available right-side padding for the line.
+                virtual float getRightPadding(size_t lineNo) = 0;
         };
 
         LineBreaker();

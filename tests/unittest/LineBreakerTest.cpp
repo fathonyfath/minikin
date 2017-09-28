@@ -192,6 +192,12 @@ public:
     float getLineWidth(size_t) override {
         return mWidth;
     }
+    float getLeftPadding(size_t) override {
+        return 0;
+    }
+    float getRightPadding(size_t) override {
+        return 0;
+    }
 
 private:
     float mWidth;
