@@ -254,6 +254,9 @@ static bool getCoverageFormat12(vector<uint32_t>& coverage, const uint8_t* data,
         }
         if (end > MAX_UNICODE_CODE_POINT) {
             // file is inclusive, vector is exclusive
+            if (end == 0xFFFFFFFF) {
+                android_errorWriteLog(0x534e4554, "62134807");
+            }
             return addRange(coverage, start, MAX_UNICODE_CODE_POINT + 1);
         }
         if (!addRange(coverage, start, end + 1)) {  // file is inclusive, vector is exclusive
