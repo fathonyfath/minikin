@@ -95,8 +95,10 @@ void LineBreaker::setText() {
     // handle initial break here because addStyleRun may never be called
     mCandidates.clear();
     Candidate cand = {
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0}, HyphenationType::DONT_BREAK};
+            0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0},
+            HyphenationType::DONT_BREAK};
     mCandidates.push_back(cand);
+    mLastNormalCandIndex = 0;
 
     // reset greedy breaker state
     mBreaks.clear();
@@ -118,8 +120,15 @@ void LineBreaker::setText() {
 // plus '\n'.
 // Note: all such characters are in the BMP, so it's ok to use code units for this.
 static bool isLineEndSpace(uint16_t c) {
-    return c == '\n' || c == ' ' || c == 0x1680 || (0x2000 <= c && c <= 0x200A && c != 0x2007) ||
-            c == 0x205F || c == 0x3000;
+    return c == '\n'
+            || c == ' ' // SPACE
+            || c == 0x1680   // OGHAM SPACE MARK
+            || (0x2000 <= c && c <= 0x200A && c != 0x2007) // EN QUAD, EM QUAD, EN SPACE, EM SPACE,
+                                                           // THREE-PER-EM SPACE, FOUR-PER-EM SPACE,
+                                                           // SIX-PER-EM SPACE, PUNCTUATION SPACE,
+                                                           // THIN SPACE, HAIR SPACE
+            || c == 0x205F   // MEDIUM MATHEMATICAL SPACE
+            || c == 0x3000;  // IDEOGRAPHIC SPACE
 }
 
 // Hyphenates a string potentially containing non-breaking spaces.
@@ -239,9 +248,12 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
                 mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
+        const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
         LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtl);
-        const ParaWidth hyphPostBreak = lastBreakWidth
-                + (firstPartWidth + (isRtl ? overhang.left : overhang.right));
+        // TODO: This ignores potential overhang from a previous word, e.g. in "R table" if the
+        // right overhang of the R is larger than the advance of " ta-". In such cases, we need to
+        // take the existing overhang into account.
+        const float firstOverhang = isRtl ? overhang.left : overhang.right;
 
         paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
         const size_t secondPartLen = afterWord - j;
@@ -250,15 +262,15 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
                 mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
-        overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtl);
         // hyphPreBreak is calculated like this so that when the line width for a future line break
         // is being calculated, the width of the whole word would be subtracted and the width of the
         // second part would be added.
-        const ParaWidth hyphPreBreak = postBreak
-                - (secondPartWidth + (isRtl ? overhang.right : overhang.left));
+        const ParaWidth hyphPreBreak = postBreak - secondPartWidth;
+        overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtl);
+        const float secondOverhang = isRtl ? overhang.right : overhang.left;
 
-        addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount, postSpaceCount, *extent,
-                hyphenPenalty, hyph);
+        addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang,
+                postSpaceCount, postSpaceCount, *extent, hyphenPenalty, hyph);
         extent->reset();
 
         paint->hyphenEdit = HyphenEdit::NO_EDIT;
@@ -311,6 +323,10 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     size_t lastBreak = start; // The index of the previous break point.
     ParaWidth lastBreakWidth = mWidth; // The width of the text as of the previous break point.
     ParaWidth postBreak = mWidth; // The width of text seen if we decide to break here
+    // postBreak plus potential forward overhang. Guaranteed to be >= postBreak.
+    ParaWidth postBreakWithOverhang = mWidth;
+    // The maximum amount of backward overhang seen since last word.
+    float maxBackwardOverhang = 0;
     size_t postSpaceCount = mSpaceCount;
     MinikinExtent extent = {0.0, 0.0, 0.0};
     const bool hyphenate = (paint != nullptr && mHyphenator != nullptr &&
@@ -334,28 +350,53 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
                 // If we break a line on a line-ending space, that space goes away. So postBreak
                 // and postSpaceCount, which keep the width and number of spaces if we decide to
                 // break at this point, don't need to get adjusted.
+                //
+                // TODO: handle the rare case of line ending spaces having overhang (it can happen
+                // for U+1680 OGHAM SPACE MARK).
             } else {
                 postBreak = mWidth;
                 postSpaceCount = mSpaceCount;
                 afterWord = i + 1;
+
+                // TODO: This doesn't work for very tight lines and large overhangs, where the
+                // overhang from a previous word that may end up on an earline line may be
+                // considered still in effect for a later word. But that's expected to be very rare,
+                // so we ignore it for now.
+                postBreakWithOverhang = std::max(postBreakWithOverhang,
+                        postBreak + (isRtl ? mCharOverhangs[i].left : mCharOverhangs[i].right));
+
+                float backwardOverhang = isRtl ? mCharOverhangs[i].right : mCharOverhangs[i].left;
+                // Adjust backwardOverhang by the advance already seen from the last break.
+                backwardOverhang -= (mWidth - mCharWidths[i]) - lastBreakWidth;
+                maxBackwardOverhang = std::max(maxBackwardOverhang, backwardOverhang);
             }
         }
         if (i + 1 == current) { // We are at the end of a word.
+            // We skip breaks for zero-width characters inside replacement spans.
+            const bool addBreak = paint != nullptr || current == end || mCharWidths[current] > 0;
+
+            if (addBreak) {
+                // adjust second overhang for previous breaks
+                adjustSecondOverhang(maxBackwardOverhang);
+            }
             if (hyphenate) {
                 addHyphenationCandidates(paint, typeface, style, start, afterWord, lastBreak,
                         lastBreakWidth, postBreak, postSpaceCount, &extent, hyphenPenalty,
                         bidiFlags);
             }
-
-            // We skip breaks for zero-width characters inside replacement spans.
-            if (paint != nullptr || current == end || mCharWidths[current] > 0) {
+            if (addBreak) {
                 const float penalty = hyphenPenalty * mWordBreaker->breakBadness();
-                addWordBreak(current, mWidth, postBreak, mSpaceCount, postSpaceCount, extent,
+                // TODO: overhangs may need adjustment at bidi boundaries.
+                addWordBreak(current, mWidth /* preBreak */, postBreak,
+                        postBreakWithOverhang - postBreak /* firstOverhang */,
+                        0.0 /* secondOverhang, to be adjusted later */,
+                        mSpaceCount, postSpaceCount, extent,
                         penalty, HyphenationType::DONT_BREAK);
                 extent.reset();
             }
             lastBreak = current;
             lastBreakWidth = mWidth;
+            maxBackwardOverhang = 0;
             current = (size_t)mWordBreaker->next();
         }
     }
@@ -365,7 +406,7 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
 
 // Add desperate breaks.
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
-// are imprecise especially in the presence of kerning, ligatures, and Arabic shaping.
+// are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
 void LineBreaker::addDesperateBreaks(ParaWidth width, size_t start, size_t end,
         size_t postSpaceCount) {
     for (size_t i = start; i < end; i++) {
@@ -375,6 +416,8 @@ void LineBreaker::addDesperateBreaks(ParaWidth width, size_t start, size_t end,
             cand.offset = i;
             cand.preBreak = width;
             cand.postBreak = width;
+            cand.firstOverhang = 0.0;
+            cand.secondOverhang = 0.0;
             // postSpaceCount doesn't include trailing spaces
             cand.preSpaceCount = postSpaceCount;
             cand.postSpaceCount = postSpaceCount;
@@ -388,10 +431,10 @@ void LineBreaker::addDesperateBreaks(ParaWidth width, size_t start, size_t end,
 }
 
 // add a word break (possibly for a hyphenated fragment), and add desperate breaks if
-// needed (ie when word exceeds current line width)
+// needed (ie when word exceeds current line width).
 void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
-        size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
-        float penalty, HyphenationType hyph) {
+        float firstOverhang, float secondOverhang, size_t preSpaceCount, size_t postSpaceCount,
+        MinikinExtent extent, float penalty, HyphenationType hyph) {
     const ParaWidth lastPreBreak = mCandidates.back().preBreak;
     if (postBreak - lastPreBreak > currentLineWidth()) { // The line doesn't fit
         const size_t lastBreak = mCandidates.back().offset;
@@ -403,12 +446,36 @@ void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth post
     cand.offset = offset;
     cand.preBreak = preBreak;
     cand.postBreak = postBreak;
+    cand.firstOverhang = firstOverhang;
+    cand.secondOverhang = secondOverhang;
     cand.penalty = penalty;
     cand.preSpaceCount = preSpaceCount;
     cand.postSpaceCount = postSpaceCount;
     cand.extent = extent;
     cand.hyphenType = hyph;
     addCandidate(cand);
+}
+
+// Go back and adjust earlier non-desperate line breaks if needed.
+void LineBreaker::adjustSecondOverhang(float secondOverhang) {
+    const size_t lastBreak = mCandidates.size() - 1;
+    const ParaWidth lastPreBreak = mCandidates[lastBreak].preBreak;
+    for (ssize_t i = lastBreak; i >= 0; i--) {
+        if (mCandidates[i].penalty == SCORE_DESPERATE) {
+            // Skip desperate breaks.
+            continue;
+        }
+        // "lastPreBreak - mCandidates[i].preBreak" is the amount of difference in mWidth when those
+        // breaks where added. So by subtracting that difference, we are subtracting the difference
+        // in advances in order to find out how much overhang still remains.
+        const float remainingOverhang = secondOverhang - (lastPreBreak - mCandidates[i].preBreak);
+        if (remainingOverhang <= 0.0) {
+            // No more remaining overhang. We don't need to adjust anything anymore.
+            return;
+        }
+        mCandidates[i].secondOverhang = std::max(mCandidates[i].secondOverhang,
+                remainingOverhang);
+    }
 }
 
 // Find the needed extent between the start and end ranges. start and end are inclusive.
@@ -658,6 +725,9 @@ void LineBreaker::finish() {
         mCharWidths.shrink_to_fit();
         mCharExtents.clear();
         mCharExtents.shrink_to_fit();
+        mCharOverhangs.clear();
+        mCharOverhangs.shrink_to_fit();
+
         mCandidates.shrink_to_fit();
         mBreaks.shrink_to_fit();
         mWidths.shrink_to_fit();
