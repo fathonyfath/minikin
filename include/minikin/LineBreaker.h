@@ -74,14 +74,20 @@ class TabStops {
 class LineBreaker {
     public:
         // Implement this for the additional information during line breaking.
+        // The functions in this class's interface may be called several times. The implementation
+        // must return the same value for the same input.
         class LineWidthDelegate {
             public:
                 virtual ~LineWidthDelegate() {}
 
                 // Called to find out the width for the line.
-                // This function may be called several times. The implementation must return the
-                // same value for the same input.
                 virtual float getLineWidth(size_t lineNo) = 0;
+
+                // Called to find out the available left-side padding for the line.
+                virtual float getLeftPadding(size_t lineNo) = 0;
+
+                // Called to find out the available right-side padding for the line.
+                virtual float getRightPadding(size_t lineNo) = 0;
         };
 
         LineBreaker();
@@ -89,15 +95,6 @@ class LineBreaker {
         virtual ~LineBreaker();
 
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
-
-        // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
-        // explicitly to avoid the cost of creating ICU BreakIterator objects. It should always
-        // be set on the first invocation, but callers are encouraged not to call again unless
-        // locale has actually changed.
-        // That logic could be here but it's better for performance that it's upstream because of
-        // the cost of constructing and comparing the ICU Locale object.
-        // Note: caller is responsible for managing lifetime of hyphenator
-        void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators);
 
         void resize(size_t size) {
             mTextBuf.resize(size);
@@ -149,12 +146,9 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        // TODO: this class is actually fairly close to being general and not tied to using
-        // Minikin to do the shaping of the strings. The main thing that would need to be changed
-        // is having some kind of callback (or virtual class, or maybe even template), which could
-        // easily be instantiated with Minikin's Layout. Future work for when needed.
         float addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-                FontStyle style, size_t start, size_t end, bool isRtl);
+                FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
+                const std::vector<Hyphenator*>& hyphenators);
 
         void addReplacement(size_t start, size_t end, float width);
 
@@ -206,6 +200,16 @@ class LineBreaker {
             HyphenationType hyphenType;
         };
 
+        // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
+        // explicitly to avoid the cost of creating ICU BreakIterator objects. It should always
+        // be set on the first invocation, but callers are encouraged not to call again unless
+        // locale has actually changed.
+        // That logic could be here but it's better for performance that it's upstream because of
+        // the cost of constructing and comparing the ICU Locale object.
+        // Note: caller is responsible for managing lifetime of hyphenator
+        void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
+                        size_t restartFrom);
+
         float currentLineWidth() const;
 
         void addHyphenationCandidates(MinikinPaint* paint,
@@ -241,7 +245,6 @@ class LineBreaker {
         void finishBreaksOptimal();
 
         std::unique_ptr<WordBreaker> mWordBreaker;
-        icu::Locale mLocale;
         std::vector<uint16_t> mTextBuf;
         std::vector<float> mCharWidths;
         std::vector<MinikinExtent> mCharExtents;

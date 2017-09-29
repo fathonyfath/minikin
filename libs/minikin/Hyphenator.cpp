@@ -108,21 +108,33 @@ struct Header {
     }
 };
 
-Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix) {
-    Hyphenator* result = new Hyphenator;
-    result->patternData = patternData;
-    result->minPrefix = minPrefix;
-    result->minSuffix = minSuffix;
-    return result;
+// static
+// TODO: Replace language/languageLength with StringPiece
+Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
+        const char* language, size_t languageLength) {
+    HyphenationLocale hyphenLocale = HyphenationLocale::OTHER;
+    if (languageLength == 2) {
+        if (language[0] == 'p' && language[1] == 'l') {
+            hyphenLocale = HyphenationLocale::POLISH;
+        } else if(language[0] == 'c' && language[1] == 'a') {
+            hyphenLocale = HyphenationLocale::CATALAN;
+        }
+    }
+    return new Hyphenator(patternData, minPrefix, minSuffix, hyphenLocale);
 }
 
-void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word, size_t len,
-        const icu::Locale& locale) {
+Hyphenator::Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
+        HyphenationLocale hyphenLocale)
+    : mPatternData(patternData), mMinPrefix(minPrefix), mMinSuffix(minSuffix),
+        mHyphenationLocale(hyphenLocale) {
+}
+
+void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word, size_t len) {
     result->clear();
     result->resize(len);
     const size_t paddedLen = len + 2;  // start and stop code each count for 1
-    if (patternData != nullptr &&
-            len >= minPrefix + minSuffix && paddedLen <= MAX_HYPHENATED_SIZE) {
+    if (mPatternData != nullptr &&
+            len >= mMinPrefix + mMinSuffix && paddedLen <= MAX_HYPHENATED_SIZE) {
         uint16_t alpha_codes[MAX_HYPHENATED_SIZE];
         const HyphenationType hyphenValue = alphabetLookup(alpha_codes, word, len);
         if (hyphenValue != HyphenationType::DONT_BREAK) {
@@ -135,7 +147,7 @@ void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word
     // Note that we will always get here if the word contains a hyphen or a soft hyphen, because the
     // alphabet is not expected to contain a hyphen or a soft hyphen character, so alphabetLookup
     // would return DONT_BREAK.
-    hyphenateWithNoPatterns(result->data(), word, len, locale);
+    hyphenateWithNoPatterns(result->data(), word, len);
 }
 
 // This function determines whether a character is like U+2010 HYPHEN in
@@ -280,8 +292,8 @@ static inline HyphenationType getHyphTypeForArabic(const uint16_t* word, size_t 
 // Use various recommendations of UAX #14 Unicode Line Breaking Algorithm for hyphenating words
 // that didn't match patterns, especially words that contain hyphens or soft hyphens (See sections
 // 5.3, Use of Hyphen, and 5.4, Use of Soft Hyphen).
-void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len,
-        const icu::Locale& locale) {
+void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word,
+        size_t len) {
     result[0] = HyphenationType::DONT_BREAK;
     for (size_t i = 1; i < len; i++) {
         const uint16_t prevChar = word[i - 1];
@@ -289,7 +301,7 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
             // Break after hyphens, but only if they don't start the word.
 
             if ((prevChar == CHAR_HYPHEN_MINUS || prevChar == CHAR_HYPHEN)
-                    && strcmp(locale.getLanguage(), "pl") == 0
+                    && mHyphenationLocale == HyphenationLocale::POLISH
                     && getScript(word[i]) == USCRIPT_LATIN ) {
                 // In Polish, hyphens get repeated at the next line. To be safe,
                 // we will do this only if the next character is Latin.
@@ -309,10 +321,10 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
                 result[i] = hyphenationTypeBasedOnScript(word[i]);
             }
         } else if (prevChar == CHAR_MIDDLE_DOT
-                && minPrefix < i && i <= len - minSuffix
+                && mMinPrefix < i && i <= len - mMinSuffix
                 && ((word[i - 2] == 'l' && word[i] == 'l')
                         || (word[i - 2] == 'L' && word[i] == 'L'))
-                && strcmp(locale.getLanguage(), "ca") == 0) {
+                && mHyphenationLocale == HyphenationLocale::CATALAN) {
             // In Catalan, "l·l" should break as "l-" on the first line
             // and "l" on the next line.
             result[i] = HyphenationType::BREAK_AND_REPLACE_WITH_HYPHEN;
@@ -394,7 +406,7 @@ void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* cod
     uint32_t link_shift = trie->link_shift;
     uint32_t link_mask = trie->link_mask;
     uint32_t pattern_shift = trie->pattern_shift;
-    size_t maxOffset = len - minSuffix - 1;
+    size_t maxOffset = len - mMinSuffix - 1;
     for (size_t i = 0; i < len - 1; i++) {
         uint32_t node = 0;  // index into Trie table
         for (size_t j = i; j < len; j++) {
@@ -416,7 +428,7 @@ void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* cod
                 const uint8_t* pat_buf = pattern->buf(pat_entry);
                 int offset = j + 1 - (pat_len + pat_shift);
                 // offset is the index within buffer that lines up with the start of pat_buf
-                int start = std::max((int)minPrefix - offset, 0);
+                int start = std::max((int)mMinPrefix - offset, 0);
                 int end = std::min(pat_len, (int)maxOffset - offset);
                 for (int k = start; k < end; k++) {
                     buffer[offset + k] = std::max(buffer[offset + k], pat_buf[k]);
@@ -425,8 +437,8 @@ void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* cod
         }
     }
     // Since the above calculation does not modify values outside
-    // [minPrefix, len - minSuffix], they are left as 0 = DONT_BREAK.
-    for (size_t i = minPrefix; i < maxOffset; i++) {
+    // [mMinPrefix, len - mMinSuffix], they are left as 0 = DONT_BREAK.
+    for (size_t i = mMinPrefix; i < maxOffset; i++) {
         // Hyphenation opportunities happen when the hyphenation numbers are odd.
         result[i] = (buffer[i] & 1u) ? hyphenValue : HyphenationType::DONT_BREAK;
     }

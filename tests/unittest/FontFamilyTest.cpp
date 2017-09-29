@@ -42,7 +42,7 @@ static FontLanguage createFontLanguage(const std::string& input) {
 }
 
 static FontLanguage createFontLanguageWithoutICUSanitization(const std::string& input) {
-    return FontLanguage(input.c_str(), input.size());
+    return FontLanguage(input);
 }
 
 std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
@@ -53,7 +53,7 @@ std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
 
 TEST_F(FontLanguageTest, basicTests) {
     FontLanguage defaultLang;
-    FontLanguage emptyLang("", 0);
+    FontLanguage emptyLang("");
     FontLanguage english = createFontLanguage("en");
     FontLanguage french = createFontLanguage("fr");
     FontLanguage und = createFontLanguage("und");
@@ -73,6 +73,7 @@ TEST_F(FontLanguageTest, basicTests) {
     EXPECT_TRUE(english != undZsye);
     EXPECT_TRUE(und != undZsye);
     EXPECT_TRUE(english != und);
+    EXPECT_TRUE(createFontLanguage("de-1901") != createFontLanguage("de-1996"));
 
     EXPECT_TRUE(defaultLang.isUnsupported());
     EXPECT_TRUE(emptyLang.isUnsupported());
@@ -110,9 +111,12 @@ TEST_F(FontLanguageTest, getStringTest) {
     EXPECT_EQ("und-Zsye", createFontLanguage("Und-ZSYE").getString());
     EXPECT_EQ("und-Zsye", createFontLanguage("Und-zsye").getString());
 
-    EXPECT_EQ("de-Latn-DE", createFontLanguage("de-1901").getString());
-
     EXPECT_EQ("es-Latn-419", createFontLanguage("es-Latn-419").getString());
+
+    // Variant
+    EXPECT_EQ("de-Latn-DE", createFontLanguage("de").getString());
+    EXPECT_EQ("de-Latn-DE-1901", createFontLanguage("de-1901").getString());
+    EXPECT_EQ("de-Latn-DE-1996", createFontLanguage("de-DE-1996").getString());
 
     // Emoji subtag is dropped from getString().
     EXPECT_EQ("es-Latn-419", createFontLanguage("es-419-u-em-emoji").getString());
@@ -363,7 +367,7 @@ TEST_F(FontLanguagesTest, subtagEmojiTest) {
         "en-Zsym-u-em-emoji",
         "en-Zsye-u-em-emoji",
 
-        // Strings that contain the county.
+        // Strings that contain the country.
         "und-US-u-em-emoji",
         "en-US-u-em-emoji",
         "es-419-u-em-emoji",
@@ -371,6 +375,9 @@ TEST_F(FontLanguagesTest, subtagEmojiTest) {
         "en-Zsym-US-u-em-emoji",
         "en-Zsye-US-u-em-emoji",
         "es-Zsye-419-u-em-emoji",
+
+        // Strings that contain the variant.
+        "de-Latn-DE-1901-u-em-emoji",
     };
 
     for (auto subtagEmojiString : subtagEmojiStrings) {
@@ -397,7 +404,7 @@ TEST_F(FontLanguagesTest, subtagTextTest) {
         "en-Zsym-u-em-text",
         "en-Zsye-u-em-text",
 
-        // Strings that contain the county.
+        // Strings that contain the country.
         "und-US-u-em-text",
         "en-US-u-em-text",
         "es-419-u-em-text",
@@ -405,6 +412,9 @@ TEST_F(FontLanguagesTest, subtagTextTest) {
         "en-Zsym-US-u-em-text",
         "en-Zsye-US-u-em-text",
         "es-Zsye-419-u-em-text",
+
+        // Strings that contain the variant.
+        "de-Latn-DE-1901-u-em-text",
     };
 
     for (auto subtagTextString : subtagTextStrings) {
@@ -431,13 +441,16 @@ TEST_F(FontLanguagesTest, subtagDefaultTest) {
         "en-Zsym-u-em-default",
         "en-Zsye-u-em-default",
 
-        // Strings that contain the county.
+        // Strings that contain the country.
         "en-US-u-em-default",
         "en-Latn-US-u-em-default",
         "es-Latn-419-u-em-default",
         "en-Zsym-US-u-em-default",
         "en-Zsye-US-u-em-default",
         "es-Zsye-419-u-em-default",
+
+        // Strings that contain the variant.
+        "de-Latn-DE-1901-u-em-default",
     };
 
     for (auto subtagDefaultString : subtagDefaultStrings) {
@@ -456,6 +469,7 @@ TEST_F(FontLanguagesTest, subtagEmptyTest) {
         "en-Latn-US",
         "en-Latn-US-u-em",
         "en-Latn-US-u-em-defaultemoji",
+        "de-Latn-DE-1901",
     };
 
     for (auto subtagEmptyString : subtagEmptyStrings) {
@@ -473,6 +487,8 @@ TEST_F(FontLanguagesTest, registerLanguageListTest) {
 
     EXPECT_EQ(FontStyle::registerLanguageList("en"), FontStyle::registerLanguageList("en"));
     EXPECT_NE(FontStyle::registerLanguageList("en"), FontStyle::registerLanguageList("jp"));
+    EXPECT_NE(FontStyle::registerLanguageList("de"),
+              FontStyle::registerLanguageList("de-1901"));
 
     EXPECT_EQ(FontStyle::registerLanguageList("en,zh-Hans"),
               FontStyle::registerLanguageList("en,zh-Hans"));
@@ -484,6 +500,8 @@ TEST_F(FontLanguagesTest, registerLanguageListTest) {
               FontStyle::registerLanguageList("en"));
     EXPECT_NE(FontStyle::registerLanguageList("en,zh-Hans"),
               FontStyle::registerLanguageList("en,zh-Hant"));
+    EXPECT_NE(FontStyle::registerLanguageList("de,de-1901"),
+              FontStyle::registerLanguageList("de-1901,de"));
 }
 
 // The test font has following glyphs.

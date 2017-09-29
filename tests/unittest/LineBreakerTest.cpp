@@ -120,9 +120,9 @@ public:
         return 0;
     }
 
-    UBool isBoundary(int32_t) override {
-        LOG_ALWAYS_FATAL("Not yet implemented.");
-        return false;
+    UBool isBoundary(int32_t offset) override {
+        auto i = std::find(mBreakPoints.begin(), mBreakPoints.end(), offset);
+        return i != mBreakPoints.end();
     }
 
     int32_t next(int32_t) override {
@@ -192,6 +192,12 @@ public:
     float getLineWidth(size_t) override {
         return mWidth;
     }
+    float getLeftPadding(size_t) override {
+        return 0;
+    }
+    float getRightPadding(size_t) override {
+        return 0;
+    }
 
 private:
     float mWidth;
@@ -202,9 +208,6 @@ static void setupLineBreaker(LineBreaker* b, const std::string& text) {
     for (size_t i = 0; i < text.size(); ++i) {
         b->buffer()[i] = text[i];
     }
-    // Need setLocales otherwise null pointer dereference happens in setText.
-    // TODO: Remove this setLocales.
-    b->setLocales("en_US", std::vector<Hyphenator*>());
     b->setText();
 }
 
@@ -252,6 +255,7 @@ static void expectLineBreaks(const std::string& expected, const std::vector<int>
 }
 
 TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
+    const std::vector<Hyphenator*> hyphenators;
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -275,7 +279,8 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, text.size(), false /* isRtl */);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, text.size(), false /* isRtl */,
+                "en-US", hyphenators);
 
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(7U, breakNum);
@@ -296,6 +301,7 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
+    const std::vector<Hyphenator*> hyphenators;
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -317,89 +323,171 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.setLocales("en_US", std::vector<Hyphenator*>());
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false /* rtl */);
-        b.setLocales("fr_FR", std::vector<Hyphenator*>());
-        b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false /* isRtl */);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false, "fr-FR",
+                hyphenators);
+        const size_t breakNum = b.computeBreaks();
+        ASSERT_EQ(3U, breakNum);
+        expectLineBreaks("ab|cdef|gh",
+                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
 
-        // Currently following expectation doesn't work
-        // The expected output is like
-        // Output: | a b       |
-        //         | c d e f   |
-        //         | g h       |
-        // However, currently it works as
-        // Output: | a b c d e |
-        //         | f g h     |
-        // http://b/65175766
-        // TODO(nona): Enable following test cases.
-        // const size_t breakNum = b.computeBreaks();
-        // ASSERT_EQ(3U, breakNum);
-        // expectLineBreaks("ab|cdef|gh",
-        //          std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
-        //
-        // EXPECT_EQ(std::vector<float>({
-        //         2 * CHAR_WIDTH,
-        //         4 * CHAR_WIDTH,
-        //         2 * CHAR_WIDTH,
-        //     }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+        EXPECT_EQ(std::vector<float>({
+                2 * CHAR_WIDTH,
+                4 * CHAR_WIDTH,
+                2 * CHAR_WIDTH,
+            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
     }
     // TODO: Add more test cases, hyphenataion etc.
 }
 
+TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
+    const std::vector<Hyphenator*> hyphenators;
+    {
+        // The line breaking is expected to work like this:
+        // Input:
+        //    Text:           a b c d e f g h
+        //    US WordBreaker:    ^     ^
+        // Output: | a b c d e |
+        //         | f g h _ _ |
+        // Here, "|" is canvas space. "^" means word break point and "_" means empty
+        const std::string text = "abcdefgh";
+        LocaleIteratorMap map;
+        map[icu::Locale::getUS()] = "ab|cde|fgh";
+
+        TestableLineBreaker b(std::move(map));
+        setupLineBreaker(&b, text);
+        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+
+        MinikinPaint paint;
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", hyphenators);
+        // nullptr means keep current locale and hyphenator
+        b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false, nullptr,
+                hyphenators);
+
+        const size_t breakNum = b.computeBreaks();
+        ASSERT_EQ(2U, breakNum);
+        expectLineBreaks("abcde|fgh",
+                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        EXPECT_EQ(std::vector<float>({
+                5 * CHAR_WIDTH,
+                3 * CHAR_WIDTH,
+            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+    }
+}
+
+TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
+    const std::vector<Hyphenator*> hyphenators;
+    {
+        // The line breaking is expected to work like this:
+        // Input:
+        //    Text:           a a a U+20 b @ c - d U+20 e e e
+        //    US WordBreaker:           ^              ^
+        //    FR WordBreaker:           ^              ^
+        //    Locale Region : [    US          ][     FR     ]
+        // Output: | a a a _ |
+        //         | b @ c _ |
+        //         | - d _ _ |
+        //         | e e e _ |
+        //
+        // Here, "|" is canvas space. "^" means word break point and "_" means empty
+        const std::string text = "aaa b@c-d eee";
+        LocaleIteratorMap map;
+        map[icu::Locale::getUS()] = "aaa |b@c-d |eee";
+        map[icu::Locale::getFrance()] = "aaa |b@c-d |eee";
+
+        TestableLineBreaker b(std::move(map));
+        setupLineBreaker(&b, text);
+        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(4 * CHAR_WIDTH));
+
+        MinikinPaint paint;
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 7, false, "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 7, text.size(), false, "fr-FR",
+                hyphenators);
+
+        const size_t breakNum = b.computeBreaks();
+        expectLineBreaks("aaa |b@c|-d |eee",
+                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        EXPECT_EQ(std::vector<float>({
+                3 * CHAR_WIDTH,  // Doesn't count the trailing spaces.
+                3 * CHAR_WIDTH,  // Doesn't count the trailing spaces.
+                2 * CHAR_WIDTH,
+                3 * CHAR_WIDTH,
+            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+    }
+}
+
 TEST_F(LineBreakerTest, setLocales) {
+    MinikinPaint paint;
+    std::string text = "abcde";
     {
         LineBreaker lineBreaker;
-        Hyphenator hyphenator;
-        std::vector<Hyphenator*> hyphenators;
-        hyphenators.push_back(&hyphenator);
-        lineBreaker.setLocales("en-US", hyphenators);
-        EXPECT_EQ(icu::Locale::getUS(), lineBreaker.mLocale);
-        EXPECT_EQ(&hyphenator, lineBreaker.mHyphenator);
+        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false, "en-US",
+                std::vector<Hyphenator*>({hyphenator.get()}));
+        EXPECT_EQ(hyphenator.get(), lineBreaker.mHyphenator);
     }
     {
         LineBreaker lineBreaker;
-        Hyphenator hyphenator1, hyphenator2;
-        std::vector<Hyphenator*> hyphenators;
-        hyphenators.push_back(&hyphenator1);
-        hyphenators.push_back(&hyphenator2);
-        lineBreaker.setLocales("fr-FR,en-US", hyphenators);
-        EXPECT_EQ(icu::Locale::getFrance(), lineBreaker.mLocale);
-        EXPECT_EQ(&hyphenator1, lineBreaker.mHyphenator);
+        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
+        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false, "fr-FR,en-US",
+                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
+        EXPECT_EQ(hyphenator1.get(), lineBreaker.mHyphenator);
     }
     {
         LineBreaker lineBreaker;
-        std::vector<Hyphenator*> hyphenators;
-        lineBreaker.setLocales("", hyphenators);
-        EXPECT_EQ(icu::Locale::getRoot(), lineBreaker.mLocale);
+        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false, "",
+                std::vector<Hyphenator*>({hyphenator.get()}));
+        EXPECT_EQ(hyphenator.get(), lineBreaker.mHyphenator);
+    }
+    {
+        LineBreaker lineBreaker;
+        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false, "THISISABOGUSLANGUAGE",
+                std::vector<Hyphenator*>({hyphenator.get()}));
         EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
     }
     {
         LineBreaker lineBreaker;
-        std::vector<Hyphenator*> hyphenators;
-        Hyphenator hyphenator;
-        hyphenators.push_back(&hyphenator);
-        lineBreaker.setLocales("THISISABOGUSLANGUAGE", hyphenators);
-        EXPECT_EQ(icu::Locale::getRoot(), lineBreaker.mLocale);
-        EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
+        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false,
+                "THISISABOGUSLANGUAGE,en-US",
+                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
+        EXPECT_EQ(hyphenator2.get(), lineBreaker.mHyphenator);
     }
     {
         LineBreaker lineBreaker;
-        Hyphenator hyphenator1, hyphenator2;
-        std::vector<Hyphenator*> hyphenators;
-        hyphenators.push_back(&hyphenator1);
-        hyphenators.push_back(&hyphenator2);
-        lineBreaker.setLocales("THISISABOGUSLANGUAGE,en-US", hyphenators);
-        EXPECT_EQ(icu::Locale::getUS(), lineBreaker.mLocale);
-        EXPECT_EQ(&hyphenator2, lineBreaker.mHyphenator);
-    }
-    {
-        LineBreaker lineBreaker;
-        Hyphenator hyphenator1, hyphenator2;
-        std::vector<Hyphenator*> hyphenators;
-        hyphenators.push_back(&hyphenator1);
-        hyphenators.push_back(&hyphenator2);
-        lineBreaker.setLocales("THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE", hyphenators);
-        EXPECT_EQ(icu::Locale::getRoot(), lineBreaker.mLocale);
+        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+        setupLineBreaker(&lineBreaker, text);
+        lineBreaker.setLineWidthDelegate(
+                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        lineBreaker.addStyleRun(
+                &paint, mCollection, FontStyle(), 0, text.size(), false,
+                "THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE",
+                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
         EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
     }
 }

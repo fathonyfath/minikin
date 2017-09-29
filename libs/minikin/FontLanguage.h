@@ -22,6 +22,8 @@
 
 #include <hb.h>
 
+#include "StringPiece.h"
+
 namespace minikin {
 
 // Due to the limits in font fallback score calculation, we can't use anything more than 12
@@ -29,7 +31,9 @@ namespace minikin {
 const size_t FONT_LANGUAGES_LIMIT = 12;
 
 // The language or region code is encoded to 15 bits.
-const uint16_t INVALID_CODE = 0x7fff;
+constexpr uint16_t INVALID_CODE = 0x7fff;
+// The script code is encoded to 20 bits.
+constexpr uint32_t INVALID_SCRIPT = 0xfffff;
 
 class FontLanguages;
 
@@ -44,21 +48,30 @@ public:
         EMSTYLE_EMOJI = 2,
         EMSTYLE_TEXT = 3,
     };
+
+    enum class Variant : uint16_t {  // Up to 12 bits
+        NO_VARIANT = 0x0000,
+        GERMAN_1901_ORTHOGRAPHY = 0x0001,
+        GERMAN_1996_ORTHOGRAPHY = 0x0002,
+    };
+
     // Default constructor creates the unsupported language.
     FontLanguage()
-            : mScript(0ul),
+            : mScript(INVALID_SCRIPT),
             mLanguage(INVALID_CODE),
             mRegion(INVALID_CODE),
             mHbLanguage(HB_LANGUAGE_INVALID),
             mSubScriptBits(0ul),
+            mVariant(Variant::NO_VARIANT),
             mEmojiStyle(EMSTYLE_EMPTY) {}
 
     // Parse from string
-    FontLanguage(const char* buf, size_t length);
+    FontLanguage(const StringPiece& buf);
 
     bool operator==(const FontLanguage other) const {
         return !isUnsupported() && isEqualScript(other) && mLanguage == other.mLanguage &&
-                mRegion == other.mRegion && mEmojiStyle == other.mEmojiStyle;
+                mRegion == other.mRegion && mVariant == other.mVariant &&
+                mEmojiStyle == other.mEmojiStyle;
     }
 
     bool operator!=(const FontLanguage other) const {
@@ -84,14 +97,15 @@ public:
     int calcScoreFor(const FontLanguages& supported) const;
 
     uint64_t getIdentifier() const {
-        return ((uint64_t)mLanguage << 49) | ((uint64_t)mScript << 17) | ((uint64_t)mRegion << 2) |
-                mEmojiStyle;
+        return ((uint64_t)mLanguage << 49) | ((uint64_t)mScript << 29) | ((uint64_t)mRegion << 14) |
+                ((uint64_t)mEmojiStyle << 12) | (uint64_t)mVariant;
     }
 
 private:
     friend class FontLanguages;  // for FontLanguages constructor
 
-    // ISO 15924 compliant script code. The 4 chars script code are packed into a 32 bit integer.
+    // ISO 15924 compliant script code. The 4 chars script code are packed into a 20 bit integer.
+    // If not specified, this is kInvalidScript.
     uint32_t mScript;
 
     // ISO 639-1 or ISO 639-2 compliant language code.
@@ -116,11 +130,14 @@ private:
     static const uint8_t kTraditionalChineseFlag = 1u << 6;
     uint8_t mSubScriptBits;
 
+    Variant mVariant;
+
     EmojiStyle mEmojiStyle;
 
-    static uint8_t scriptToSubScriptBits(uint32_t script);
+    static uint8_t scriptToSubScriptBits(uint32_t rawScript);
 
-    static EmojiStyle resolveEmojiStyle(const char* buf, size_t length, uint32_t script);
+    static EmojiStyle resolveEmojiStyle(const char* buf, size_t length);
+    static EmojiStyle scriptToEmojiStyle(uint32_t script);
 
     // Returns true if the provide subscript bits has the requested subscript bits.
     // Note that this function returns false if the requested subscript bits are empty.

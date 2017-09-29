@@ -31,18 +31,20 @@ namespace minikin {
 const uint32_t FontLanguageListCache::kEmptyListId;
 
 // Returns the text length of output.
-static size_t toLanguageTag(char* output, size_t outSize, const std::string& locale) {
+static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& locale) {
     output[0] = '\0';
     if (locale.empty()) {
         return 0;
     }
 
+    std::string localeString = locale.toString();  // ICU only understand C-style string.
+
     size_t outLength = 0;
     UErrorCode uErr = U_ZERO_ERROR;
-    outLength = uloc_canonicalize(locale.c_str(), output, outSize, &uErr);
+    outLength = uloc_canonicalize(localeString.c_str(), output, outSize, &uErr);
     if (U_FAILURE(uErr)) {
         // unable to build a proper language identifier
-        ALOGD("uloc_canonicalize(\"%s\") failed: %s", locale.c_str(), u_errorName(uErr));
+        ALOGD("uloc_canonicalize(\"%s\") failed: %s", localeString.c_str(), u_errorName(uErr));
         output[0] = '\0';
         return 0;
     }
@@ -50,6 +52,7 @@ static size_t toLanguageTag(char* output, size_t outSize, const std::string& loc
     // Preserve "und" and "und-****" since uloc_addLikelySubtags changes "und" to "en-Latn-US".
     if (strncmp(output, "und", 3) == 0 &&
         (outLength == 3 || (outLength == 8 && output[3]  == '_'))) {
+        output[3] = '-';  // to be language tag.
         return outLength;
     }
 
@@ -72,41 +75,33 @@ static size_t toLanguageTag(char* output, size_t outSize, const std::string& loc
         return 0;
     }
 #ifdef VERBOSE_DEBUG
-    ALOGD("ICU normalized '%s' to '%s'", locale.c_str(), output);
+    ALOGD("ICU normalized '%s' to '%s'", localeString.c_str(), output);
 #endif
     return outLength;
 }
 
 static std::vector<FontLanguage> parseLanguageList(const std::string& input) {
     std::vector<FontLanguage> result;
-    size_t currentIdx = 0;
-    size_t commaLoc = 0;
     char langTag[ULOC_FULLNAME_CAPACITY];
     std::unordered_set<uint64_t> seen;
-    std::string locale(input.size(), 0);
 
-    while ((commaLoc = input.find_first_of(',', currentIdx)) != std::string::npos) {
-        locale.assign(input, currentIdx, commaLoc - currentIdx);
-        currentIdx = commaLoc + 1;
+    SplitIterator it(input, ',');
+    while (it.hasNext()) {
+        StringPiece locale = it.next();
         size_t length = toLanguageTag(langTag, ULOC_FULLNAME_CAPACITY, locale);
-        FontLanguage lang(langTag, length);
-        uint64_t identifier = lang.getIdentifier();
-        if (!lang.isUnsupported() && seen.count(identifier) == 0) {
-            result.push_back(lang);
-            if (result.size() == FONT_LANGUAGES_LIMIT) {
-              break;
-            }
-            seen.insert(identifier);
+        FontLanguage lang(StringPiece(langTag, length));
+        if (lang.isUnsupported()) {
+            continue;
         }
-    }
-    if (result.size() < FONT_LANGUAGES_LIMIT) {
-      locale.assign(input, currentIdx, input.size() - currentIdx);
-      size_t length = toLanguageTag(langTag, ULOC_FULLNAME_CAPACITY, locale);
-      FontLanguage lang(langTag, length);
-      uint64_t identifier = lang.getIdentifier();
-      if (!lang.isUnsupported() && seen.count(identifier) == 0) {
-          result.push_back(lang);
-      }
+        const bool isNewLang = seen.insert(lang.getIdentifier()).second;
+        if (!isNewLang) {
+            continue;
+        }
+
+        result.push_back(lang);
+        if (result.size() >= FONT_LANGUAGES_LIMIT) {
+            break;
+        }
     }
     return result;
 }

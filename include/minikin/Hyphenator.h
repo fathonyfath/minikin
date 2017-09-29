@@ -123,8 +123,7 @@ public:
     //
     // Example: word is "hyphen", result is the following, corresponding to "hy-phen":
     // [DONT_BREAK, DONT_BREAK, BREAK_AND_INSERT_HYPHEN, DONT_BREAK, DONT_BREAK, DONT_BREAK]
-    void hyphenate(std::vector<HyphenationType>* result, const uint16_t* word, size_t len,
-            const icu::Locale& locale);
+    void hyphenate(std::vector<HyphenationType>* result, const uint16_t* word, size_t len);
 
     // Returns true if the codepoint is like U+2010 HYPHEN in line breaking and usage: a character
     // immediately after which line breaks are allowed, but words containing it should not be
@@ -135,13 +134,24 @@ public:
     // the caller is responsible for ensuring that the lifetime of the pattern data is
     // at least as long as the Hyphenator object.
 
+    // This class doesn't copy or take ownership of patternData. Caller must keep the data valid
+    // until this instance is deleted.
     // Note: nullptr is valid input, in which case the hyphenator only processes soft hyphens.
-    static Hyphenator* loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix);
-
+    static Hyphenator* loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
+            const char* language, size_t languageLength);
 private:
+    enum class HyphenationLocale : uint8_t {
+        OTHER = 0,
+        POLISH = 1,
+        CATALAN = 2,
+    };
+
+    // Use Hyphenator::loadBinary instead.
+    Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
+        HyphenationLocale hyphenLocale);
+
     // apply various hyphenation rules including hard and soft hyphens, ignoring patterns
-    void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len,
-            const icu::Locale& locale);
+    void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len);
 
     // Try looking up word in alphabet table, return DONT_BREAK if any code units fail to map.
     // Otherwise, returns BREAK_AND_INSERT_HYPHEN, BREAK_AND_INSERT_ARMENIAN_HYPHEN, or
@@ -158,12 +168,13 @@ private:
     // different use case. It measures UTF-16 code units.
     static const size_t MAX_HYPHENATED_SIZE = 64;
 
-    const uint8_t* patternData;
-    size_t minPrefix, minSuffix;
+    const uint8_t* mPatternData;
+    const size_t mMinPrefix, mMinSuffix;
+    const HyphenationLocale mHyphenationLocale;
 
     // accessors for binary data
     const Header* getHeader() const {
-        return reinterpret_cast<const Header*>(patternData);
+        return reinterpret_cast<const Header*>(mPatternData);
     }
 
 };

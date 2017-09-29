@@ -11,7 +11,8 @@
 using minikin::HyphenationType;
 using minikin::Hyphenator;
 
-Hyphenator* loadHybFile(const char* fn, int minPrefix, int minSuffix) {
+Hyphenator* loadHybFile(const char* fn, int minPrefix, int minSuffix, const char* language,
+        size_t languageLength) {
     struct stat statbuf;
     int status = stat(fn, &statbuf);
     if (status < 0) {
@@ -32,11 +33,11 @@ Hyphenator* loadHybFile(const char* fn, int minPrefix, int minSuffix) {
         delete[] buf;
         return nullptr;
     }
-    return Hyphenator::loadBinary(buf, minPrefix, minSuffix);
+    return Hyphenator::loadBinary(buf, minPrefix, minSuffix, language, languageLength);
 }
 
 int main(int argc, char** argv) {
-    Hyphenator* hyph = loadHybFile("/tmp/en.hyb", 2, 3);  // should also be configurable
+    Hyphenator* hyph = loadHybFile("/tmp/en.hyb", 2, 3, "en", 2);  // should also be configurable
     std::vector<HyphenationType> result;
     std::vector<uint16_t> word;
     if (argc < 2) {
@@ -53,7 +54,7 @@ int main(int argc, char** argv) {
         // ASCII (or possibly ISO Latin 1), but kinda painful to do utf conversion :(
         word.push_back(c);
     }
-    hyph->hyphenate(&result, word.data(), word.size(), icu::Locale::getUS());
+    hyph->hyphenate(&result, word.data(), word.size());
     for (size_t i = 0; i < len; i++) {
         if (result[i] != HyphenationType::DONT_BREAK) {
             printf("-");
