@@ -256,19 +256,26 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
                 mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
-        const LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtl);
-        const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth
-                + (isRtl ? overhang.left : overhang.right);
+        LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtl);
+        const ParaWidth hyphPostBreak = lastBreakWidth
+                + (firstPartWidth + (isRtl ? overhang.left : overhang.right));
 
-        paint->hyphenEdit = HyphenEdit::editForNextLine(hyph); // XXX may need to be NO_EDIT.
+        paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
         const size_t secondPartLen = afterWord - j;
+        advances.resize(secondPartLen);
+        overhangs.resize(secondPartLen);
         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
-                mTextBuf.size(), bidiFlags, style, *paint, typeface, nullptr /* advances */,
-                nullptr /* extent */, nullptr /* overhangs */);
-        const ParaWidth hyphPreBreak = postBreak - secondPartWidth;
+                mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
+                nullptr /* extent */, overhangs.data());
+        overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtl);
+        // hyphPreBreak is calculated like this so that when the line width for a future line break
+        // is being calculated, the width of the whole word would be subtracted and the width of the
+        // second part would be added.
+        const ParaWidth hyphPreBreak = postBreak
+                - (secondPartWidth + (isRtl ? overhang.right : overhang.left));
 
-        addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount,
-                postSpaceCount, *extent, hyphenPenalty, hyph);
+        addWordBreak(j, hyphPreBreak, hyphPostBreak, postSpaceCount, postSpaceCount, *extent,
+                hyphenPenalty, hyph);
         extent->reset();
 
         paint->hyphenEdit = HyphenEdit::NO_EDIT;
@@ -323,6 +330,8 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     ParaWidth postBreak = mWidth; // The width of text seen if we decide to break here
     size_t postSpaceCount = mSpaceCount;
     MinikinExtent extent = {0.0, 0.0, 0.0};
+    const bool hyphenate = (paint != nullptr && mHyphenator != nullptr &&
+            mHyphenationFrequency != kHyphenationFrequency_None);
     for (size_t i = start; i < end; i++) {
         const uint16_t c = mTextBuf[i];
         if (c == CHAR_TAB) {
@@ -349,14 +358,13 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             }
         }
         if (i + 1 == current) { // We are at the end of a word.
-            if (paint != nullptr && mHyphenator != nullptr &&
-                    mHyphenationFrequency != kHyphenationFrequency_None) {
+            if (hyphenate) {
                 addHyphenationCandidates(paint, typeface, style, start, afterWord, lastBreak,
                         lastBreakWidth, postBreak, postSpaceCount, &extent, hyphenPenalty,
                         bidiFlags);
             }
 
-            // Skip break for zero-width characters inside replacement span
+            // We skip breaks for zero-width characters inside replacement spans.
             if (paint != nullptr || current == end || mCharWidths[current] > 0) {
                 const float penalty = hyphenPenalty * mWordBreaker->breakBadness();
                 addWordBreak(current, mWidth, postBreak, mSpaceCount, postSpaceCount, extent,
@@ -372,41 +380,43 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
     return width;
 }
 
+// Add desperate breaks.
+// Note: these breaks are based on the shaping of the (non-broken) original text; they
+// are imprecise especially in the presence of kerning, ligatures, and Arabic shaping.
+void LineBreaker::addDesperateBreaks(ParaWidth width, size_t start, size_t end,
+        size_t postSpaceCount) {
+    for (size_t i = start; i < end; i++) {
+        const float w = mCharWidths[i];
+        if (w > 0) { // Add desperate breaks only before grapheme clusters.
+            Candidate cand;
+            cand.offset = i;
+            cand.preBreak = width;
+            cand.postBreak = width;
+            // postSpaceCount doesn't include trailing spaces
+            cand.preSpaceCount = postSpaceCount;
+            cand.postSpaceCount = postSpaceCount;
+            cand.extent = mCharExtents[i];
+            cand.penalty = SCORE_DESPERATE;
+            cand.hyphenType = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
+            addCandidate(cand);
+            width += w;
+        }
+    }
+}
+
 // add a word break (possibly for a hyphenated fragment), and add desperate breaks if
 // needed (ie when word exceeds current line width)
 void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
         size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
         float penalty, HyphenationType hyph) {
-    Candidate cand;
-    ParaWidth width = mCandidates.back().preBreak;
-    if (postBreak - width > currentLineWidth()) {
-        // Add desperate breaks.
-        // Note: these breaks are based on the shaping of the (non-broken) original text; they
-        // are imprecise especially in the presence of kerning, ligatures, and Arabic shaping.
-        size_t i = mCandidates.back().offset;
-        width += mCharWidths[i++];
-        for (; i < offset; i++) {
-            float w = mCharWidths[i];
-            if (w > 0) {
-                cand.offset = i;
-                cand.preBreak = width;
-                cand.postBreak = width;
-                // postSpaceCount doesn't include trailing spaces
-                cand.preSpaceCount = postSpaceCount;
-                cand.postSpaceCount = postSpaceCount;
-                cand.extent = mCharExtents[i];
-                cand.penalty = SCORE_DESPERATE;
-                cand.hyphenType = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
-#if VERBOSE_DEBUG
-                ALOGD("desperate cand: %zd %g:%g",
-                        mCandidates.size(), cand.postBreak, cand.preBreak);
-#endif
-                addCandidate(cand);
-                width += w;
-            }
-        }
+    const ParaWidth lastPreBreak = mCandidates.back().preBreak;
+    if (postBreak - lastPreBreak > currentLineWidth()) { // The line doesn't fit
+        const size_t lastBreak = mCandidates.back().offset;
+        // Add desperate breaks starting immediately after the last break
+        addDesperateBreaks(lastPreBreak + mCharWidths[lastBreak],
+                lastBreak + 1 /* start */, offset /* end */, postSpaceCount);
     }
-
+    Candidate cand;
     cand.offset = offset;
     cand.preBreak = preBreak;
     cand.postBreak = postBreak;
@@ -415,9 +425,6 @@ void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth post
     cand.postSpaceCount = postSpaceCount;
     cand.extent = extent;
     cand.hyphenType = hyph;
-#if VERBOSE_DEBUG
-    ALOGD("cand: %zd %g:%g", mCandidates.size(), cand.postBreak, cand.preBreak);
-#endif
     addCandidate(cand);
 }
 
