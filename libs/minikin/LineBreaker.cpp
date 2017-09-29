@@ -501,13 +501,13 @@ void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, uint8
     mFirstTabIndex = INT_MAX;
 }
 
-void LineBreaker::addReplacement(size_t start, size_t end, float width) {
+void LineBreaker::addReplacement(size_t start, size_t end, float width, const char* langTags,
+        const std::vector<Hyphenator*>& hyphenators) {
     mCharWidths[start] = width;
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRun(nullptr, nullptr, FontStyle(), start, end, false, nullptr,
-            std::vector<Hyphenator*>());
+    addStyleRun(nullptr, nullptr, FontStyle(), start, end, false, langTags, hyphenators);
 }
 
 // Get the width of a space. May return 0 if there are no spaces.
