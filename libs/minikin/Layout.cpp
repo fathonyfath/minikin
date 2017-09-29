@@ -720,23 +720,16 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
 }
 
 static void addFeatures(const string &str, vector<hb_feature_t>* features) {
-    if (!str.size())
-        return;
-
-    const char* start = str.c_str();
-    const char* end = start + str.size();
-
-    while (start < end) {
+    SplitIterator it(str, ',');
+    while (it.hasNext()) {
+        StringPiece featureStr = it.next();
         static hb_feature_t feature;
-        const char* p = strchr(start, ',');
-        if (!p)
-            p = end;
         /* We do not allow setting features on ranges.  As such, reject any
          * setting that has non-universal range. */
-        if (hb_feature_from_string (start, p - start, &feature)
-                && feature.start == 0 && feature.end == (unsigned int) -1)
+        if (hb_feature_from_string (featureStr.data(), featureStr.size(), &feature)
+                && feature.start == 0 && feature.end == (unsigned int) -1) {
             features->push_back(feature);
-        start = p + 1;
+        }
     }
 }
 
@@ -916,9 +909,6 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
         ctx->paint.font = mFaces[font_ix].font;
         ctx->paint.fakery = mFaces[font_ix].fakery;
         hb_font_t* hbFont = ctx->hbFonts[font_ix];
-#ifdef VERBOSE_DEBUG
-        ALOGD("Run %zu, font %d [%d:%d]", run_ix, font_ix, run.start, run.end);
-#endif
 
         MinikinExtent verticalExtent;
         ctx->paint.font->GetFontExtent(&verticalExtent, ctx->paint);
@@ -1004,14 +994,6 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                 x += letterSpaceHalfLeft;
             }
             for (unsigned int i = 0; i < numGlyphs; i++) {
-#ifdef VERBOSE_DEBUG
-                ALOGD("%d %d %d %d",
-                        positions[i].x_advance, positions[i].y_advance,
-                        positions[i].x_offset, positions[i].y_offset);
-                ALOGD("DoLayout %u: %f; %d, %d",
-                        info[i].codepoint, HBFixedToFloat(positions[i].x_advance),
-                        positions[i].x_offset, positions[i].y_offset);
-#endif
                 const size_t clusterBaseIndex = info[i].cluster - clusterOffset;
                 if (i > 0 && info[i - 1].cluster != info[i].cluster) {
                     mAdvances[info[i - 1].cluster - clusterOffset] += letterSpaceHalfRight;

@@ -255,7 +255,8 @@ static void expectLineBreaks(const std::string& expected, const std::vector<int>
 }
 
 TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
-    const std::vector<Hyphenator*> hyphenators;
+    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+    const std::vector<Hyphenator*> hyphenators = { enHyph.get() };
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -301,7 +302,10 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
-    const std::vector<Hyphenator*> hyphenators;
+    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+    const std::vector<Hyphenator*> enHyphenators = { enHyph.get() };
+    std::unique_ptr<Hyphenator> frHyph(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
+    const std::vector<Hyphenator*> frHyphenators = { frHyph.get() };
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -323,9 +327,9 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", enHyphenators);
         b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false, "fr-FR",
-                hyphenators);
+                frHyphenators);
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(3U, breakNum);
         expectLineBreaks("ab|cdef|gh",
@@ -341,7 +345,8 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
-    const std::vector<Hyphenator*> hyphenators;
+    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+    const std::vector<Hyphenator*> hyphenators = { enHyph.get() };
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -376,7 +381,10 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
-    const std::vector<Hyphenator*> hyphenators;
+    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
+    const std::vector<Hyphenator*> enHyphenators = { enHyph.get() };
+    std::unique_ptr<Hyphenator> frHyph(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
+    const std::vector<Hyphenator*> frHyphenators = { frHyph.get() };
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -400,9 +408,9 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(4 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 7, false, "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 7, false, "en-US", enHyphenators);
         b.addStyleRun(&paint, mCollection, FontStyle(), 7, text.size(), false, "fr-FR",
-                hyphenators);
+                frHyphenators);
 
         const size_t breakNum = b.computeBreaks();
         expectLineBreaks("aaa |b@c|-d |eee",
@@ -444,14 +452,13 @@ TEST_F(LineBreakerTest, setLocales) {
     }
     {
         LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
         setupLineBreaker(&lineBreaker, text);
         lineBreaker.setLineWidthDelegate(
                 std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
         lineBreaker.addStyleRun(
                 &paint, mCollection, FontStyle(), 0, text.size(), false, "",
-                std::vector<Hyphenator*>({hyphenator.get()}));
-        EXPECT_EQ(hyphenator.get(), lineBreaker.mHyphenator);
+                std::vector<Hyphenator*>());
+        EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
     }
     {
         LineBreaker lineBreaker;

@@ -74,9 +74,6 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
         output[0] = '\0';
         return 0;
     }
-#ifdef VERBOSE_DEBUG
-    ALOGD("ICU normalized '%s' to '%s'", localeString.c_str(), output);
-#endif
     return outLength;
 }
 

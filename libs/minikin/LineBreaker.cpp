@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define VERBOSE_DEBUG 0
-
 #define LOG_TAG "Minikin"
 
 #include <limits>
@@ -23,6 +21,7 @@
 #include <log/log.h>
 
 #include "LayoutUtils.h"
+#include "StringPiece.h"
 #include "WordBreaker.h"
 #include <minikin/Layout.h>
 #include <minikin/LineBreaker.h>
@@ -72,38 +71,22 @@ LineBreaker::~LineBreaker() {}
 
 void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
         size_t restartFrom) {
-    bool goodLocaleFound = false;
-    const ssize_t numLocales = hyphenators.size();
     // For now, we ignore all locales except the first valid one.
     // TODO: Support selecting the locale based on the script of the text.
-    const char* localeStart = locales;
-    icu::Locale locale;
-    for (ssize_t i = 0; i < numLocales - 1; i++) { // Loop over all locales, except the last one.
-        const char* localeEnd = strchr(localeStart, ',');
-        const size_t localeNameLength = localeEnd - localeStart;
-        char localeName[localeNameLength + 1];
-        strncpy(localeName, localeStart, localeNameLength);
-        localeName[localeNameLength] = '\0';
-        locale = icu::Locale::createFromName(localeName);
-        goodLocaleFound = !locale.isBogus();
-        if (goodLocaleFound) {
-            mHyphenator = hyphenators[i];
-            break;
-        } else {
-            localeStart = localeEnd + 1;
+    SplitIterator it(locales, ',');
+    for (size_t i = 0; it.hasNext(); i++) {
+        StringPiece localeStr = it.next();
+        icu::Locale locale = icu::Locale::createFromName(localeStr.toString().c_str());
+        if (!locale.isBogus()) {  // found a good locale
+            mHyphenator = hyphenators[i];  // The number of locales and hyphenators are the same.
+            mWordBreaker->followingWithLocale(locale, restartFrom);
+            return;
         }
     }
-    if (!goodLocaleFound) { // Try the last locale.
-        locale = icu::Locale::createFromName(localeStart);
-        if (locale.isBogus()) {
-            // No good locale.
-            locale = icu::Locale::getRoot();
-            mHyphenator = nullptr;
-        } else {
-            mHyphenator = numLocales == 0 ? nullptr : hyphenators[numLocales - 1];
-        }
-    }
-    mWordBreaker->followingWithLocale(locale, restartFrom);
+
+    // No good locale found. Use Root locale.
+    mWordBreaker->followingWithLocale(icu::Locale::getRoot(), restartFrom);
+    mHyphenator = nullptr;
 }
 
 void LineBreaker::setText() {
@@ -444,9 +427,6 @@ void LineBreaker::pushGreedyBreak() {
             computeMaxExtent(mLastBreak + 1, mBestBreak),
             mLastHyphenation | HyphenEdit::editForThisLine(bestCandidate.hyphenType));
     mBestScore = SCORE_INFTY;
-#if VERBOSE_DEBUG
-    ALOGD("break: %d %g", mBreaks.back(), mWidths.back());
-#endif
     mLastBreak = mBestBreak;
     mPreBreak = bestCandidate.preBreak;
     mLastHyphenation = HyphenEdit::editForNextLine(bestCandidate.hyphenType);
@@ -541,9 +521,6 @@ void LineBreaker::computeBreaksGreedy() {
                 computeMaxExtent(mLastBreak + 1, nCand - 1),
                 mLastHyphenation);
         // don't need to update mBestScore, because we're done
-#if VERBOSE_DEBUG
-        ALOGD("final break: %d %g", mBreaks.back(), mWidths.back());
-#endif
     }
 }
 
@@ -652,9 +629,6 @@ void LineBreaker::computeBreaksOptimal() {
         mCandidates[i].score = best + mCandidates[i].penalty + mLinePenalty;
         mCandidates[i].prev = bestPrev;
         lineNumbers.push_back(lineNumbers[bestPrev] + 1);
-#if VERBOSE_DEBUG
-        ALOGD("break %zd: score=%g, prev=%zd", i, mCandidates[i].score, mCandidates[i].prev);
-#endif
     }
     finishBreaksOptimal();
 }
