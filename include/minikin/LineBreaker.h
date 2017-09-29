@@ -191,7 +191,10 @@ class LineBreaker {
         struct Candidate {
             size_t offset;  // offset to text buffer, in code units
             size_t prev;  // index to previous break
-            ParaWidth preBreak;  // width of text until this point, if we decide to not break here
+            ParaWidth preBreak;  // width of text until this point, if we decide to not break here:
+                                 // preBreak is used as an optimized way to calculate the width
+                                 // between two candidates. The line width between two line break
+                                 // candidates i and j is calculated as postBreak(j) - preBreak(i).
             ParaWidth postBreak;  // width of text until this point, if we decide to break here
             float penalty;  // penalty of this break (for example, hyphen penalty)
             float score;  // best score found for this break
@@ -217,6 +220,8 @@ class LineBreaker {
                 const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
                 size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
                 size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags);
+
+        void addDesperateBreaks(ParaWidth width, size_t start, size_t end, size_t postSpaceCount);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
