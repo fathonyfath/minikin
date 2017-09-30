@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-// #define VERBOSE_DEBUG
-
 #define LOG_TAG "Minikin"
 
 #include <algorithm>
@@ -60,9 +58,6 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
     mId = sNextId++;
     vector<uint32_t> lastChar;
     size_t nTypefaces = typefaces.size();
-#ifdef VERBOSE_DEBUG
-    ALOGD("nTypefaces = %zd\n", nTypefaces);
-#endif
     const FontStyle defaultStyle;
     for (size_t i = 0; i < nTypefaces; i++) {
         const std::shared_ptr<FontFamily>& family = typefaces[i];
@@ -94,18 +89,12 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
         Range dummy;
         mRanges.push_back(dummy);
         Range* range = &mRanges.back();
-#ifdef VERBOSE_DEBUG
-        ALOGD("i=%zd: range start = %zd\n", i, offset);
-#endif
         range->start = mFamilyVec.size();
         for (size_t j = 0; j < nTypefaces; j++) {
             if (lastChar[j] < (i + 1) << kLogCharsPerPage) {
                 const std::shared_ptr<FontFamily>& family = mFamilies[j];
                 mFamilyVec.push_back(static_cast<uint8_t>(j));
                 uint32_t nextChar = family->getCoverage().nextSetBit((i + 1) << kLogCharsPerPage);
-#ifdef VERBOSE_DEBUG
-                ALOGD("nextChar = %d (j = %zd)\n", nextChar, j);
-#endif
                 lastChar[j] = nextChar;
             }
         }
@@ -260,9 +249,6 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
         range = { 0, static_cast<uint16_t>(mFamilies.size()) };
     }
 
-#ifdef VERBOSE_DEBUG
-    ALOGD("querying range %zd:%zd\n", range.start, range.end);
-#endif
     int bestFamilyIndex = -1;
     uint32_t bestScore = kUnsupportedFontScore;
     for (size_t i = range.start; i < range.end; i++) {

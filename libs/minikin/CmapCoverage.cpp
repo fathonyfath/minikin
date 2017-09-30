@@ -52,9 +52,6 @@ static uint32_t readU32(const uint8_t* data, size_t offset) {
 // The start must be larger than or equal to coverage.back() if coverage is not empty.
 // Returns true if the range is appended. Otherwise returns false as an error.
 static bool addRange(vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
-#ifdef VERBOSE_DEBUG
-    ALOGD("adding range %d-%d\n", start, end);
-#endif
     if (coverage.empty() || coverage.back() < start) {
         coverage.push_back(start);
         coverage.push_back(end);
