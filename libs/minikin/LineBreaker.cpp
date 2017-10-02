@@ -16,6 +16,7 @@
 
 #define LOG_TAG "Minikin"
 
+#include <algorithm>
 #include <limits>
 
 #include <log/log.h>
@@ -98,7 +99,6 @@ void LineBreaker::setText() {
             0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0},
             HyphenationType::DONT_BREAK};
     mCandidates.push_back(cand);
-    mLastNormalCandIndex = 0;
 
     // reset greedy breaker state
     mBreaks.clear();
@@ -106,9 +106,9 @@ void LineBreaker::setText() {
     mAscents.clear();
     mDescents.clear();
     mFlags.clear();
+
+    mBestGreedyBreaks.clear();
     mLastBreak = 0;
-    mBestBreak = 0;
-    mBestScore = SCORE_INFTY;
     mPreBreak = 0;
     mLastHyphenation = HyphenEdit::NO_EDIT;
     mFirstTabIndex = INT_MAX;
@@ -433,7 +433,7 @@ void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth post
         float firstOverhang, float secondOverhang, size_t preSpaceCount, size_t postSpaceCount,
         MinikinExtent extent, float penalty, HyphenationType hyph) {
     const ParaWidth lastPreBreak = mCandidates.back().preBreak;
-    if (postBreak - lastPreBreak > currentLineWidth()) { // The line doesn't fit
+    if (postBreak - lastPreBreak > currentLineWidth()) { // The word doesn't fit on the line
         const size_t lastBreak = mCandidates.back().offset;
         // Add desperate breaks starting immediately after the last break
         addDesperateBreaks(lastPreBreak + mCharWidths[lastBreak],
@@ -485,15 +485,14 @@ MinikinExtent LineBreaker::computeMaxExtent(size_t start, size_t end) const {
 }
 
 // Helper method for addCandidate()
-void LineBreaker::pushGreedyBreak() {
-    const Candidate& bestCandidate = mCandidates[mBestBreak];
-    pushBreak(bestCandidate.offset, bestCandidate.postBreak - mPreBreak,
-            computeMaxExtent(mLastBreak + 1, mBestBreak),
-            mLastHyphenation | HyphenEdit::editForThisLine(bestCandidate.hyphenType));
-    mBestScore = SCORE_INFTY;
-    mLastBreak = mBestBreak;
-    mPreBreak = bestCandidate.preBreak;
-    mLastHyphenation = HyphenEdit::editForNextLine(bestCandidate.hyphenType);
+void LineBreaker::addGreedyBreak(size_t breakIndex) {
+    const Candidate& candidate = mCandidates[breakIndex];
+    pushBreak(candidate.offset, candidate.postBreak - mPreBreak,
+            computeMaxExtent(mLastBreak + 1, breakIndex),
+            mLastHyphenation | HyphenEdit::editForThisLine(candidate.hyphenType));
+    mLastBreak = breakIndex;
+    mPreBreak = candidate.preBreak;
+    mLastHyphenation = HyphenEdit::editForNextLine(candidate.hyphenType);
 }
 
 // TODO performance: could avoid populating mCandidates if greedy only
@@ -501,44 +500,23 @@ void LineBreaker::addCandidate(Candidate cand) {
     const size_t candIndex = mCandidates.size();
     mCandidates.push_back(cand);
 
-    // mLastBreak is the index of the last line break we decided to do in mCandidates,
-    // and mPreBreak is its preBreak value. mBestBreak is the index of the best line breaking
-    // candidate we have found since then, and mBestScore is its penalty.
-    if (cand.postBreak - mPreBreak > currentLineWidth()) {
-        // This break would create an overfull line, pick the best break and break there (greedy)
-        if (mBestBreak == mLastBreak) {
-            // No good break has been found since last break. Break here.
-            mBestBreak = candIndex;
-        }
-        pushGreedyBreak();
-    }
+    // mPreBreak is the preBreak value of the last greedy line break we decided to do.
+    while (cand.postBreak - mPreBreak > currentLineWidth()) {
+        // This break would create an overfull line, pick the best break and break there (greedy).
+        // We do this in a loop, since there's no guarantee that after a break the remaining text
+        // would fit on the next line.
 
-    while (mLastBreak != candIndex && cand.postBreak - mPreBreak > currentLineWidth()) {
-        // We should rarely come here. But if we are here, we have broken the line, but the
-        // remaining part still doesn't fit. We now need to break at the second best place after the
-        // last break, but we have not kept that information, so we need to go back and find it.
-        //
-        // In some really rare cases, postBreak - preBreak of a candidate itself may be over the
-        // current line width. We protect ourselves against an infinite loop in that case by
-        // checking that we have not broken the line at this candidate already.
-        for (size_t i = mLastBreak + 1; i < candIndex; i++) {
-            const float penalty = mCandidates[i].penalty;
-            if (penalty <= mBestScore) {
-                mBestBreak = i;
-                mBestScore = penalty;
-            }
+        if (mBestGreedyBreaks.empty()) {
+            // If no good break has been found since last break, break here, desperately. The line
+            // still doesn't fit, but we can't do much more than avoiding further overfull lines.
+            addGreedyBreak(candIndex);
+            return;
+        } else {
+            // Break at the best known break.
+            addGreedyBreak(popBestGreedyBreak());
         }
-        if (mBestBreak == mLastBreak) {
-            // We didn't find anything good. Break here.
-            mBestBreak = candIndex;
-        }
-        pushGreedyBreak();
     }
-
-    if (cand.penalty <= mBestScore) {
-        mBestBreak = candIndex;
-        mBestScore = cand.penalty;
-    }
+    insertGreedyBreakCandidate(candIndex, cand.penalty);
 }
 
 void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit) {
@@ -579,12 +557,13 @@ float LineBreaker::currentLineWidth() const {
 
 void LineBreaker::computeBreaksGreedy() {
     // All breaks but the last have been added in addCandidate already.
-    size_t nCand = mCandidates.size();
-    if (nCand == 1 || mLastBreak != nCand - 1) {
-        pushBreak(mCandidates[nCand - 1].offset, mCandidates[nCand - 1].postBreak - mPreBreak,
-                computeMaxExtent(mLastBreak + 1, nCand - 1),
+    const size_t lastCandidate = mCandidates.size() - 1;
+    if (lastCandidate == 0 || mLastBreak != lastCandidate) {
+        pushBreak(mCandidates[lastCandidate].offset,
+                mCandidates[lastCandidate].postBreak - mPreBreak,
+                computeMaxExtent(mLastBreak + 1, lastCandidate),
                 mLastHyphenation);
-        // don't need to update mBestScore, because we're done
+        // No need to update mLastBreak, mPreBreak, or mLastHyphenation, because we're done.
     }
 }
 
@@ -710,6 +689,7 @@ void LineBreaker::finish() {
     mWordBreaker->finish();
     mWidth = 0;
     mCandidates.clear();
+    mBestGreedyBreaks.clear();
     mBreaks.clear();
     mWidths.clear();
     mAscents.clear();
@@ -726,6 +706,8 @@ void LineBreaker::finish() {
         mCharOverhangs.shrink_to_fit();
 
         mCandidates.shrink_to_fit();
+        mBestGreedyBreaks.shrink_to_fit();
+
         mBreaks.shrink_to_fit();
         mWidths.shrink_to_fit();
         mAscents.shrink_to_fit();
@@ -737,6 +719,28 @@ void LineBreaker::finish() {
     mLinePenalty = 0.0f;
     mJustified = false;
     mLineWidthDelegate.reset();
+}
+
+size_t LineBreaker::popBestGreedyBreak() {
+    const size_t bestBreak = mBestGreedyBreaks.front().index;
+    mBestGreedyBreaks.pop_front();
+    return bestBreak;
+}
+
+void LineBreaker::insertGreedyBreakCandidate(size_t index, float penalty) {
+    GreedyBreak gBreak = {index, penalty};
+    if (!mBestGreedyBreaks.empty()) {
+        // Find the location in the queue where the penalty is <= the current penalty, and drop the
+        // elements from there to the end of the queue.
+        auto where = std::lower_bound(
+                mBestGreedyBreaks.begin(), mBestGreedyBreaks.end(), gBreak,
+                [](GreedyBreak first, GreedyBreak second) -> bool
+                        { return first.penalty < second.penalty; });
+        if (where != mBestGreedyBreaks.end()) {
+            mBestGreedyBreaks.erase(where, mBestGreedyBreaks.end());
+        }
+    }
+    mBestGreedyBreaks.push_back(gBreak);
 }
 
 }  // namespace minikin
