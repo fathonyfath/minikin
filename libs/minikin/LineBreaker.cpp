@@ -271,15 +271,14 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addCandidate.
-float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
+void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
         FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
         const std::vector<Hyphenator*>& hyphenators) {
-    float width = 0.0f;
     const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {
-        width = Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
+        Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
                 style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
                 mCharOverhangs.data() + start);
 
@@ -359,8 +358,6 @@ float LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCo
             current = (size_t)mWordBreaker->next();
         }
     }
-
-    return width;
 }
 
 // Add desperate breaks.

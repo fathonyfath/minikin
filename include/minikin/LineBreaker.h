@@ -146,7 +146,7 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        float addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
+        void addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
                 FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
                 const std::vector<Hyphenator*>& hyphenators);
 
