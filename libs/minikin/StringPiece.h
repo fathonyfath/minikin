@@ -37,11 +37,17 @@ public:
 
     inline char operator[] (size_t i) const { return mData[i]; }
 
-    StringPiece substr(size_t from, size_t length) const {
+    inline StringPiece substr(size_t from, size_t length) const {
         return StringPiece(mData + from, length);
     }
 
-    size_t find(size_t from, char c) const;
+    inline size_t find(size_t from, char c) const {
+        if (from >= mLength) {
+            return mLength;
+        }
+        const char* p = static_cast<const char*>(memchr(mData + from, c, mLength - from));
+        return p == nullptr ? mLength : p - mData;
+    }
 
     std::string toString() const {
         return std::string(mData, mData + mLength);
@@ -86,8 +92,16 @@ public:
     SplitIterator(const StringPiece& string, char delimiter) :
         mStarted(false), mCurrent(0), mString(string), mDelimiter(delimiter) {}
 
-    StringPiece next();
-    bool hasNext() const { return mCurrent < mString.size(); }
+    inline StringPiece next() {
+        if (!hasNext()) {
+            return StringPiece();
+        }
+        const size_t searchFrom = mStarted ? mCurrent + 1 : 0;
+        mStarted = true;
+        mCurrent = mString.find(searchFrom, mDelimiter);
+        return mString.substr(searchFrom, mCurrent - searchFrom);
+    }
+    inline bool hasNext() const { return mCurrent < mString.size(); }
 private:
     bool mStarted;
     size_t mCurrent;
