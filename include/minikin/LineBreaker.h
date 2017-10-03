@@ -191,11 +191,18 @@ class LineBreaker {
         struct Candidate {
             size_t offset;  // offset to text buffer, in code units
             size_t prev;  // index to previous break
+
             ParaWidth preBreak;  // width of text until this point, if we decide to not break here:
                                  // preBreak is used as an optimized way to calculate the width
                                  // between two candidates. The line width between two line break
                                  // candidates i and j is calculated as postBreak(j) - preBreak(i).
             ParaWidth postBreak;  // width of text until this point, if we decide to break here
+
+            float firstOverhang;  // amount of overhang needed on the end of the line if we decide
+                                  // to break here
+            float secondOverhang;  // amount of overhang needed on the beginning of the next line
+                                   // if we decide to break here
+
             float penalty;  // penalty of this break (for example, hyphen penalty)
             float score;  // best score found for this break
             size_t preSpaceCount;  // preceding space count before breaking
@@ -224,8 +231,10 @@ class LineBreaker {
         void addDesperateBreaks(ParaWidth width, size_t start, size_t end, size_t postSpaceCount);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
+                float firstOverhang, float secondOverhang,
                 size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
                 float penalty, HyphenationType hyph);
+        void adjustSecondOverhang(float secondOverhang);
 
         void addCandidate(Candidate cand);
         void pushGreedyBreak();
@@ -271,18 +280,21 @@ class LineBreaker {
         std::vector<float> mDescents;
         std::vector<int> mFlags;
 
-        ParaWidth mWidth = 0; // Total width of text seen, assuming no line breaks
+        ParaWidth mWidth = 0;  // Total width of text seen, assuming no line breaks
         std::vector<Candidate> mCandidates;
         float mLinePenalty = 0.0f;
+        size_t mSpaceCount;  // Number of word spaces seen in the input text
+
+        // Index of the last line break candidate, ignoring hyphenated words and desperate breaks.
+        size_t mLastNormalCandIndex;
 
         // the following are state for greedy breaker (updated while adding style runs)
         size_t mLastBreak;
         size_t mBestBreak;
         float mBestScore;
-        ParaWidth mPreBreak;  // prebreak of last break
+        ParaWidth mPreBreak;  // preBreak of last break
         uint32_t mLastHyphenation;  // hyphen edit of last break kept for next line
-        int mFirstTabIndex; // The index of the first tab character seen in input text
-        size_t mSpaceCount; // Number of word spaces seen in the input text
+        int mFirstTabIndex;  // The index of the first tab character seen in input text
 
         std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
 
