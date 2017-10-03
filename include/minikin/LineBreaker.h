@@ -210,6 +210,7 @@ class LineBreaker {
             size_t postSpaceCount;  // preceding space count after breaking
             MinikinExtent extent; // the largest extent between last candidate and this candidate
             HyphenationType hyphenType;
+            bool isRtl; // The direction of the bidi run containing or ending in this candidate
         };
 
         // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
@@ -222,22 +223,23 @@ class LineBreaker {
         void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
                         size_t restartFrom);
 
-        float currentLineWidth() const;
+        bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
 
         void addHyphenationCandidates(MinikinPaint* paint,
                 const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
                 size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
                 size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags);
 
-        void addDesperateBreaks(ParaWidth width, size_t start, size_t end, size_t postSpaceCount);
+        void addDesperateBreaks(ParaWidth width, size_t start, size_t end, size_t postSpaceCount,
+                bool isRtl);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 float firstOverhang, float secondOverhang,
                 size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
-                float penalty, HyphenationType hyph);
+                float penalty, HyphenationType hyph, bool isRtl);
         void adjustSecondOverhang(float secondOverhang);
 
-        void addCandidate(Candidate cand);
+        void addCandidate(const Candidate& cand);
         void addGreedyBreak(size_t breakIndex);
 
         MinikinExtent computeMaxExtent(size_t start, size_t end) const;
