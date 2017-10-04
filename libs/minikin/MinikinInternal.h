@@ -21,6 +21,7 @@
 
 #include <hb.h>
 
+#include <utils/Log.h>
 #include <utils/Mutex.h>
 
 #include <minikin/MinikinFont.h>
@@ -37,6 +38,12 @@ extern android::Mutex gMinikinLock;
 void assertMinikinLocked();
 
 hb_blob_t* getFontTable(const MinikinFont* minikinFont, uint32_t tag);
+
+#ifdef ENABLE_ASSERTION
+#define MINIKIN_ASSERT(cond, ...) LOG_ALWAYS_FATAL_IF(!(cond), __VA_ARGS__)
+#else
+#define MINIKIN_ASSERT(cond, ...) ((void)0)
+#endif
 
 constexpr uint32_t MAX_UNICODE_CODE_POINT = 0x10FFFF;
 

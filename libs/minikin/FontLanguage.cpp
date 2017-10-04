@@ -164,7 +164,6 @@ FontLanguage::FontLanguage(const StringPiece& input) : FontLanguage() {
     }
 
     if (!it.hasNext()) {
-        mHbLanguage = hb_language_from_string(getString().c_str(), -1);
         return;  // Language code only.
     }
     StringPiece token = it.next();
@@ -207,7 +206,6 @@ FontLanguage::FontLanguage(const StringPiece& input) : FontLanguage() {
     mEmojiStyle = resolveEmojiStyle(input.data(), input.length());
 
 finalize:
-    mHbLanguage = hb_language_from_string(getString().c_str(), -1);
     if (mEmojiStyle == EMSTYLE_EMPTY) {
         mEmojiStyle = scriptToEmojiStyle(mScript);
     }
@@ -290,12 +288,17 @@ uint8_t FontLanguage::scriptToSubScriptBits(uint32_t script) {
 }
 
 std::string FontLanguage::getString() const {
-    if (isUnsupported()) {
-        return "und";
-    }
     char buf[24];
-    size_t i = unpackLanguage(mLanguage, buf);
-    if (mScript != INVALID_SCRIPT) {
+    size_t i;
+    if (mLanguage == NO_LANGUAGE) {
+        buf[0] = 'u';
+        buf[1] = 'n';
+        buf[2] = 'd';
+        i = 3;
+    } else {
+        i = unpackLanguage(mLanguage, buf);
+    }
+    if (mScript != NO_SCRIPT) {
         uint32_t rawScript = unpackScript(mScript);
         buf[i++] = '-';
         buf[i++] = (rawScript >> 24) & 0xFFu;
@@ -303,7 +306,7 @@ std::string FontLanguage::getString() const {
         buf[i++] = (rawScript >> 8) & 0xFFu;
         buf[i++] = rawScript & 0xFFu;
     }
-    if (mRegion != INVALID_CODE) {
+    if (mRegion != NO_REGION) {
         buf[i++] = '-';
         i += unpackRegion(mRegion, buf + i);
     }
@@ -325,6 +328,29 @@ std::string FontLanguage::getString() const {
         }
     }
     return std::string(buf, i);
+}
+
+FontLanguage FontLanguage::getPartialLocale(SubtagBits bits) const {
+    FontLanguage subLocale;
+    if ((bits & SubtagBits::LANGUAGE) != SubtagBits::EMPTY) {
+        subLocale.mLanguage = mLanguage;
+    } else {
+        subLocale.mLanguage = packLanguage("und");
+    }
+    if ((bits & SubtagBits::SCRIPT) != SubtagBits::EMPTY) {
+        subLocale.mScript = mScript;
+        subLocale.mSubScriptBits = mSubScriptBits;
+    }
+    if ((bits & SubtagBits::REGION) != SubtagBits::EMPTY) {
+        subLocale.mRegion = mRegion;
+    }
+    if ((bits & SubtagBits::VARIANT) != SubtagBits::EMPTY) {
+        subLocale.mVariant = mVariant;
+    }
+    if ((bits & SubtagBits::EMOJI) != SubtagBits::EMPTY) {
+        subLocale.mEmojiStyle = mEmojiStyle;
+    }
+    return subLocale;
 }
 
 bool FontLanguage::isEqualScript(const FontLanguage& other) const {
@@ -383,6 +409,11 @@ int FontLanguage::calcScoreFor(const FontLanguages& supported) const {
     return 0;
 }
 
+static hb_language_t buildHbLanguage(const FontLanguage& lang) {
+    return lang.isSupported() ?
+            hb_language_from_string(lang.getString().c_str(), -1) : HB_LANGUAGE_INVALID;
+}
+
 FontLanguages::FontLanguages(std::vector<FontLanguage>&& languages)
     : mLanguages(std::move(languages)) {
     if (mLanguages.empty()) {
@@ -393,12 +424,18 @@ FontLanguages::FontLanguages(std::vector<FontLanguage>&& languages)
 
     mIsAllTheSameLanguage = true;
     mUnionOfSubScriptBits = lang.mSubScriptBits;
+    mHbLangs.reserve(mLanguages.size());
+    mHbLangs.push_back(buildHbLanguage(lang));
     for (size_t i = 1; i < mLanguages.size(); ++i) {
-        mUnionOfSubScriptBits |= mLanguages[i].mSubScriptBits;
-        if (mIsAllTheSameLanguage && lang.mLanguage != mLanguages[i].mLanguage) {
+        const FontLanguage& language = mLanguages[i];
+        mUnionOfSubScriptBits |= language.mSubScriptBits;
+        if (mIsAllTheSameLanguage && lang.mLanguage != language.mLanguage) {
             mIsAllTheSameLanguage = false;
         }
+        mHbLangs.push_back(buildHbLanguage(language));
     }
+
+
 }
 
 }  // namespace minikin

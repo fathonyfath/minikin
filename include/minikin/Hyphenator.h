@@ -18,14 +18,23 @@
  * An implementation of Liang's hyphenation algorithm.
  */
 
-#include "unicode/locid.h"
-#include <memory>
-#include <unordered_map>
-
 #ifndef MINIKIN_HYPHENATOR_H
 #define MINIKIN_HYPHENATOR_H
 
+#include "unicode/locid.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 namespace minikin {
+
+class Hyphenator;
+
+// Registers the hyphenator.
+// This doesn't take ownership of the hyphenator but we don't need to care about the ownership.
+// In Android, the Hyphenator is allocated in Zygote and never gets released.
+void addHyphenator(const std::string& localeStr, const Hyphenator* hyphenator);
+void addHyphenatorAlias(const std::string& fromLocaleStr, const std::string& toLocaleStr);
 
 enum class HyphenationType : uint8_t {
     // Note: There are implicit assumptions scattered in the code that DONT_BREAK is 0.
@@ -123,7 +132,7 @@ public:
     //
     // Example: word is "hyphen", result is the following, corresponding to "hy-phen":
     // [DONT_BREAK, DONT_BREAK, BREAK_AND_INSERT_HYPHEN, DONT_BREAK, DONT_BREAK, DONT_BREAK]
-    void hyphenate(std::vector<HyphenationType>* result, const uint16_t* word, size_t len);
+    void hyphenate(std::vector<HyphenationType>* result, const uint16_t* word, size_t len) const;
 
     // Returns true if the codepoint is like U+2010 HYPHEN in line breaking and usage: a character
     // immediately after which line breaks are allowed, but words containing it should not be
@@ -151,17 +160,17 @@ private:
         HyphenationLocale hyphenLocale);
 
     // apply various hyphenation rules including hard and soft hyphens, ignoring patterns
-    void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len);
+    void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len) const;
 
     // Try looking up word in alphabet table, return DONT_BREAK if any code units fail to map.
     // Otherwise, returns BREAK_AND_INSERT_HYPHEN, BREAK_AND_INSERT_ARMENIAN_HYPHEN, or
     // BREAK_AND_DONT_INSERT_HYPHEN based on the the script of the characters seen.
     // Note that this method writes len+2 entries into alpha_codes (including start and stop)
-    HyphenationType alphabetLookup(uint16_t* alpha_codes, const uint16_t* word, size_t len);
+    HyphenationType alphabetLookup(uint16_t* alpha_codes, const uint16_t* word, size_t len) const;
 
     // calculate hyphenation from patterns, assuming alphabet lookup has already been done
     void hyphenateFromCodes(HyphenationType* result, const uint16_t* codes, size_t len,
-            HyphenationType hyphenValue);
+            HyphenationType hyphenValue) const;
 
     // See also LONGEST_HYPHENATED_WORD in LineBreaker.cpp. Here the constant is used so
     // that temporary buffers can be stack-allocated without waste, which is a slightly
