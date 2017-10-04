@@ -26,6 +26,7 @@
 #include "unicode/brkiter.h"
 #include "unicode/locid.h"
 #include <cmath>
+#include <deque>
 #include <vector>
 #include "minikin/FontCollection.h"
 #include "minikin/Hyphenator.h"
@@ -146,7 +147,7 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        float addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
+        void addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
                 FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
                 const std::vector<Hyphenator*>& hyphenators);
 
@@ -237,7 +238,7 @@ class LineBreaker {
         void adjustSecondOverhang(float secondOverhang);
 
         void addCandidate(Candidate cand);
-        void pushGreedyBreak();
+        void addGreedyBreak(size_t breakIndex);
 
         MinikinExtent computeMaxExtent(size_t start, size_t end) const;
 
@@ -285,14 +286,23 @@ class LineBreaker {
         float mLinePenalty = 0.0f;
         size_t mSpaceCount;  // Number of word spaces seen in the input text
 
-        // Index of the last line break candidate, ignoring hyphenated words and desperate breaks.
-        size_t mLastNormalCandIndex;
+        struct GreedyBreak {
+            size_t index;
+            float penalty;
+        };
+
+        // This will hold a list of greedy breaks, with strictly increasing indexes and penalties.
+        // The top of the list always holds the best break.
+        std::deque<GreedyBreak> mBestGreedyBreaks;
+        // Return the best greedy break from the top of the queue.
+        size_t popBestGreedyBreak();
+        // Insert a greedy break in mBestGreedyBreaks.
+        void insertGreedyBreakCandidate(size_t index, float penalty);
 
         // the following are state for greedy breaker (updated while adding style runs)
         size_t mLastBreak;
-        size_t mBestBreak;
-        float mBestScore;
         ParaWidth mPreBreak;  // preBreak of last break
+
         uint32_t mLastHyphenation;  // hyphen edit of last break kept for next line
         int mFirstTabIndex;  // The index of the first tab character seen in input text
 
