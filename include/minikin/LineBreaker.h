@@ -191,7 +191,6 @@ class LineBreaker {
         // A single candidate break
         struct Candidate {
             size_t offset;  // offset to text buffer, in code units
-            size_t prev;  // index to previous break
 
             ParaWidth preBreak;  // width of text until this point, if we decide to not break here:
                                  // preBreak is used as an optimized way to calculate the width
@@ -205,12 +204,18 @@ class LineBreaker {
                                    // if we decide to break here
 
             float penalty;  // penalty of this break (for example, hyphen penalty)
-            float score;  // best score found for this break
             size_t preSpaceCount;  // preceding space count before breaking
             size_t postSpaceCount;  // preceding space count after breaking
             MinikinExtent extent; // the largest extent between last candidate and this candidate
             HyphenationType hyphenType;
             bool isRtl; // The direction of the bidi run containing or ending in this candidate
+        };
+
+        // Data used to compute optimal line breaks.
+        struct OptimalBreaksData {
+            float score;  // best score found for this break
+            size_t prev;  // index to previous break
+            size_t lineNumber;  // the computed line number of the candidate
         };
 
         // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
@@ -260,7 +265,7 @@ class LineBreaker {
 
         void computeBreaksOptimal();
 
-        void finishBreaksOptimal();
+        void finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData);
 
         std::unique_ptr<WordBreaker> mWordBreaker;
         std::vector<uint16_t> mTextBuf;

@@ -96,7 +96,7 @@ void LineBreaker::setText() {
     // handle initial break here because addStyleRun may never be called
     mCandidates.clear();
     Candidate cand = {
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0},
+            0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0},
             HyphenationType::DONT_BREAK, false /* isRtl. TODO: may need to be based on input. */};
     mCandidates.push_back(cand);
 
@@ -602,7 +602,7 @@ void LineBreaker::computeBreaksGreedy() {
 }
 
 // Follow "prev" links in mCandidates array, and copy to result arrays.
-void LineBreaker::finishBreaksOptimal() {
+void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData) {
     // clear existing greedy break result
     mBreaks.clear();
     mWidths.clear();
@@ -610,10 +610,10 @@ void LineBreaker::finishBreaksOptimal() {
     mDescents.clear();
     mFlags.clear();
 
-    size_t nCand = mCandidates.size();
+    const size_t nCand = mCandidates.size();
     size_t prev;
     for (size_t i = nCand - 1; i > 0; i = prev) {
-        prev = mCandidates[i].prev;
+        prev = breaksData[i].prev;
         mBreaks.push_back(mCandidates[i].offset);
         mWidths.push_back(mCandidates[i].postBreak - mCandidates[prev].preBreak);
         MinikinExtent extent = computeMaxExtent(prev + 1, i);
@@ -632,30 +632,30 @@ void LineBreaker::finishBreaksOptimal() {
 
 void LineBreaker::computeBreaksOptimal() {
     size_t active = 0;
-    size_t nCand = mCandidates.size();
-    float width = mLineWidthDelegate->getLineWidth(0);
-    float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth() : 0.0f;
-    std::vector<size_t> lineNumbers;
-    lineNumbers.reserve(nCand);
-    lineNumbers.push_back(0);  // The first candidate is always at the first line.
+    const size_t nCand = mCandidates.size();
+    const float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth() : 0.0f;
+
+    std::vector<OptimalBreaksData> breaksData;
+    breaksData.reserve(nCand);
+    breaksData.push_back({0.0, 0, 0}); // The first candidate is always at the first line.
 
     // "i" iterates through candidates for the end of the line.
     for (size_t i = 1; i < nCand; i++) {
-        bool atEnd = i == nCand - 1;
+        const bool atEnd = i == nCand - 1;
         float best = SCORE_INFTY;
         size_t bestPrev = 0;
 
-        size_t lineNumberLast = lineNumbers[active];
-        width = mLineWidthDelegate->getLineWidth(lineNumberLast);
+        size_t lineNumberLast = breaksData[active].lineNumber;
+        float width = mLineWidthDelegate->getLineWidth(lineNumberLast);
 
         ParaWidth leftEdge = mCandidates[i].postBreak - width;
         float bestHope = 0;
 
         // "j" iterates through candidates for the beginning of the line.
         for (size_t j = active; j < i; j++) {
-            size_t lineNumber = lineNumbers[j];
+            const size_t lineNumber = breaksData[j].lineNumber;
             if (lineNumber != lineNumberLast) {
-                float widthNew = mLineWidthDelegate->getLineWidth(lineNumber);
+                const float widthNew = mLineWidthDelegate->getLineWidth(lineNumber);
                 if (widthNew != width) {
                     leftEdge = mCandidates[i].postBreak - width;
                     bestHope = 0;
@@ -663,9 +663,9 @@ void LineBreaker::computeBreaksOptimal() {
                 }
                 lineNumberLast = lineNumber;
             }
-            float jScore = mCandidates[j].score;
+            const float jScore = breaksData[j].score;
             if (jScore + bestHope >= best) continue;
-            float delta = mCandidates[j].preBreak - leftEdge;
+            const float delta = mCandidates[j].preBreak - leftEdge;
 
             // compute width score for line
 
@@ -697,17 +697,18 @@ void LineBreaker::computeBreaksOptimal() {
                 bestHope = widthScore;
             }
 
-            float score = jScore + widthScore + additionalPenalty;
+            const float score = jScore + widthScore + additionalPenalty;
             if (score <= best) {
                 best = score;
                 bestPrev = j;
             }
         }
-        mCandidates[i].score = best + mCandidates[i].penalty + mLinePenalty;
-        mCandidates[i].prev = bestPrev;
-        lineNumbers.push_back(lineNumbers[bestPrev] + 1);
+        breaksData.push_back({
+            best + mCandidates[i].penalty + mLinePenalty,  // score
+            bestPrev,  // prev
+            breaksData[bestPrev].lineNumber + 1});  // lineNumber
     }
-    finishBreaksOptimal();
+    finishBreaksOptimal(breaksData);
 }
 
 size_t LineBreaker::computeBreaks() {
