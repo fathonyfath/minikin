@@ -206,16 +206,8 @@ class LineBreaker {
             float penalty;  // penalty of this break (for example, hyphen penalty)
             size_t preSpaceCount;  // preceding space count before breaking
             size_t postSpaceCount;  // preceding space count after breaking
-            MinikinExtent extent; // the largest extent between last candidate and this candidate
             HyphenationType hyphenType;
             bool isRtl; // The direction of the bidi run containing or ending in this candidate
-        };
-
-        // Data used to compute optimal line breaks.
-        struct OptimalBreaksData {
-            float score;  // best score found for this break
-            size_t prev;  // index to previous break
-            size_t lineNumber;  // the computed line number of the candidate
         };
 
         // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
@@ -227,45 +219,22 @@ class LineBreaker {
         // Note: caller is responsible for managing lifetime of hyphenator
         void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
                         size_t restartFrom);
-
-        bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
-
-        void addHyphenationCandidates(MinikinPaint* paint,
-                const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
-                size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
-                size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags);
-
-        void addDesperateBreaks(ParaWidth width, size_t start, size_t end, size_t postSpaceCount,
-                bool isRtl);
-
-        void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
-                float firstOverhang, float secondOverhang,
-                size_t preSpaceCount, size_t postSpaceCount, MinikinExtent extent,
-                float penalty, HyphenationType hyph, bool isRtl);
-        void adjustSecondOverhang(float secondOverhang);
-
-        void addCandidate(const Candidate& cand);
-        void addGreedyBreak(size_t breakIndex);
-
-        MinikinExtent computeMaxExtent(size_t start, size_t end) const;
-
-        static LayoutOverhang computeOverhang(float totalAdvance,
-                const std::vector<float>& advances, const std::vector<LayoutOverhang>& overhangs,
-                bool isRtl);
-
-        // push an actual break to the output. Takes care of setting flags for tab
-        void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
+        FRIEND_TEST(LineBreakerTest, setLocales);
 
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
 
-        float getSpaceWidth() const;
+        void addHyphenationCandidates(MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
+                size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
+                size_t postSpaceCount, float hyphenPenalty, int bidiFlags);
 
-        void computeBreaksGreedy();
+        void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
+                float firstOverhang, float secondOverhang,
+                size_t preSpaceCount, size_t postSpaceCount,
+                float penalty, HyphenationType hyph, bool isRtl);
 
-        void computeBreaksOptimal();
-
-        void finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData);
+        void adjustSecondOverhang(float secondOverhang);
 
         std::unique_ptr<WordBreaker> mWordBreaker;
         std::vector<uint16_t> mTextBuf;
@@ -280,6 +249,7 @@ class LineBreaker {
         HyphenationFrequency mHyphenationFrequency = kHyphenationFrequency_Normal;
         bool mJustified;
         TabStops mTabStops;
+        std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
 
         // result of line breaking
         std::vector<int> mBreaks;
@@ -288,17 +258,54 @@ class LineBreaker {
         std::vector<float> mDescents;
         std::vector<int> mFlags;
 
+        void clearResults() {
+            mBreaks.clear();
+            mWidths.clear();
+            mAscents.clear();
+            mDescents.clear();
+            mFlags.clear();
+        }
+
         ParaWidth mWidth = 0;  // Total width of text seen, assuming no line breaks
-        std::vector<Candidate> mCandidates;
-        float mLinePenalty = 0.0f;
-        size_t mSpaceCount;  // Number of word spaces seen in the input text
+        std::vector<Candidate> mCandidates;  // All line breaking candidates
+
+        static LayoutOverhang computeOverhang(float totalAdvance,
+                const std::vector<float>& advances, const std::vector<LayoutOverhang>& overhangs,
+                bool isRtl);
+
+        MinikinExtent computeMaxExtent(size_t start, size_t end) const;
+
+        //
+        // Types, methods, and fields related to the greedy algorithm
+        //
+
+        void computeBreaksGreedy();
+
+        // This method is called as a helper to computeBreaksGreedy(), but also when we encounter a
+        // tab character, which forces the line breaking algorithm to greedy mode. It computes all
+        // the greedy line breaks based on available candidates and returns the preBreak of the last
+        // break which would then be used to calculate the width of the tab.
+        ParaWidth computeBreaksGreedyPartial();
+
+        // Called by computerBreaksGreedyPartial() on all candidates to determine if the line should
+        // be broken at the candidate
+        void considerGreedyBreakCandidate(size_t candIndex);
+
+        // Adds a greedy break to list of line breaks.
+        void addGreedyBreak(size_t breakIndex);
+
+        // Push an actual break to the output. Takes care of setting flags for tab, etc.
+        void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
+
+        void addDesperateBreaks(ParaWidth existingPreBreak, size_t start, size_t end);
+
+        bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
 
         struct GreedyBreak {
             size_t index;
             float penalty;
         };
-
-        // This will hold a list of greedy breaks, with strictly increasing indexes and penalties.
+        // This will hold a list of greedy breaks, with strictly increasing indices and penalties.
         // The top of the list always holds the best break.
         std::deque<GreedyBreak> mBestGreedyBreaks;
         // Return the best greedy break from the top of the queue.
@@ -306,16 +313,34 @@ class LineBreaker {
         // Insert a greedy break in mBestGreedyBreaks.
         void insertGreedyBreakCandidate(size_t index, float penalty);
 
-        // the following are state for greedy breaker (updated while adding style runs)
-        size_t mLastBreak;
-        ParaWidth mPreBreak;  // preBreak of last break
+        // The following are state for greedy breaker. They get updated during calculation of
+        // greedy breaks (including when a partial greedy algorithm is run when adding style runs
+        // containing tabs).
+        const Candidate* mLastGreedyBreak;  // The last greedy break
+        size_t mLastConsideredGreedyCandidate;  // The index of the last candidate considered
+        int mFirstTabIndex;  // The index of the first tab character seen in current line
 
-        uint32_t mLastHyphenation;  // hyphen edit of last break kept for next line
-        int mFirstTabIndex;  // The index of the first tab character seen in input text
+        // Used to hold a desperate break as the last greedy break
+        Candidate mFakeDesperateCandidate;
 
-        std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
+        //
+        // Types, methods, and fields related to the optimal algorithm
+        //
 
-        FRIEND_TEST(LineBreakerTest, setLocales);
+        void computeBreaksOptimal();
+
+        // Data used to compute optimal line breaks
+        struct OptimalBreaksData {
+            float score;  // best score found for this break
+            size_t prev;  // index to previous break
+            size_t lineNumber;  // the computed line number of the candidate
+        };
+        void finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData);
+
+        float getSpaceWidth() const;
+
+        float mLinePenalty = 0.0f;
+        size_t mSpaceCount;  // Number of word spaces seen in the input text
 };
 
 }  // namespace minikin

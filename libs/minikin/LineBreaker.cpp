@@ -38,7 +38,8 @@ constexpr uint16_t CHAR_NBSP = 0x00A0;
 // constants are larger than any reasonable actual width score.
 const float SCORE_INFTY = std::numeric_limits<float>::max();
 const float SCORE_OVERFULL = 1e12f;
-const float SCORE_DESPERATE = 1e10f;
+// TODO: re-enable when adding support for desperate line breaks in optimal line breaking.
+// const float SCORE_DESPERATE = 1e10f;
 
 // Multiplier for hyphen penalty on last line.
 const float LAST_LINE_PENALTY_MULTIPLIER = 4.0f;
@@ -95,23 +96,16 @@ void LineBreaker::setText() {
 
     // handle initial break here because addStyleRun may never be called
     mCandidates.clear();
-    Candidate cand = {
-            0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, {0.0, 0.0, 0.0},
-            HyphenationType::DONT_BREAK, false /* isRtl. TODO: may need to be based on input. */};
-    mCandidates.push_back(cand);
+    mCandidates.push_back({
+            0 /* offset */, 0.0 /* preBreak */, 0.0 /* postBreak */,
+            0.0 /* firstOverhang */, 0.0 /* secondOverhang */,
+            0.0 /* penalty */,
+            0 /* preSpaceCount */, 0 /* postSpaceCount */,
+            HyphenationType::DONT_BREAK /* hyphenType */,
+            false /* isRtl. TODO: may need to be based on input. */});
 
-    // reset greedy breaker state
-    mBreaks.clear();
-    mWidths.clear();
-    mAscents.clear();
-    mDescents.clear();
-    mFlags.clear();
+    mLastConsideredGreedyCandidate = SIZE_MAX;
 
-    mBestGreedyBreaks.clear();
-    mLastBreak = 0;
-    mPreBreak = 0;
-    mLastHyphenation = HyphenEdit::NO_EDIT;
-    mFirstTabIndex = INT_MAX;
     mSpaceCount = 0;
 }
 
@@ -205,8 +199,6 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 //     words, the index of the first code unit after a word.
 // lastBreak is the index of the previous break point and lastBreakWidth is the width seen until
 //     that point.
-// extent is a pointer to the variable that keeps track of the maximum vertical extents seen since
-//     the last time addWordBreak() was called. It will be reset to 0 after every call.
 // bidiFlags keep the bidi flags to determine the direction of text for layout and other
 //     calculations. It may only be kBidi_Force_RTL or kBidi_Force_LTR.
 //
@@ -219,7 +211,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
         size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
-        size_t postSpaceCount, MinikinExtent* extent, float hyphenPenalty, int bidiFlags) {
+        size_t postSpaceCount, float hyphenPenalty, int bidiFlags) {
     const bool isRtl = (bidiFlags == kBidi_Force_RTL);
     const size_t wordStart = mWordBreaker->wordStart();
     const size_t wordEnd = mWordBreaker->wordEnd();
@@ -270,8 +262,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const float secondOverhang = isRtl ? overhang.right : overhang.left;
 
         addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang,
-                postSpaceCount, postSpaceCount, *extent, hyphenPenalty, hyph, isRtl);
-        extent->reset();
+                postSpaceCount, postSpaceCount, hyphenPenalty, hyph, isRtl);
 
         paint->hyphenEdit = HyphenEdit::NO_EDIT;
     }
@@ -282,7 +273,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 // the mCharWidths, mCharExtents, and mCharOverhangs buffers.
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
-// to addCandidate.
+// to addWordBreak.
 void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
         FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
         const std::vector<Hyphenator*>& hyphenators) {
@@ -327,24 +318,25 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
     // The maximum amount of backward overhang seen since last word.
     float maxBackwardOverhang = 0;
     size_t postSpaceCount = mSpaceCount;
-    MinikinExtent extent = {0.0, 0.0, 0.0};
     const bool hyphenate = (paint != nullptr && mHyphenator != nullptr &&
             mHyphenationFrequency != kHyphenationFrequency_None);
     for (size_t i = start; i < end; i++) {
         const uint16_t c = mTextBuf[i];
         if (c == CHAR_TAB) {
-            mWidth = mPreBreak + mTabStops.nextTab(mWidth - mPreBreak);
-            if (mFirstTabIndex == INT_MAX) {
-                mFirstTabIndex = (int)i;
-            }
-            // fall back to greedy; other modes don't know how to deal with tabs
+            // Fall back to greedy; other modes don't know how to deal with tabs.
             mStrategy = kBreakStrategy_Greedy;
+            // In order to figure out the actual width of the tab, we need to run the greedy
+            // algorithm on all previous text and determine the last line break's preBreak.
+            const ParaWidth lastPreBreak = computeBreaksGreedyPartial();
+            mWidth = lastPreBreak + mTabStops.nextTab(mWidth - lastPreBreak);
+            if (mFirstTabIndex == INT_MAX) {
+                mFirstTabIndex = static_cast<int>(i);
+            }
         } else {
             if (isWordSpace(c)) {
                 mSpaceCount += 1;
             }
             mWidth += mCharWidths[i];
-            extent.extendBy(mCharExtents[i]);
             if (isLineEndSpace(c)) {
                 // If we break a line on a line-ending space, that space goes away. So postBreak
                 // and postSpaceCount, which keep the width and number of spaces if we decide to
@@ -380,7 +372,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
             }
             if (hyphenate) {
                 addHyphenationCandidates(paint, typeface, style, start, afterWord, lastBreak,
-                        lastBreakWidth, postBreak, postSpaceCount, &extent, hyphenPenalty,
+                        lastBreakWidth, postBreak, postSpaceCount, hyphenPenalty,
                         bidiFlags);
             }
             if (addBreak) {
@@ -389,9 +381,8 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
                 addWordBreak(current, mWidth /* preBreak */, postBreak,
                         postBreakWithOverhang - postBreak /* firstOverhang */,
                         0.0 /* secondOverhang, to be adjusted later */,
-                        mSpaceCount, postSpaceCount, extent,
+                        mSpaceCount, postSpaceCount,
                         penalty, HyphenationType::DONT_BREAK, isRtl);
-                extent.reset();
             }
             lastBreak = current;
             lastBreakWidth = mWidth;
@@ -404,78 +395,47 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
 // Add desperate breaks.
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
 // are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
-void LineBreaker::addDesperateBreaks(ParaWidth width, size_t start, size_t end,
-        size_t postSpaceCount, bool isRtl) {
-    for (size_t i = start; i < end; i++) {
+void LineBreaker::addDesperateBreaks(ParaWidth existingPreBreak, size_t start, size_t end) {
+    ParaWidth width = mCharWidths[start];
+    for (size_t i = start + 1; i < end; i++) {
         const float w = mCharWidths[i];
         if (w > 0) { // Add desperate breaks only before grapheme clusters.
-            Candidate cand;
-            cand.offset = i;
-            cand.preBreak = width;
-            cand.postBreak = width;
-            cand.firstOverhang = 0.0;
-            cand.secondOverhang = 0.0;
-            // postSpaceCount doesn't include trailing spaces
-            cand.preSpaceCount = postSpaceCount;
-            cand.postSpaceCount = postSpaceCount;
-            cand.extent = mCharExtents[i];
-            cand.penalty = SCORE_DESPERATE;
-            cand.hyphenType = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
-            cand.isRtl = isRtl;
-            addCandidate(cand);
-            width += w;
+            const ParaWidth newWidth = width + w;
+            if (!fitsOnCurrentLine(newWidth, 0.0, 0.0)) {
+                constexpr HyphenationType hyphen = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
+                pushBreak(i, width, computeMaxExtent(mLastGreedyBreak->offset, i),
+                        HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType)
+                                | HyphenEdit::editForThisLine(hyphen));
+
+                existingPreBreak += width;
+                // Only set the fields that will be later read.
+                mFakeDesperateCandidate.offset = i;
+                mFakeDesperateCandidate.preBreak = existingPreBreak;
+                mFakeDesperateCandidate.secondOverhang = 0.0;
+                mFakeDesperateCandidate.hyphenType = hyphen;
+                mLastGreedyBreak = &mFakeDesperateCandidate;
+
+                width = w;
+            } else {
+                width = newWidth;
+            }
         }
     }
 }
 
-// add a word break (possibly for a hyphenated fragment), and add desperate breaks if
-// needed (ie when word exceeds current line width).
-void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
+// Add a word break (possibly for a hyphenated fragment).
+inline void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
         float firstOverhang, float secondOverhang, size_t preSpaceCount, size_t postSpaceCount,
-        MinikinExtent extent, float penalty, HyphenationType hyph, bool isRtl) {
-    // Check if we need desperate breaks.
-    const Candidate& lastBreak = mCandidates.back();
-    float leftOverhang, rightOverhang;
-    // TODO: Only works correctly for unidirectional text. Needs changes for bidi text.
-    if (isRtl) {
-        leftOverhang = firstOverhang;
-        rightOverhang = lastBreak.secondOverhang;
-    } else {
-        leftOverhang = lastBreak.secondOverhang;
-        rightOverhang = firstOverhang;
-    }
-    if (!fitsOnCurrentLine(postBreak - lastBreak.preBreak, leftOverhang, rightOverhang)) {
-        // The word doesn't fit on the line
-        // Add desperate breaks starting immediately after the last break
-        addDesperateBreaks(lastBreak.preBreak + mCharWidths[lastBreak.offset],
-                lastBreak.offset + 1 /* start */, offset /* end */, postSpaceCount, isRtl);
-    }
-
-    // Add the candidate itself.
-    Candidate cand;
-    cand.offset = offset;
-    cand.preBreak = preBreak;
-    cand.postBreak = postBreak;
-    cand.firstOverhang = firstOverhang;
-    cand.secondOverhang = secondOverhang;
-    cand.penalty = penalty;
-    cand.preSpaceCount = preSpaceCount;
-    cand.postSpaceCount = postSpaceCount;
-    cand.extent = extent;
-    cand.hyphenType = hyph;
-    cand.isRtl = isRtl;
-    addCandidate(cand);
+        float penalty, HyphenationType hyph, bool isRtl) {
+    mCandidates.push_back({offset, preBreak, postBreak, firstOverhang, secondOverhang, penalty,
+            preSpaceCount, postSpaceCount, hyph, isRtl});
 }
 
-// Go back and adjust earlier non-desperate line breaks if needed.
+// Go back and adjust earlier line breaks if needed.
 void LineBreaker::adjustSecondOverhang(float secondOverhang) {
-    const size_t lastBreak = mCandidates.size() - 1;
-    const ParaWidth lastPreBreak = mCandidates[lastBreak].preBreak;
-    for (ssize_t i = lastBreak; i >= 0; i--) {
-        if (mCandidates[i].penalty == SCORE_DESPERATE) {
-            // Skip desperate breaks.
-            continue;
-        }
+    const size_t lastCand = mCandidates.size() - 1;
+    const ParaWidth lastPreBreak = mCandidates[lastCand].preBreak;
+    for (ssize_t i = lastCand; i >= 0; i--) {
         // "lastPreBreak - mCandidates[i].preBreak" is the amount of difference in mWidth when those
         // breaks where added. So by subtracting that difference, we are subtracting the difference
         // in advances in order to find out how much overhang still remains.
@@ -489,62 +449,63 @@ void LineBreaker::adjustSecondOverhang(float secondOverhang) {
     }
 }
 
-// Find the needed extent between the start and end ranges. start and end are inclusive.
+// Find the needed extent between the start and end ranges. start is inclusive and end is exclusive.
+// Both are indices of the source string.
 MinikinExtent LineBreaker::computeMaxExtent(size_t start, size_t end) const {
-    MinikinExtent res = mCandidates[end].extent;
+    MinikinExtent res = {0.0, 0.0, 0.0};
     for (size_t j = start; j < end; j++) {
-        res.extendBy(mCandidates[j].extent);
+        res.extendBy(mCharExtents[j]);
     }
     return res;
 }
 
-// Helper method for addCandidate()
 void LineBreaker::addGreedyBreak(size_t breakIndex) {
     const Candidate& candidate = mCandidates[breakIndex];
-    pushBreak(candidate.offset, candidate.postBreak - mPreBreak,
-            computeMaxExtent(mLastBreak + 1, breakIndex),
-            mLastHyphenation | HyphenEdit::editForThisLine(candidate.hyphenType));
-    mLastBreak = breakIndex;
-    mPreBreak = candidate.preBreak;
-    mLastHyphenation = HyphenEdit::editForNextLine(candidate.hyphenType);
+    pushBreak(candidate.offset,
+            candidate.postBreak - mLastGreedyBreak->preBreak,
+            computeMaxExtent(mLastGreedyBreak->offset, candidate.offset),
+            HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType)
+                    | HyphenEdit::editForThisLine(candidate.hyphenType));
+    mLastGreedyBreak = &candidate;
 }
 
-// TODO performance: could avoid populating mCandidates if greedy only
-void LineBreaker::addCandidate(const Candidate& cand) {
-    const size_t candIndex = mCandidates.size();
-    mCandidates.push_back(cand);
-
+// Also add desperate breaks if needed (ie when word exceeds current line width).
+void LineBreaker::considerGreedyBreakCandidate(size_t candIndex) {
+    const Candidate* cand = &mCandidates[candIndex];
     float leftOverhang, rightOverhang;
     // TODO: Only works correctly for unidirectional text. Needs changes for bidi text.
-    if (cand.isRtl) {
-        leftOverhang = cand.firstOverhang;
-        rightOverhang = mCandidates[mLastBreak].secondOverhang;
+    if (cand->isRtl) {
+        leftOverhang = cand->firstOverhang;
+        rightOverhang = mLastGreedyBreak->secondOverhang;
     } else {
-        leftOverhang = mCandidates[mLastBreak].secondOverhang;
-        rightOverhang = cand.firstOverhang;
+        leftOverhang = mLastGreedyBreak->secondOverhang;
+        rightOverhang = cand->firstOverhang;
     }
-    // mPreBreak is the preBreak value of the last greedy line break we decided to do.
-    while (!fitsOnCurrentLine(cand.postBreak - mPreBreak, leftOverhang, rightOverhang)) {
+    while (!fitsOnCurrentLine(cand->postBreak - mLastGreedyBreak->preBreak,
+            leftOverhang, rightOverhang)) {
         // This break would create an overfull line, pick the best break and break there (greedy).
         // We do this in a loop, since there's no guarantee that after a break the remaining text
         // would fit on the next line.
 
         if (mBestGreedyBreaks.empty()) {
-            // If no good break has been found since last break, break here, desperately. The line
-            // still doesn't fit, but we can't do much more than avoiding further overfull lines.
-            addGreedyBreak(candIndex);
-            return;
+            // If no break has been found since last break but we are inside this loop, the
+            // section between the last line break and this candidate doesn't fit in the available
+            // space. So we need to consider desperate breaks.
+
+            // Add desperate breaks starting immediately after the last break.
+            addDesperateBreaks(mLastGreedyBreak->preBreak, mLastGreedyBreak->offset, cand->offset);
+            break;
         } else {
             // Break at the best known break.
             addGreedyBreak(popBestGreedyBreak());
-            if (cand.isRtl) {
-                rightOverhang = mCandidates[mLastBreak].secondOverhang;
+            if (cand->isRtl) {
+                rightOverhang = mLastGreedyBreak->secondOverhang;
             } else {
-                leftOverhang = mCandidates[mLastBreak].secondOverhang;
+                leftOverhang = mLastGreedyBreak->secondOverhang;
             }
         }
     }
-    insertGreedyBreakCandidate(candIndex, cand.penalty);
+    insertGreedyBreakCandidate(candIndex, cand->penalty);
 }
 
 void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit) {
@@ -552,10 +513,30 @@ void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, uint8
     mWidths.push_back(width);
     mAscents.push_back(extent.ascent);
     mDescents.push_back(extent.descent);
-    int flags = (mFirstTabIndex < mBreaks.back()) << kTab_Shift;
-    flags |= hyphenEdit;
+    const int flags = ((mFirstTabIndex < mBreaks.back()) << kTab_Shift) | hyphenEdit;
     mFlags.push_back(flags);
     mFirstTabIndex = INT_MAX;
+}
+
+LineBreaker::ParaWidth LineBreaker::computeBreaksGreedyPartial() {
+    size_t firstCandidate;
+    if (mLastConsideredGreedyCandidate == SIZE_MAX) {
+        // Clear results and reset greedy line breaker state if we are here for the first time.
+        clearResults();
+        mBestGreedyBreaks.clear();
+        mLastGreedyBreak = &mCandidates[0];
+        mFirstTabIndex = INT_MAX;
+        firstCandidate = 1;
+    } else {
+        firstCandidate = mLastConsideredGreedyCandidate + 1;
+    }
+
+    const size_t lastCandidate = mCandidates.size() - 1;
+    for (size_t cand = firstCandidate; cand <= lastCandidate; cand++) {
+        considerGreedyBreakCandidate(cand);
+    }
+    mLastConsideredGreedyCandidate = lastCandidate;
+    return mLastGreedyBreak->preBreak;
 }
 
 void LineBreaker::addReplacement(size_t start, size_t end, float width, const char* langTags,
@@ -590,25 +571,22 @@ bool LineBreaker::fitsOnCurrentLine(float width, float leftOverhang, float right
 }
 
 void LineBreaker::computeBreaksGreedy() {
-    // All breaks but the last have been added in addCandidate already.
-    const size_t lastCandidate = mCandidates.size() - 1;
-    if (lastCandidate == 0 || mLastBreak != lastCandidate) {
-        pushBreak(mCandidates[lastCandidate].offset,
-                mCandidates[lastCandidate].postBreak - mPreBreak,
-                computeMaxExtent(mLastBreak + 1, lastCandidate),
-                mLastHyphenation);
-        // No need to update mLastBreak, mPreBreak, or mLastHyphenation, because we're done.
+    computeBreaksGreedyPartial();
+    // All breaks but the last have been added by computeBreaksGreedyPartial() already.
+    const Candidate* lastCandidate = &mCandidates.back();
+    if (mCandidates.size() == 1 || mLastGreedyBreak != lastCandidate) {
+        pushBreak(lastCandidate->offset,
+                lastCandidate->postBreak - mLastGreedyBreak->preBreak,
+                computeMaxExtent(mLastGreedyBreak->offset, lastCandidate->offset),
+                HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType));
+        // No need to update mLastGreedyBreak because we're done.
     }
 }
 
 // Follow "prev" links in mCandidates array, and copy to result arrays.
 void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData) {
-    // clear existing greedy break result
-    mBreaks.clear();
-    mWidths.clear();
-    mAscents.clear();
-    mDescents.clear();
-    mFlags.clear();
+    // clear output vectors.
+    clearResults();
 
     const size_t nCand = mCandidates.size();
     size_t prev;
@@ -616,7 +594,7 @@ void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& brea
         prev = breaksData[i].prev;
         mBreaks.push_back(mCandidates[i].offset);
         mWidths.push_back(mCandidates[i].postBreak - mCandidates[prev].preBreak);
-        MinikinExtent extent = computeMaxExtent(prev + 1, i);
+        MinikinExtent extent = computeMaxExtent(mCandidates[prev].offset, mCandidates[i].offset);
         mAscents.push_back(extent.ascent);
         mDescents.push_back(extent.descent);
         int flags = HyphenEdit::editForThisLine(mCandidates[i].hyphenType);
@@ -630,6 +608,7 @@ void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& brea
     std::reverse(mFlags.begin(), mFlags.end());
 }
 
+//TODO: Support desperate breaks in optimal line breaking.
 void LineBreaker::computeBreaksOptimal() {
     size_t active = 0;
     const size_t nCand = mCandidates.size();
@@ -725,11 +704,7 @@ void LineBreaker::finish() {
     mWidth = 0;
     mCandidates.clear();
     mBestGreedyBreaks.clear();
-    mBreaks.clear();
-    mWidths.clear();
-    mAscents.clear();
-    mDescents.clear();
-    mFlags.clear();
+    clearResults();
     if (mTextBuf.size() > MAX_TEXT_BUF_RETAIN) {
         mTextBuf.clear();
         mTextBuf.shrink_to_fit();
