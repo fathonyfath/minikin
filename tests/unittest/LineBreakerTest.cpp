@@ -213,14 +213,22 @@ static void setupLineBreaker(LineBreaker* b, const std::string& text) {
 
 class LineBreakerTest : public ICUTestBase {
 public:
-    LineBreakerTest()
-            : ICUTestBase(), mCollection(getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML)) {
-    }
+    LineBreakerTest() : ICUTestBase() {}
 
     virtual ~LineBreakerTest() {}
 
 protected:
-    const std::shared_ptr<FontCollection> mCollection;
+    virtual void SetUp() override {
+        ICUTestBase::SetUp();
+        mCollection = getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
+    }
+
+    virtual void TearDown() override {
+        mCollection.reset();
+        ICUTestBase::TearDown();
+    }
+
+    std::shared_ptr<FontCollection> mCollection;
 
 private:
     static constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
