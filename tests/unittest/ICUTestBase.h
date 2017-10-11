@@ -37,6 +37,7 @@ protected:
         struct stat sb;
         ASSERT_EQ(0, fstat(fd, &sb));
         void* data = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        close(fd);
 
         UErrorCode errorCode = U_ZERO_ERROR;
         udata_setCommonData(data, &errorCode);
