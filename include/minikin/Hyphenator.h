@@ -147,7 +147,7 @@ public:
     // until this instance is deleted.
     // Note: nullptr is valid input, in which case the hyphenator only processes soft hyphens.
     static Hyphenator* loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
-            const char* language, size_t languageLength);
+            const std::string& language);
 private:
     enum class HyphenationLocale : uint8_t {
         OTHER = 0,

@@ -31,6 +31,9 @@ public:
     // default.
     const static uint32_t kEmptyListId = 0;
 
+    // A special ID for the invalid language list.
+    const static uint32_t kInvalidListId = (uint32_t)(-1);
+
     // Returns language list ID for the given string representation of FontLanguages.
     // Caller should acquire a lock before calling the method.
     static uint32_t getId(const std::string& languages);

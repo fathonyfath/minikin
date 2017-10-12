@@ -16,10 +16,14 @@
 
 #define LOG_TAG "Minikin"
 
+#include <list>
+#include <map>
+
 #include <android/log.h>
 
 #include <minikin/Emoji.h>
 #include <minikin/Hyphenator.h>
+#include "FontLanguage.h"
 #include "MinikinInternal.h"
 #include "WordBreaker.h"
 #include "cutils/log.h"
@@ -29,22 +33,60 @@
 
 namespace minikin {
 
-const uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
-const uint32_t CHAR_ZWJ = 0x200D;
+constexpr uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
+constexpr uint32_t CHAR_ZWJ = 0x200D;
 
-std::unique_ptr<icu::BreakIterator> WordBreaker::createBreakIterator(const icu::Locale& locale) {
+namespace {
+static icu::BreakIterator* createNewIterator(const FontLanguage& locale) {
     // TODO: handle failure status
     UErrorCode status = U_ZERO_ERROR;
-    return std::unique_ptr<icu::BreakIterator>(
-            icu::BreakIterator::createLineInstance(locale, status));
+    return icu::BreakIterator::createLineInstance(locale.isUnsupported()  ?
+            icu::Locale::getRoot() : icu::Locale::createFromName(locale.getString().c_str()),
+            status);
+}
+}  // namespace
+
+ICULineBreakerPool::Slot ICULineBreakerPoolImpl::acquire(const FontLanguage& locale) {
+    const uint64_t id = locale.getIdentifier();
+    android::AutoMutex _l(gMinikinLock);
+    for (auto i = mPool.begin(); i != mPool.end(); i++) {
+        if (i->localeId == id) {
+            Slot slot = std::move(*i);
+            mPool.erase(i);
+            return slot;
+        }
+    }
+
+    // Not found in pool. Create new one.
+    return { id, std::unique_ptr<icu::BreakIterator>(createNewIterator(locale)) };
 }
 
-ssize_t WordBreaker::followingWithLocale(const icu::Locale& locale, size_t from) {
-    mBreakIterator = createBreakIterator(locale);
+void ICULineBreakerPoolImpl::release(ICULineBreakerPool::Slot&& slot) {
+    if (slot.breaker.get() == nullptr) {
+        return;  // Already released slot. Do nothing.
+    }
+    android::AutoMutex _l(gMinikinLock);
+    if (mPool.size() >= MAX_POOL_SIZE) {
+        // Pool is full. Move to local variable, so that the given slot will be released when the
+        // variable leaves the scope.
+        Slot localSlot = std::move(slot);
+        return;
+    }
+    mPool.push_front(std::move(slot));
+}
+
+WordBreaker::WordBreaker() : mPool(&ICULineBreakerPoolImpl::getInstance()) {
+}
+
+WordBreaker::WordBreaker(ICULineBreakerPool* pool) : mPool(pool) {
+}
+
+ssize_t WordBreaker::followingWithLocale(const FontLanguage& locale, size_t from) {
+    mIcuBreaker = mPool->acquire(locale);
     UErrorCode status = U_ZERO_ERROR;
     LOG_ALWAYS_FATAL_IF(mText == nullptr, "setText must be called first");
     // TODO: handle failure status
-    mBreakIterator->setText(&mUText, status);
+    mIcuBreaker.breaker->setText(&mUText, status);
     if (mInEmailOrUrl) {
         // Note:
         // Don't reset mCurrent, mLast, or mScanOffset for keeping email/URL context.
@@ -126,9 +168,9 @@ static bool isValidBreak(const uint16_t* buf, size_t bufEnd, int32_t i) {
 // Customized iteratorNext that takes care of both resets and our modifications
 // to ICU's behavior.
 int32_t WordBreaker::iteratorNext() {
-    int32_t result = mBreakIterator->following(mCurrent);
+    int32_t result = mIcuBreaker.breaker->following(mCurrent);
     while (!isValidBreak(mText, mTextSize, result)) {
-        result = mBreakIterator->next();
+        result = mIcuBreaker.breaker->next();
     }
     return result;
 }
@@ -176,11 +218,11 @@ void WordBreaker::detectEmailOrUrl() {
             }
         }
         if (state == SAW_AT || state == SAW_COLON_SLASH_SLASH) {
-            if (!mBreakIterator->isBoundary(i)) {
+            if (!mIcuBreaker.breaker->isBoundary(i)) {
                 // If there are combining marks or such at the end of the URL or the email address,
                 // consider them a part of the URL or the email, and skip to the next actual
                 // boundary.
-                i = mBreakIterator->following(i);
+                i = mIcuBreaker.breaker->following(i);
             }
             mInEmailOrUrl = true;
         } else {
@@ -278,6 +320,7 @@ void WordBreaker::finish() {
     mText = nullptr;
     // Note: calling utext_close multiply is safe
     utext_close(&mUText);
+    mPool->release(std::move(mIcuBreaker));
 }
 
 }  // namespace minikin

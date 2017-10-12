@@ -21,7 +21,11 @@
 
 #include <log/log.h>
 
+#include "FontLanguage.h"
+#include "FontLanguageListCache.h"
+#include "HyphenatorMap.h"
 #include "LayoutUtils.h"
+#include "MinikinInternal.h"
 #include "StringPiece.h"
 #include "WordBreaker.h"
 #include <minikin/Layout.h>
@@ -64,6 +68,11 @@ const size_t MAX_TEXT_BUF_RETAIN = 32678;
 // Maximum amount that spaces can shrink, in justified text.
 const float SHRINKABILITY = 1.0 / 3.0;
 
+inline static const FontLanguages& getLanguages(uint32_t langListId) {
+    android::AutoMutex _l(gMinikinLock);
+    return FontLanguageListCache::getById(langListId);
+}
+
 LineBreaker::LineBreaker() : mWordBreaker(std::make_unique<WordBreaker>()) { }
 
 LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker)
@@ -71,24 +80,29 @@ LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker)
 
 LineBreaker::~LineBreaker() {}
 
-void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
-        size_t restartFrom) {
-    // For now, we ignore all locales except the first valid one.
-    // TODO: Support selecting the locale based on the script of the text.
-    SplitIterator it(locales, ',');
-    for (size_t i = 0; it.hasNext(); i++) {
-        StringPiece localeStr = it.next();
-        icu::Locale locale = icu::Locale::createFromName(localeStr.toString().c_str());
-        if (!locale.isBogus()) {  // found a good locale
-            mHyphenator = hyphenators[i];  // The number of locales and hyphenators are the same.
-            mWordBreaker->followingWithLocale(locale, restartFrom);
-            return;
-        }
+void LineBreaker::setLocales(uint32_t langListId, size_t restartFrom) {
+    if (mCurrentLocaleListId == langListId) {
+        return;
     }
 
-    // No good locale found. Use Root locale.
-    mWordBreaker->followingWithLocale(icu::Locale::getRoot(), restartFrom);
-    mHyphenator = nullptr;
+    const FontLanguages& newLanguages = getLanguages(langListId);
+    const FontLanguage newLocale = newLanguages.empty() ? FontLanguage() : newLanguages[0];
+    const uint64_t newLocaleId = newLocale.getIdentifier();
+
+    const bool needUpdate =
+        // The first time setLocale is called.
+        mCurrentLocaleListId == FontLanguageListCache::kInvalidListId ||
+        // The effective locale is changed.
+        newLocaleId != mCurrentLocaleId;
+
+    // For now, we ignore all locales except the first valid one.
+    // TODO: Support selecting the locale based on the script of the text.
+    mCurrentLocaleListId = langListId;
+    mCurrentLocaleId = newLocaleId;
+    if (needUpdate) {
+        mWordBreaker->followingWithLocale(newLocale, restartFrom);
+        mHyphenator = HyphenatorMap::lookup(newLocale);
+    }
 }
 
 void LineBreaker::setText() {
@@ -107,6 +121,7 @@ void LineBreaker::setText() {
     mLastConsideredGreedyCandidate = SIZE_MAX;
 
     mSpaceCount = 0;
+    mCurrentLocaleListId = FontLanguageListCache::kInvalidListId;
 }
 
 // This function determines whether a character is a space that disappears at end of line.
@@ -275,8 +290,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addWordBreak.
 void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-        FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
-        const std::vector<Hyphenator*>& hyphenators) {
+        FontStyle style, size_t start, size_t end, bool isRtl) {
     const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
 
     float hyphenPenalty = 0.0;
@@ -301,10 +315,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
         }
     }
 
-    // Caller passes nullptr for langTag if language is not changed.
-    if (langTags != nullptr) {
-        setLocales(langTags, hyphenators, start);
-    }
+    setLocales(style.getLanguageListId(), start);
     size_t current = (size_t) mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
@@ -318,7 +329,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
     // The maximum amount of backward overhang seen since last word.
     float maxBackwardOverhang = 0;
     size_t postSpaceCount = mSpaceCount;
-    const bool hyphenate = (paint != nullptr && mHyphenator != nullptr &&
+    const bool hyphenate = (paint != nullptr &&
             mHyphenationFrequency != kHyphenationFrequency_None);
     for (size_t i = start; i < end; i++) {
         const uint16_t c = mTextBuf[i];
@@ -539,13 +550,12 @@ LineBreaker::ParaWidth LineBreaker::computeBreaksGreedyPartial() {
     return mLastGreedyBreak->preBreak;
 }
 
-void LineBreaker::addReplacement(size_t start, size_t end, float width, const char* langTags,
-        const std::vector<Hyphenator*>& hyphenators) {
+void LineBreaker::addReplacement(size_t start, size_t end, float width, uint32_t langListId) {
     mCharWidths[start] = width;
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRun(nullptr, nullptr, FontStyle(), start, end, false, langTags, hyphenators);
+    addStyleRun(nullptr, nullptr, FontStyle(langListId), start, end, false);
 }
 
 // Get the width of a space. May return 0 if there are no spaces.
@@ -704,6 +714,7 @@ void LineBreaker::finish() {
     mWidth = 0;
     mCandidates.clear();
     mBestGreedyBreaks.clear();
+    mCurrentLocaleListId = FontLanguageListCache::kInvalidListId;
     clearResults();
     if (mTextBuf.size() > MAX_TEXT_BUF_RETAIN) {
         mTextBuf.clear();

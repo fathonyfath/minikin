@@ -35,6 +35,8 @@
 
 namespace minikin {
 
+class FontLanguages;
+
 enum BreakStrategy {
     kBreakStrategy_Greedy = 0,
     kBreakStrategy_HighQuality = 1,
@@ -148,11 +150,9 @@ class LineBreaker {
         }
 
         void addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-                FontStyle style, size_t start, size_t end, bool isRtl, const char* langTags,
-                const std::vector<Hyphenator*>& hyphenators);
+                FontStyle style, size_t start, size_t end, bool isRtl);
 
-        void addReplacement(size_t start, size_t end, float width, const char* langTags,
-                const std::vector<Hyphenator*>& hyphenators);
+        void addReplacement(size_t start, size_t end, float width, uint32_t langListId);
 
         size_t computeBreaks();
 
@@ -210,16 +210,10 @@ class LineBreaker {
             bool isRtl; // The direction of the bidi run containing or ending in this candidate
         };
 
-        // Note: Locale persists across multiple invocations (it is not cleaned up by finish()),
-        // explicitly to avoid the cost of creating ICU BreakIterator objects. It should always
-        // be set on the first invocation, but callers are encouraged not to call again unless
-        // locale has actually changed.
-        // That logic could be here but it's better for performance that it's upstream because of
-        // the cost of constructing and comparing the ICU Locale object.
-        // Note: caller is responsible for managing lifetime of hyphenator
-        void setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators,
-                        size_t restartFrom);
-        FRIEND_TEST(LineBreakerTest, setLocales);
+        void setLocales(uint32_t langListId, size_t restartFrom);
+        // A locale list ID and locale ID currently used for word iterator and hyphenator.
+        uint32_t mCurrentLocaleListId;
+        uint64_t mCurrentLocaleId = 0;
 
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
@@ -242,7 +236,7 @@ class LineBreaker {
         std::vector<MinikinExtent> mCharExtents;
         std::vector<LayoutOverhang> mCharOverhangs;
 
-        Hyphenator* mHyphenator;
+        const Hyphenator* mHyphenator;
 
         // layout parameters
         BreakStrategy mStrategy = kBreakStrategy_Greedy;

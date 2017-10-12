@@ -28,7 +28,7 @@ const icu::Locale& usLocale = icu::Locale::getUS();
 
 static void BM_Hyphenator_short_word(benchmark::State& state) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(
-            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en", 2);
+            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en");
     std::vector<uint16_t> word = utf8ToUtf16("hyphen");
     std::vector<HyphenationType> result;
     while (state.KeepRunning()) {
@@ -41,7 +41,7 @@ BENCHMARK(BM_Hyphenator_short_word);
 
 static void BM_Hyphenator_long_word(benchmark::State& state) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(
-            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en", 2);
+            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en");
     std::vector<uint16_t> word = utf8ToUtf16(
             "Pneumonoultramicroscopicsilicovolcanoconiosis");
     std::vector<HyphenationType> result;
