@@ -58,7 +58,7 @@ cc_test {
         "WordBreakerTests.cpp",
     ],
 
-    cppflags: [
+    cflags: [
         "-Werror",
         "-Wall",
         "-Wextra",
