@@ -46,6 +46,7 @@ cc_test {
         "FontFamilyTest.cpp",
         "FontLanguageListCacheTest.cpp",
         "HbFontCacheTest.cpp",
+        "HyphenatorMapTest.cpp",
         "HyphenatorTest.cpp",
         "GraphemeBreakTests.cpp",
         "LayoutTest.cpp",
@@ -58,7 +59,7 @@ cc_test {
         "WordBreakerTests.cpp",
     ],
 
-    cppflags: [
+    cflags: [
         "-Werror",
         "-Wall",
         "-Wextra",

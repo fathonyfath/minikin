@@ -129,7 +129,8 @@ Hyphenator::Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minS
         mHyphenationLocale(hyphenLocale) {
 }
 
-void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word, size_t len) {
+void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word,
+        size_t len) const {
     result->clear();
     result->resize(len);
     const size_t paddedLen = len + 2;  // start and stop code each count for 1
@@ -293,7 +294,7 @@ static inline HyphenationType getHyphTypeForArabic(const uint16_t* word, size_t 
 // that didn't match patterns, especially words that contain hyphens or soft hyphens (See sections
 // 5.3, Use of Hyphen, and 5.4, Use of Soft Hyphen).
 void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word,
-        size_t len) {
+        size_t len) const {
     result[0] = HyphenationType::DONT_BREAK;
     for (size_t i = 1; i < len; i++) {
         const uint16_t prevChar = word[i - 1];
@@ -335,7 +336,7 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
 }
 
 HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t* word,
-        size_t len) {
+        size_t len) const {
     const Header* header = getHeader();
     HyphenationType result = HyphenationType::BREAK_AND_INSERT_HYPHEN;
     // TODO: check header magic
@@ -394,7 +395,7 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
  * Note: len here is the padded length including 0 codes at start and end.
  **/
 void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* codes, size_t len,
-        HyphenationType hyphenValue) {
+        HyphenationType hyphenValue) const {
     static_assert(sizeof(HyphenationType) == sizeof(uint8_t), "HyphnationType must be uint8_t.");
     // Reuse the result array as a buffer for calculating intermediate hyphenation numbers.
     uint8_t* buffer = reinterpret_cast<uint8_t*>(result);

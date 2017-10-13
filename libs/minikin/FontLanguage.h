@@ -31,11 +31,30 @@ namespace minikin {
 const size_t FONT_LANGUAGES_LIMIT = 12;
 
 // The language or region code is encoded to 15 bits.
-constexpr uint16_t INVALID_CODE = 0x7fff;
+constexpr uint16_t NO_LANGUAGE = 0x7fff;
+constexpr uint16_t NO_REGION = 0x7fff;
 // The script code is encoded to 20 bits.
-constexpr uint32_t INVALID_SCRIPT = 0xfffff;
+constexpr uint32_t NO_SCRIPT = 0xfffff;
 
 class FontLanguages;
+
+// Enum for making sub-locale from FontLangauge.
+enum class SubtagBits : uint8_t {
+    EMPTY    = 0b00000000,
+    LANGUAGE = 0b00000001,
+    SCRIPT   = 0b00000010,
+    REGION   = 0b00000100,
+    VARIANT  = 0b00001000,
+    EMOJI    = 0b00010000,
+    ALL      = 0b00011111,
+};
+
+inline constexpr SubtagBits operator&(SubtagBits l, SubtagBits r) {
+    return static_cast<SubtagBits>(static_cast<uint8_t>(l) & static_cast<uint8_t>(r));
+}
+inline constexpr SubtagBits operator|(SubtagBits l, SubtagBits r) {
+    return static_cast<SubtagBits>(static_cast<uint8_t>(l) | static_cast<uint8_t>(r));
+}
 
 // FontLanguage is a compact representation of a BCP 47 language tag. It
 // does not capture all possible information, only what directly affects
@@ -57,10 +76,9 @@ public:
 
     // Default constructor creates the unsupported language.
     FontLanguage()
-            : mScript(INVALID_SCRIPT),
-            mLanguage(INVALID_CODE),
-            mRegion(INVALID_CODE),
-            mHbLanguage(HB_LANGUAGE_INVALID),
+            : mScript(NO_SCRIPT),
+            mLanguage(NO_LANGUAGE),
+            mRegion(NO_REGION),
             mSubScriptBits(0ul),
             mVariant(Variant::NO_VARIANT),
             mEmojiStyle(EMSTYLE_EMPTY) {}
@@ -78,10 +96,21 @@ public:
         return !(*this == other);
     }
 
-    bool isUnsupported() const { return mLanguage == INVALID_CODE; }
-    EmojiStyle getEmojiStyle() const { return mEmojiStyle; }
-    hb_language_t getHbLanguage() const { return mHbLanguage; }
+    inline bool hasLanguage() const { return mLanguage != NO_LANGUAGE; }
+    inline bool hasScript() const { return mScript != NO_SCRIPT; }
+    inline bool hasRegion() const { return mRegion != NO_REGION; }
+    inline bool hasVariant() const { return mVariant != Variant::NO_VARIANT; }
+    inline bool hasEmojiStyle() const { return mEmojiStyle != EMSTYLE_EMPTY; }
 
+    inline bool isSupported() const {
+        return hasLanguage() || hasScript() || hasRegion() || hasVariant() || hasEmojiStyle();
+    }
+
+    inline bool isUnsupported() const {
+        return !isSupported();
+    }
+
+    EmojiStyle getEmojiStyle() const { return mEmojiStyle; }
 
     bool isEqualScript(const FontLanguage& other) const;
 
@@ -101,6 +130,8 @@ public:
                 ((uint64_t)mEmojiStyle << 12) | (uint64_t)mVariant;
     }
 
+    FontLanguage getPartialLocale(SubtagBits bits) const;
+
 private:
     friend class FontLanguages;  // for FontLanguages constructor
 
@@ -116,9 +147,6 @@ private:
     // ISO 3166-1 or UN M.49 compliant region code. The two-letter or three-digit region code is
     // packed into a 15 bit integer.
     uint16_t mRegion;
-
-    // The language to be passed HarfBuzz shaper.
-    hb_language_t mHbLanguage;
 
     // For faster comparing, use 7 bits for specific scripts.
     static const uint8_t kBopomofoFlag = 1u;
@@ -155,10 +183,15 @@ public:
     bool empty() const { return mLanguages.empty(); }
     const FontLanguage& operator[] (size_t n) const { return mLanguages[n]; }
 
+    hb_language_t getHbLanguage(size_t n) const { return mHbLangs[n]; }
+
 private:
     friend struct FontLanguage;  // for calcScoreFor
 
     std::vector<FontLanguage> mLanguages;
+
+    // The languages to be passed to HarfBuzz shaper.
+    std::vector<hb_language_t> mHbLangs;
     uint8_t mUnionOfSubScriptBits;
     bool mIsAllTheSameLanguage;
 

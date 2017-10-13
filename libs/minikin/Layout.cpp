@@ -959,14 +959,14 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             const FontLanguages& langList =
                     FontLanguageListCache::getById(ctx->style.getLanguageListId());
             if (langList.size() != 0) {
-                const FontLanguage* hbLanguage = &langList[0];
+                hb_language_t hbLanguage = langList.getHbLanguage(0);
                 for (size_t i = 0; i < langList.size(); ++i) {
                     if (langList[i].supportsHbScript(script)) {
-                        hbLanguage = &langList[i];
+                        hbLanguage = langList.getHbLanguage(i);
                         break;
                     }
                 }
-                hb_buffer_set_language(buffer, hbLanguage->getHbLanguage());
+                hb_buffer_set_language(buffer, hbLanguage);
             }
 
             const uint32_t clusterStart = addToHbBuffer(

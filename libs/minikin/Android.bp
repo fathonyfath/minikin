@@ -25,6 +25,7 @@ cc_library {
     srcs: [
         "Hyphenator.cpp",
     ],
+    cflags: ["-Wall", "-Werror"],
     target: {
         android: {
             srcs: [
@@ -37,6 +38,7 @@ cc_library {
                 "FontUtils.cpp",
                 "GraphemeBreak.cpp",
                 "HbFontCache.cpp",
+                "HyphenatorMap.cpp",
                 "Layout.cpp",
                 "LayoutUtils.cpp",
                 "LineBreaker.cpp",
@@ -71,8 +73,8 @@ cc_library {
     ],
     product_variables: {
         debuggable: {
-            // Enable race detection on eng and userdebug build.
-            cppflags: ["-DENABLE_RACE_DETECTION"],
+            // Enable race detection and assertion on eng and userdebug build.
+            cppflags: ["-DENABLE_RACE_DETECTION", "-DENABLE_ASSERTION"],
         },
     },
     shared_libs: [
