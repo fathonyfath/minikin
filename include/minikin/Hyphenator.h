@@ -56,8 +56,8 @@ enum class HyphenationType : uint8_t {
     // as "l-/l".
     BREAK_AND_REPLACE_WITH_HYPHEN = 6,
     // Break the line, and repeat the hyphen (which is the last character) at the beginning of the
-    // next line. Used in Polish, where "czerwono-niebieska" should hyphenate as
-    // "czerwono-/-niebieska".
+    // next line. Used in Polish (where "czerwono-niebieska" should hyphenate as
+    // "czerwono-/-niebieska") and Slovenian.
     BREAK_AND_INSERT_HYPHEN_AT_NEXT_LINE = 7,
     // Break the line, insert a ZWJ and hyphen at the first line, and a ZWJ at the second line.
     // This is used in Arabic script, mostly for writing systems of Central Asia. It's our default
@@ -151,8 +151,9 @@ public:
 private:
     enum class HyphenationLocale : uint8_t {
         OTHER = 0,
-        POLISH = 1,
-        CATALAN = 2,
+        CATALAN = 1,
+        POLISH = 2,
+        SLOVENIAN = 3,
     };
 
     // Use Hyphenator::loadBinary instead.

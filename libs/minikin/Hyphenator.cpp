@@ -114,10 +114,12 @@ Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix,
         const char* language, size_t languageLength) {
     HyphenationLocale hyphenLocale = HyphenationLocale::OTHER;
     if (languageLength == 2) {
-        if (language[0] == 'p' && language[1] == 'l') {
-            hyphenLocale = HyphenationLocale::POLISH;
-        } else if(language[0] == 'c' && language[1] == 'a') {
+        if (language[0] == 'c' && language[1] == 'a') {
             hyphenLocale = HyphenationLocale::CATALAN;
+        } else if (language[0] == 'p' && language[1] == 'l') {
+            hyphenLocale = HyphenationLocale::POLISH;
+        } else if (language[0] == 's' && language[1] == 'l') {
+            hyphenLocale = HyphenationLocale::SLOVENIAN;
         }
     }
     return new Hyphenator(patternData, minPrefix, minSuffix, hyphenLocale);
@@ -302,9 +304,10 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
             // Break after hyphens, but only if they don't start the word.
 
             if ((prevChar == CHAR_HYPHEN_MINUS || prevChar == CHAR_HYPHEN)
-                    && mHyphenationLocale == HyphenationLocale::POLISH
-                    && getScript(word[i]) == USCRIPT_LATIN ) {
-                // In Polish, hyphens get repeated at the next line. To be safe,
+                    && (mHyphenationLocale == HyphenationLocale::POLISH
+                        || mHyphenationLocale == HyphenationLocale::SLOVENIAN)
+                    && getScript(word[i]) == USCRIPT_LATIN) {
+                // In Polish and Slovenian, hyphens get repeated at the next line. To be safe,
                 // we will do this only if the next character is Latin.
                 result[i] = HyphenationType::BREAK_AND_INSERT_HYPHEN_AT_NEXT_LINE;
             } else {
