@@ -16,26 +16,40 @@
 
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cutils/log.h>
-#include "ICUTestBase.h"
-#include "WordBreaker.h"
 #include <minikin/LineBreaker.h>
 #include <unicode/locid.h>
 #include <unicode/uchriter.h>
+
+#include <algorithm>
+
 #include "../util/FontTestUtils.h"
+#include "FontLanguageListCache.h"
+#include "ICUTestBase.h"
+#include "MinikinInternal.h"
+#include "WordBreaker.h"
 
 namespace minikin {
 
-constexpr float CHAR_WIDTH = 10.0;  // Mock implementation alwasy returns 10.0 for advance.
+constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 for advance.
+
+static uint32_t getLocaleListId(const std::string& langTags) {
+    android::AutoMutex _l(gMinikinLock);
+    return FontLanguageListCache::getId(langTags);
+}
+
+static const FontLanguages& getLocaleList(uint32_t localeListId) {
+    android::AutoMutex _l(gMinikinLock);
+    return FontLanguageListCache::getById(localeListId);
+}
 
 struct LocaleComparator {
-    bool operator() (const icu::Locale& l, const icu::Locale& r) const {
-        return strcmp(l.getName(), r.getName()) > 0;
+    bool operator() (const FontLanguage& l, const FontLanguage& r) const {
+        return l.getIdentifier() > r.getIdentifier();
     }
 };
 
-typedef std::map<icu::Locale, std::string, LocaleComparator> LocaleIteratorMap;
+typedef std::map<FontLanguage, std::string, LocaleComparator> LocaleIteratorMap;
 
 class MockBreakIterator : public icu::BreakIterator {
 public:
@@ -145,16 +159,24 @@ private:
     std::vector<int32_t> mBreakPoints;
 };
 
-class TestableWordBreaker : public WordBreaker {
+// A mock implementation of ICULineBreakerPool for injecting mock break iterators.
+// This class does not pool and delete immediately when the iterator is released.
+class MockICULineBreakerPoolImpl : public ICULineBreakerPool {
 public:
-    TestableWordBreaker(LocaleIteratorMap&& map) : mLocaleIteratorMap(std::move(map)) {
-    }
+    MockICULineBreakerPoolImpl(LocaleIteratorMap&& map) : mLocaleIteratorMap(std::move(map)) {}
 
-    std::unique_ptr<icu::BreakIterator> createBreakIterator(const icu::Locale& locale) override {
+    Slot acquire(const FontLanguage& locale) override {
         auto i = mLocaleIteratorMap.find(locale);
         LOG_ALWAYS_FATAL_IF(i == mLocaleIteratorMap.end(),
-                "Iterator not found for %s", locale.getName());
-        return std::make_unique<MockBreakIterator>(buildBreakPointList(i->second));
+                "Iterator not found for %s", locale.getString().c_str());
+        return {locale.getIdentifier(),
+              std::make_unique<MockBreakIterator>(buildBreakPointList(i->second)) };
+
+    }
+
+    void release(Slot&& slot) override {
+        // Move to local variable, so that the slot will be deleted when returning this method.
+        Slot localSlot = std::move(slot);
     }
 
 private:
@@ -177,11 +199,15 @@ private:
     LocaleIteratorMap mLocaleIteratorMap;
 };
 
+class TestableWordBreaker : public WordBreaker {
+public:
+    TestableWordBreaker(ICULineBreakerPool* pool) : WordBreaker(pool) {}
+};
+
 class TestableLineBreaker : public LineBreaker {
 public:
-    TestableLineBreaker(LocaleIteratorMap&& breaker)
-            : LineBreaker(std::make_unique<TestableWordBreaker>(std::move(breaker))) {
-    }
+    TestableLineBreaker(ICULineBreakerPool* pool)
+            : LineBreaker(std::make_unique<TestableWordBreaker>(pool)) {}
 };
 
 class RectangleLineWidthDelegate : public LineBreaker::LineWidthDelegate {
@@ -263,8 +289,8 @@ static void expectLineBreaks(const std::string& expected, const std::vector<int>
 }
 
 TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
-    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-    const std::vector<Hyphenator*> hyphenators = { enHyph.get() };
+    const uint32_t enUSLangId = getLocaleListId("en-US");
+    const FontLanguage& enUSLanguage = getLocaleList(enUSLangId)[0];
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -280,16 +306,16 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
         // Here, "|" is canvas boundary. "^" is word break point.
         const std::string text = "abcdefghijklmnopqrstuvwxyz";
         LocaleIteratorMap map;
-        map[icu::Locale::getUS()] = "ab|cde|fgh|ijk|lmn|o|pqr|st|u|vwxyz";
+        map[enUSLanguage] = "ab|cde|fgh|ijk|lmn|o|pqr|st|u|vwxyz";
 
-        TestableLineBreaker b(std::move(map));
+        MockICULineBreakerPoolImpl impl(std::move(map));
+        TestableLineBreaker b(&impl);
         setupLineBreaker(&b, text);
 
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, text.size(), false /* isRtl */,
-                "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(enUSLangId), 0, text.size(), false);
 
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(7U, breakNum);
@@ -310,10 +336,10 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
-    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-    const std::vector<Hyphenator*> enHyphenators = { enHyph.get() };
-    std::unique_ptr<Hyphenator> frHyph(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
-    const std::vector<Hyphenator*> frHyphenators = { frHyph.get() };
+    const uint32_t enUSLangId = getLocaleListId("en-US");
+    const FontLanguage& enUSLanguage = getLocaleList(enUSLangId)[0];
+    const uint32_t frFRLangId = getLocaleListId("fr-FR");
+    const FontLanguage& frFRLanguage = getLocaleList(frFRLangId)[0];
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -327,17 +353,17 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
         // Here, "|" is canvas boundary. "^" is word break point.
         const std::string text = "abcdefgh";
         LocaleIteratorMap map;
-        map[icu::Locale::getUS()] = "ab|cde|fgh";
-        map[icu::Locale::getFrance()] = "ab|cdef|gh";
+        map[enUSLanguage] = "ab|cde|fgh";
+        map[frFRLanguage] = "ab|cdef|gh";
 
-        TestableLineBreaker b(std::move(map));
+        MockICULineBreakerPoolImpl impl(std::move(map));
+        TestableLineBreaker b(&impl);
         setupLineBreaker(&b, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", enHyphenators);
-        b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false, "fr-FR",
-                frHyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(enUSLangId), 0, 2, false);
+        b.addStyleRun(&paint, mCollection, FontStyle(frFRLangId), 2, text.size(), false);
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(3U, breakNum);
         expectLineBreaks("ab|cdef|gh",
@@ -353,8 +379,8 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
-    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-    const std::vector<Hyphenator*> hyphenators = { enHyph.get() };
+    const uint32_t enUSLangId = getLocaleListId("en-US");
+    const FontLanguage& enUSLanguage = getLocaleList(enUSLangId)[0];
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -365,17 +391,17 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
         // Here, "|" is canvas space. "^" means word break point and "_" means empty
         const std::string text = "abcdefgh";
         LocaleIteratorMap map;
-        map[icu::Locale::getUS()] = "ab|cde|fgh";
+        map[enUSLanguage] = "ab|cde|fgh";
 
-        TestableLineBreaker b(std::move(map));
+        MockICULineBreakerPoolImpl impl(std::move(map));
+        TestableLineBreaker b(&impl);
         setupLineBreaker(&b, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 2, false, "en-US", hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(enUSLangId), 0, 2, false);
         // nullptr means keep current locale and hyphenator
-        b.addStyleRun(&paint, mCollection, FontStyle(), 2, text.size(), false, nullptr,
-                hyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(enUSLangId), 2, text.size(), false);
 
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(2U, breakNum);
@@ -389,10 +415,10 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
 }
 
 TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
-    std::unique_ptr<Hyphenator> enHyph(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-    const std::vector<Hyphenator*> enHyphenators = { enHyph.get() };
-    std::unique_ptr<Hyphenator> frHyph(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
-    const std::vector<Hyphenator*> frHyphenators = { frHyph.get() };
+    const uint32_t enUSLangId = getLocaleListId("en-US");
+    const FontLanguage& enUSLanguage = getLocaleList(enUSLangId)[0];
+    const uint32_t frFRLangId = getLocaleListId("fr-FR");
+    const FontLanguage& frFRLanguage = getLocaleList(frFRLangId)[0];
     {
         // The line breaking is expected to work like this:
         // Input:
@@ -408,17 +434,17 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
         // Here, "|" is canvas space. "^" means word break point and "_" means empty
         const std::string text = "aaa b@c-d eee";
         LocaleIteratorMap map;
-        map[icu::Locale::getUS()] = "aaa |b@c-d |eee";
-        map[icu::Locale::getFrance()] = "aaa |b@c-d |eee";
+        map[enUSLanguage] = "aaa |b@c-d |eee";
+        map[frFRLanguage] = "aaa |b@c-d |eee";
 
-        TestableLineBreaker b(std::move(map));
+        MockICULineBreakerPoolImpl impl(std::move(map));
+        TestableLineBreaker b(&impl);
         setupLineBreaker(&b, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(4 * CHAR_WIDTH));
 
         MinikinPaint paint;
-        b.addStyleRun(&paint, mCollection, FontStyle(), 0, 7, false, "en-US", enHyphenators);
-        b.addStyleRun(&paint, mCollection, FontStyle(), 7, text.size(), false, "fr-FR",
-                frHyphenators);
+        b.addStyleRun(&paint, mCollection, FontStyle(enUSLangId), 0, 7, false);
+        b.addStyleRun(&paint, mCollection, FontStyle(frFRLangId), 7, text.size(), false);
 
         const size_t breakNum = b.computeBreaks();
         expectLineBreaks("aaa |b@c|-d |eee",
@@ -432,78 +458,133 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
     }
 }
 
+class LocaleTraceICULineBreakerPoolImpl : public ICULineBreakerPool {
+public:
+    LocaleTraceICULineBreakerPoolImpl() : mAcquireCallCount(0) {}
+
+    Slot acquire(const FontLanguage& locale) override {
+        mAcquireCallCount++;
+        mLastRequestedLanguage = locale;
+        UErrorCode status = U_ZERO_ERROR;
+        return {locale.getIdentifier(), std::unique_ptr<icu::BreakIterator>(
+                icu::BreakIterator::createLineInstance(icu::Locale::getRoot(), status))};
+    }
+
+    void release(Slot&& slot) override {
+        // Move to local variable, so that the slot will be deleted when returning this method.
+        Slot localSlot = std::move(slot);
+    }
+
+    int getLocaleChangeCount() const {
+        return mAcquireCallCount;
+    }
+
+    const FontLanguage& getLastPassedLocale() const {
+        return mLastRequestedLanguage;
+    }
+
+private:
+    int mAcquireCallCount;
+    FontLanguage mLastRequestedLanguage;
+
+};
+
 TEST_F(LineBreakerTest, setLocales) {
+    constexpr size_t CHAR_COUNT = 14;
     MinikinPaint paint;
-    std::string text = "abcde";
+    std::string text('a', CHAR_COUNT);
+    LocaleTraceICULineBreakerPoolImpl localeTracer;
+    TestableLineBreaker lineBreaker(&localeTracer);
+    setupLineBreaker(&lineBreaker, text);
+    lineBreaker.setLineWidthDelegate(
+            std::make_unique<RectangleLineWidthDelegate>(CHAR_COUNT * CHAR_WIDTH));
+    int expectedCallCount = 0;
+
+    const FontLanguage& enUS = getLocaleList(getLocaleListId("en-US"))[0];
+    const FontLanguage& frFR = getLocaleList(getLocaleListId("fr-FR"))[0];
     {
-        LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false, "en-US",
-                std::vector<Hyphenator*>({hyphenator.get()}));
-        EXPECT_EQ(hyphenator.get(), lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 0, 1, false);
+        expectedCallCount++;  // The locale changes from initial state to en-US.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 1, 2, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
     }
     {
-        LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "fr", 2));
-        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false, "fr-FR,en-US",
-                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
-        EXPECT_EQ(hyphenator1.get(), lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("fr-FR,en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 2, 3, false);
+        expectedCallCount++;  // The locale changes from en-US to fr-FR.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 3, 4, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
     }
     {
-        LineBreaker lineBreaker;
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false, "",
-                std::vector<Hyphenator*>());
-        EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("fr-FR");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 4, 5, false);
+        // Expected not to be called since the first locale is not changed.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 5, 6, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
     }
     {
-        LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false, "THISISABOGUSLANGUAGE",
-                std::vector<Hyphenator*>({hyphenator.get()}));
-        EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 6, 7, false);
+        expectedCallCount++;  // The locale changes from fr-FR to icu::Locale::Root.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 7, 8, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
     {
-        LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false,
-                "THISISABOGUSLANGUAGE,en-US",
-                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
-        EXPECT_EQ(hyphenator2.get(), lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("THISISABOGUSLANGUAGE");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 8, 9, false);
+        // Expected not to be called. The bogus locale ends up with the empty locale.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 9, 10, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
     {
-        LineBreaker lineBreaker;
-        std::unique_ptr<Hyphenator> hyphenator1(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        std::unique_ptr<Hyphenator> hyphenator2(Hyphenator::loadBinary(nullptr, 0, 0, "en", 2));
-        setupLineBreaker(&lineBreaker, text);
-        lineBreaker.setLineWidthDelegate(
-                std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-        lineBreaker.addStyleRun(
-                &paint, mCollection, FontStyle(), 0, text.size(), false,
-                "THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE",
-                std::vector<Hyphenator*>({hyphenator1.get(), hyphenator2.get()}));
-        EXPECT_EQ(nullptr, lineBreaker.mHyphenator);
+        const uint32_t langId = getLocaleListId("THISISABOGUSLANGUAGE,en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 10, 11, false);
+        expectedCallCount++;  // The locale changes from icu::Locale::Root to en-US.
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 11, 12, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+    }
+    {
+        const uint32_t langId = getLocaleListId("THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE");
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 12, 13, false);
+        expectedCallCount++;  // The locale changes from en-US to icu::Locale::Root
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+
+        // Calling the same locale must not update locale.
+        lineBreaker.addStyleRun(&paint, mCollection, FontStyle(langId), 13, 14, false);
+        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
+        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
 }
 

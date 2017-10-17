@@ -23,10 +23,58 @@
 #ifndef MINIKIN_WORD_BREAKER_H
 #define MINIKIN_WORD_BREAKER_H
 
+#include "FontLanguage.h"
 #include "unicode/brkiter.h"
+#include <list>
 #include <memory>
 
 namespace minikin {
+
+// A class interface for providing pooling implementation of ICU's line breaker.
+// The implementation can be customized for testing purposes.
+class ICULineBreakerPool {
+public:
+    struct Slot {
+        Slot() : localeId(0), breaker(nullptr) {}
+        Slot(uint64_t localeId, std::unique_ptr<icu::BreakIterator>&& breaker)
+                : localeId(localeId), breaker(std::move(breaker)) {}
+
+        Slot(Slot&& other) = default;
+        Slot& operator=(Slot&& other) = default;
+
+        // Forbid copy and assignment.
+        Slot(const Slot&) = delete;
+        Slot& operator=(const Slot&) = delete;
+
+        uint64_t localeId;
+        std::unique_ptr<icu::BreakIterator> breaker;
+    };
+    virtual ~ICULineBreakerPool() {}
+    virtual Slot acquire(const FontLanguage& locale) = 0;
+    virtual void release(Slot&& slot) = 0;
+};
+
+// An singleton implementation of the ICU line breaker pool.
+// Since creating ICU line breaker instance takes some time. Pool it for later use.
+class ICULineBreakerPoolImpl : public ICULineBreakerPool {
+public:
+    Slot acquire(const FontLanguage& locale) override;
+    void release(Slot&& slot) override;
+
+    static ICULineBreakerPoolImpl& getInstance() {
+        static ICULineBreakerPoolImpl pool;
+        return pool;
+    }
+
+protected:
+    // protected for testing purposes.
+    static constexpr size_t MAX_POOL_SIZE = 4;
+    ICULineBreakerPoolImpl() {};  // singleton.
+    size_t getPoolSize() const { return mPool.size(); }
+
+private:
+    std::list<Slot> mPool;  // Guarded by gMinikinLock
+};
 
 class WordBreaker {
 public:
@@ -34,6 +82,7 @@ public:
         finish();
     }
 
+    WordBreaker();
 
     void setText(const uint16_t* data, size_t size);
 
@@ -42,7 +91,7 @@ public:
 
     // Advance iterator to the break just after "from" with using the new provided locale.
     // Return offset, or -1 if EOT
-    ssize_t followingWithLocale(const icu::Locale& locale, size_t from);
+    ssize_t followingWithLocale(const FontLanguage& locale, size_t from);
 
     // Current offset of iterator, equal to 0 at BOT or last return from next()
     ssize_t current() const;
@@ -59,14 +108,19 @@ public:
 
 protected:
     // protected virtual for testing purpose.
-    virtual std::unique_ptr<icu::BreakIterator> createBreakIterator(const icu::Locale& locale);
+    // Caller must release the pool.
+    WordBreaker(ICULineBreakerPool* pool);
 
 private:
     int32_t iteratorNext();
     void detectEmailOrUrl();
     ssize_t findNextBreakInEmailOrUrl();
 
-    std::unique_ptr<icu::BreakIterator> mBreakIterator;
+    // Doesn't take ownership. Must not be nullptr. Must be set in constructor.
+    ICULineBreakerPool* mPool;
+
+    ICULineBreakerPool::Slot mIcuBreaker;
+
     UText mUText = UTEXT_INITIALIZER;
     const uint16_t* mText = nullptr;
     size_t mTextSize;

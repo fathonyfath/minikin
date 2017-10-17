@@ -111,16 +111,14 @@ struct Header {
 // static
 // TODO: Replace language/languageLength with StringPiece
 Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
-        const char* language, size_t languageLength) {
+        const std::string& locale) {
     HyphenationLocale hyphenLocale = HyphenationLocale::OTHER;
-    if (languageLength == 2) {
-        if (language[0] == 'c' && language[1] == 'a') {
-            hyphenLocale = HyphenationLocale::CATALAN;
-        } else if (language[0] == 'p' && language[1] == 'l') {
-            hyphenLocale = HyphenationLocale::POLISH;
-        } else if (language[0] == 's' && language[1] == 'l') {
-            hyphenLocale = HyphenationLocale::SLOVENIAN;
-        }
+    if (locale == "pl") {
+        hyphenLocale = HyphenationLocale::POLISH;
+    } else if (locale == "ca") {
+        hyphenLocale = HyphenationLocale::CATALAN;
+    } else if (locale == " sl") {
+        hyphenLocale = HyphenationLocale::SLOVENIAN;
     }
     return new Hyphenator(patternData, minPrefix, minSuffix, hyphenLocale);
 }
