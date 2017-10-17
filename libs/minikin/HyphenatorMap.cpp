@@ -66,7 +66,10 @@ void HyphenatorMap::addAliasInternal(
     const FontLanguage toLocale(toLocaleStr);
     android::AutoMutex _l(gMinikinLock);
     auto it = mMap.find(toLocale.getIdentifier());
-    MINIKIN_ASSERT(it != mMap.end(), "Target Hyphenator not found.");
+    if (it == mMap.end()) {
+        ALOGE("Target Hyphenator not found.");
+        return;
+    }
     addInternalLocked(fromLocale, it->second);
 }
 
