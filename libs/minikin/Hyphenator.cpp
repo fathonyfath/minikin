@@ -117,7 +117,7 @@ Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix,
         hyphenLocale = HyphenationLocale::POLISH;
     } else if (locale == "ca") {
         hyphenLocale = HyphenationLocale::CATALAN;
-    } else if (locale == " sl") {
+    } else if (locale == "sl") {
         hyphenLocale = HyphenationLocale::SLOVENIAN;
     }
     return new Hyphenator(patternData, minPrefix, minSuffix, hyphenLocale);
