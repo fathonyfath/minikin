@@ -17,9 +17,9 @@
 #ifndef MINIKIN_FONT_TEST_UTILS_H
 #define MINIKIN_FONT_TEST_UTILS_H
 
-#include <minikin/FontCollection.h>
-
 #include <memory>
+
+#include "minikin/FontCollection.h"
 
 namespace minikin {
 

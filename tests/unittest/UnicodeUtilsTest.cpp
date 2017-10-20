@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
-
 #include "UnicodeUtils.h"
+
+#include <gtest/gtest.h>
 
 namespace minikin {
 

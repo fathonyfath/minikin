@@ -17,7 +17,7 @@
 #ifndef MINIKIN_CMAP_COVERAGE_H
 #define MINIKIN_CMAP_COVERAGE_H
 
-#include <minikin/SparseBitSet.h>
+#include "minikin/SparseBitSet.h"
 
 #include <memory>
 #include <vector>

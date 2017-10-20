@@ -16,34 +16,27 @@
 
 #define LOG_TAG "Minikin"
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>  // for debugging
-#include <math.h>
-#include <string>
-#include <unicode/ubidi.h>
-#include <unicode/utf16.h>
-#include <vector>
+#include "minikin/Layout.h"
 
-#include <log/log.h>
-#include <utils/JenkinsHash.h>
-#include <utils/LruCache.h>
-#include <utils/Singleton.h>
-#include <utils/String16.h>
+#include <cmath>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include <hb-icu.h>
 #include <hb-ot.h>
+#include <log/log.h>
+#include <unicode/ubidi.h>
+#include <unicode/utf16.h>
+#include <utils/JenkinsHash.h>
+#include <utils/LruCache.h>
+#include <utils/Singleton.h>
 
-#include "FontLanguage.h"
-#include "FontLanguageListCache.h"
+#include "minikin/Emoji.h"
 #include "HbFontCache.h"
 #include "LayoutUtils.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
-#include <minikin/Emoji.h>
-#include <minikin/Layout.h>
-
-using std::string;
-using std::vector;
 
 namespace minikin {
 
@@ -719,7 +712,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
     return advance;
 }
 
-static void addFeatures(const string &str, vector<hb_feature_t>* features) {
+static void addFeatures(const std::string &str, std::vector<hb_feature_t>* features) {
     SplitIterator it(str, ',');
     while (it.hasNext()) {
         StringPiece featureStr = it.next();
@@ -874,10 +867,10 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
 void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, const std::shared_ptr<FontCollection>& collection) {
     hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
-    vector<FontCollection::Run> items;
+    std::vector<FontCollection::Run> items;
     collection->itemize(buf + start, count, ctx->style, &items);
 
-    vector<hb_feature_t> features;
+    std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing
     // See http://dev.w3.org/csswg/css-text-3/#letter-spacing-property
     // "When the effective spacing between two characters is not zero (due to
@@ -956,13 +949,12 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             hb_buffer_clear_contents(buffer);
             hb_buffer_set_script(buffer, script);
             hb_buffer_set_direction(buffer, isRtl? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-            const FontLanguages& langList =
-                    FontLanguageListCache::getById(ctx->style.getLanguageListId());
-            if (langList.size() != 0) {
-                hb_language_t hbLanguage = langList.getHbLanguage(0);
-                for (size_t i = 0; i < langList.size(); ++i) {
-                    if (langList[i].supportsHbScript(script)) {
-                        hbLanguage = langList.getHbLanguage(i);
+            const LocaleList& localeList = LocaleListCache::getById(ctx->style.getLocaleListId());
+            if (localeList.size() != 0) {
+                hb_language_t hbLanguage = localeList.getHbLanguage(0);
+                for (size_t i = 0; i < localeList.size(); ++i) {
+                    if (localeList[i].supportsHbScript(script)) {
+                        hbLanguage = localeList.getHbLanguage(i);
                         break;
                     }
                 }

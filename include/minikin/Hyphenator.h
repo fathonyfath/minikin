@@ -21,10 +21,7 @@
 #ifndef MINIKIN_HYPHENATOR_H
 #define MINIKIN_HYPHENATOR_H
 
-#include "unicode/locid.h"
-#include <memory>
 #include <string>
-#include <unordered_map>
 
 namespace minikin {
 
@@ -147,7 +144,7 @@ public:
     // until this instance is deleted.
     // Note: nullptr is valid input, in which case the hyphenator only processes soft hyphens.
     static Hyphenator* loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
-            const std::string& language);
+            const std::string& locale);
 private:
     enum class HyphenationLocale : uint8_t {
         OTHER = 0,

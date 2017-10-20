@@ -17,9 +17,8 @@
 #ifndef MINIKIN_SPARSE_BIT_SET_H
 #define MINIKIN_SPARSE_BIT_SET_H
 
-#include <stdint.h>
 #include <sys/types.h>
-
+#include <cstdint>
 #include <memory>
 
 // ---------------------------------------------------------------------------

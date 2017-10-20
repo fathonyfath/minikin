@@ -1,12 +1,12 @@
-#include <stdio.h>
 #include <sys/stat.h>
 #include <string.h>
-
-#include "unicode/locid.h"
-#include "utils/Log.h"
-
+#include <cstdio>
 #include <vector>
-#include <minikin/Hyphenator.h>
+
+#include <unicode/locid.h>
+#include <utils/Log.h>
+
+#include "minikin/Hyphenator.h"
 
 using minikin::HyphenationType;
 using minikin::Hyphenator;

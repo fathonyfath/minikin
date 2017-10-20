@@ -16,48 +16,41 @@
 
 #define LOG_TAG "Minikin"
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include "minikin/FontFamily.h"
+
+#include <cstdint>
+#include <vector>
 
 #include <log/log.h>
 #include <utils/JenkinsHash.h>
 
-#include <hb.h>
-#include <hb-ot.h>
-
-#include "FontLanguage.h"
-#include "FontLanguageListCache.h"
+#include "minikin/CmapCoverage.h"
+#include "minikin/MinikinFont.h"
 #include "FontUtils.h"
-#include "HbFontCache.h"
+#include "Locale.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
-#include <minikin/CmapCoverage.h>
-#include <minikin/MinikinFont.h>
-#include <minikin/FontFamily.h>
-#include <minikin/MinikinFont.h>
-
-using std::vector;
 
 namespace minikin {
 
 FontStyle::FontStyle(int variant, int weight, bool italic)
-        : FontStyle(FontLanguageListCache::kEmptyListId, variant, weight, italic) {
+        : FontStyle(LocaleListCache::kEmptyListId, variant, weight, italic) {
 }
 
-FontStyle::FontStyle(uint32_t languageListId, int variant, int weight, bool italic)
-        : bits(pack(variant, weight, italic)), mLanguageListId(languageListId) {
+FontStyle::FontStyle(uint32_t localeListId, int variant, int weight, bool italic)
+        : bits(pack(variant, weight, italic)), mLocaleListId(localeListId) {
 }
 
 android::hash_t FontStyle::hash() const {
     uint32_t hash = android::JenkinsHashMix(0, bits);
-    hash = android::JenkinsHashMix(hash, mLanguageListId);
+    hash = android::JenkinsHashMix(hash, mLocaleListId);
     return android::JenkinsHashWhiten(hash);
 }
 
 // static
-uint32_t FontStyle::registerLanguageList(const std::string& languages) {
+uint32_t FontStyle::registerLocaleList(const std::string& locales) {
     android::AutoMutex _l(gMinikinLock);
-    return FontLanguageListCache::getId(languages);
+    return LocaleListCache::getId(locales);
 }
 
 // static
@@ -101,11 +94,11 @@ FontFamily::FontFamily(std::vector<Font>&& fonts) : FontFamily(0 /* variant */, 
 }
 
 FontFamily::FontFamily(int variant, std::vector<Font>&& fonts)
-    : FontFamily(FontLanguageListCache::kEmptyListId, variant, std::move(fonts)) {
+    : FontFamily(LocaleListCache::kEmptyListId, variant, std::move(fonts)) {
 }
 
-FontFamily::FontFamily(uint32_t langId, int variant, std::vector<Font>&& fonts)
-    : mLangId(langId), mVariant(variant), mFonts(std::move(fonts)) {
+FontFamily::FontFamily(uint32_t localeListId, int variant, std::vector<Font>&& fonts)
+    : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
     computeCoverage();
 }
 
@@ -156,9 +149,9 @@ FakedFont FontFamily::getClosestMatch(FontStyle style) const {
 }
 
 bool FontFamily::isColorEmojiFamily() const {
-    const FontLanguages& languageList = FontLanguageListCache::getById(mLangId);
-    for (size_t i = 0; i < languageList.size(); ++i) {
-        if (languageList[i].getEmojiStyle() == FontLanguage::EMSTYLE_EMOJI) {
+    const LocaleList& localeList = LocaleListCache::getById(mLocaleListId);
+    for (size_t i = 0; i < localeList.size(); ++i) {
+        if (localeList[i].getEmojiStyle() == Locale::EMSTYLE_EMOJI) {
             return true;
         }
     }
@@ -249,7 +242,7 @@ std::shared_ptr<FontFamily> FontFamily::createFamilyWithVariation(
         fonts.push_back(Font(std::move(minikinFont), font.style));
     }
 
-    return std::shared_ptr<FontFamily>(new FontFamily(mLangId, mVariant, std::move(fonts)));
+    return std::shared_ptr<FontFamily>(new FontFamily(mLocaleListId, mVariant, std::move(fonts)));
 }
 
 }  // namespace minikin

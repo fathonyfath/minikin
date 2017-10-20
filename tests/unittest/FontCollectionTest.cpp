@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
+#include "minikin/FontCollection.h"
+
 #include <gtest/gtest.h>
 
-#include <minikin/FontCollection.h>
 #include "FontTestUtils.h"
 #include "MinikinFontForTest.h"
 #include "MinikinInternal.h"

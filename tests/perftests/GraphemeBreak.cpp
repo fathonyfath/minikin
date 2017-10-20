@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <benchmark/benchmark.h>
-
-#include <cutils/log.h>
 
 #include "minikin/GraphemeBreak.h"
+
+#include <benchmark/benchmark.h>
+#include <cutils/log.h>
+
 #include "UnicodeUtils.h"
 
 namespace minikin {

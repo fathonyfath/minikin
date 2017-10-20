@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-
 #include "FontUtils.h"
+
+#include <cstdint>
 
 namespace minikin {
 

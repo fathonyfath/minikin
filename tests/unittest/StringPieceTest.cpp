@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
-
 #include "StringPiece.h"
+
+#include <gtest/gtest.h>
 
 namespace minikin {
 

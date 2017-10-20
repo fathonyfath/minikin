@@ -17,7 +17,7 @@
 #ifndef MINIKIN_TEST_MINIKIN_FONT_FOR_TEST_H
 #define MINIKIN_TEST_MINIKIN_FONT_FOR_TEST_H
 
-#include <minikin/MinikinFont.h>
+#include "minikin/MinikinFont.h"
 
 class SkTypeface;
 

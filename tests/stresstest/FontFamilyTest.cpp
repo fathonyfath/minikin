@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
+#include "minikin/FontFamily.h"
+
 #include <gtest/gtest.h>
 
-#include "../util/FontTestUtils.h"
-#include "../util/MinikinFontForTest.h"
-#include "HbFontCache.h"
-#include "MinikinInternal.h"
 #include "minikin/FontCollection.h"
-#include "minikin/Layout.h"
+#include "FontTestUtils.h"
+#include "HbFontCache.h"
+#include "MinikinFontForTest.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 

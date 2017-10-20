@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
+#include "minikin/FontCollection.h"
 
 #include <memory>
 
-#include "FontLanguageListCache.h"
-#include "FontLanguage.h"
+#include <gtest/gtest.h>
+
+#include "minikin/FontFamily.h"
 #include "FontTestUtils.h"
 #include "ICUTestBase.h"
+#include "Locale.h"
+#include "LocaleListCache.h"
 #include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 #include "UnicodeUtils.h"
-#include "minikin/FontFamily.h"
 
 namespace minikin {
 
@@ -71,10 +73,10 @@ const std::string& getFontPath(const FontCollection::Run& run) {
     return ((MinikinFontForTest*)run.fakedFont.font)->fontPath();
 }
 
-// Utility function to obtain FontLanguages from string.
-const FontLanguages& registerAndGetFontLanguages(const std::string& lang_string) {
+// Utility function to obtain LocaleList from string.
+const LocaleList& registerAndGetLocaleList(const std::string& locale_string) {
     android::AutoMutex _l(gMinikinLock);
-    return FontLanguageListCache::getById(FontLanguageListCache::getId(lang_string));
+    return LocaleListCache::getById(LocaleListCache::getId(locale_string));
 }
 
 TEST_F(FontCollectionItemizeTest, itemize_latin) {
@@ -278,9 +280,9 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kJAStyle = FontStyle(FontStyle::registerLanguageList("ja_JP"));
-    FontStyle kUSStyle = FontStyle(FontStyle::registerLanguageList("en_US"));
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLanguageList("zh_Hans"));
+    FontStyle kJAStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"));
+    FontStyle kUSStyle = FontStyle(FontStyle::registerLocaleList("en_US"));
+    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
 
     // All Japanese Hiragana characters.
     itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kUSStyle, &runs);
@@ -367,7 +369,7 @@ TEST_F(FontCollectionItemizeTest, itemize_mixed) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kUSStyle = FontStyle(FontStyle::registerLanguageList("en_US"));
+    FontStyle kUSStyle = FontStyle(FontStyle::registerLocaleList("en_US"));
 
     itemize(collection, "'a' U+4F60 'b' U+4F60 'c'", kUSStyle, &runs);
     ASSERT_EQ(5U, runs.size());
@@ -410,8 +412,8 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     // Chinese font. Also a glyph for U+242EE is provided by both Japanese and
     // Traditional Chinese font.  To avoid effects of device default locale,
     // explicitly specify the locale.
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLanguageList("zh_Hans"));
-    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLanguageList("zh_Hant"));
+    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
+    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLocaleList("zh_Hant"));
 
     // U+4FAE is available in both zh_Hans and ja font, but U+4FAE,U+FE00 is
     // only available in ja font.
@@ -549,8 +551,8 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     // Chinese font. Also a glyph for U+242EE is provided by both Japanese and
     // Traditional Chinese font.  To avoid effects of device default locale,
     // explicitly specify the locale.
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLanguageList("zh_Hans"));
-    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLanguageList("zh_Hant"));
+    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
+    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLocaleList("zh_Hant"));
 
     // U+845B is available in both zh_Hans and ja font, but U+845B,U+E0100 is
     // only available in ja font.
@@ -694,10 +696,10 @@ TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kJABoldStyle = FontStyle(FontStyle::registerLanguageList("ja_JP"), 0, 7, false);
-    FontStyle kJAItalicStyle = FontStyle(FontStyle::registerLanguageList("ja_JP"), 0, 5, true);
+    FontStyle kJABoldStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 7, false);
+    FontStyle kJAItalicStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 5, true);
     FontStyle kJABoldItalicStyle =
-           FontStyle(FontStyle::registerLanguageList("ja_JP"), 0, 7, true);
+           FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 7, true);
 
     // Currently there is no italic or bold font for Japanese. FontFakery has
     // the differences between desired and actual font style.
@@ -825,19 +827,19 @@ TEST_F(FontCollectionItemizeTest, itemize_format_chars) {
     EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
+TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
     struct TestCase {
-        std::string userPreferredLanguages;
-        std::vector<std::string> fontLanguages;
+        std::string userPreferredLocale;
+        std::vector<std::string> fontLocales;
         int selectedFontIndex;
     } testCases[] = {
-        // Font can specify empty language.
+        // Font can specify empty locale.
         { "und", { "", "" }, 0 },
         { "und", { "", "en-Latn" }, 0 },
         { "en-Latn", { "", "" }, 0 },
         { "en-Latn", { "", "en-Latn" }, 1 },
 
-        // Single user preferred language.
+        // Single user preferred locale.
         // Exact match case
         { "en-Latn", { "en-Latn", "ja-Jpan" }, 0 },
         { "ja-Jpan", { "en-Latn", "ja-Jpan" }, 1 },
@@ -878,8 +880,8 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
         { "ja-Hira", { "en-Latn", "ja-Latn" }, 0 },
         { "ja-Hira", { "en-Jpan", "ja-Jpan" }, 1 },
 
-        // Multiple languages.
-        // Even if all fonts have the same score, use the 2nd language for better selection.
+        // Multiple locales.
+        // Even if all fonts have the same score, use the 2nd locale for better selection.
         { "en-Latn,ja-Jpan", { "zh-Hant", "zh-Hans", "ja-Jpan" }, 2 },
         { "en-Latn,nl-Latn", { "es-Latn", "be-Latn", "nl-Latn" }, 2 },
         { "en-Latn,br-Latn,nl-Latn", { "es-Latn", "be-Latn", "nl-Latn" }, 2 },
@@ -896,7 +898,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
         // Language match only happens if the script matches.
         { "en-Latn,ar-Arab", { "en-Beng", "ar-Arab" }, 1 },
 
-        // Multiple languages in the font settings.
+        // Multiple locales in the font settings.
         { "ko-Jamo", { "ja-Jpan", "ko-Kore", "ko-Kore,ko-Jamo"}, 2 },
         { "en-Latn", { "ja-Jpan", "en-Latn,ja-Jpan"}, 1 },
         { "en-Latn", { "ja-Jpan", "ja-Jpan,en-Latn"}, 1 },
@@ -924,22 +926,22 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
         { "en-Zsym-u-em-emoji", { "ja-Zsym", "ja-Zsye"}, 1 },
         { "en-Zsye-u-em-text", { "ja-Zsym", "ja-Zsye"}, 0 },
 
-        // Multiple languages list with subtags.
+        // Multiple locale list with subtags.
         { "en-Latn,ja-Jpan-u-em-text", { "en-Latn", "en-Zsye", "en-Zsym"}, 0 },
         { "en-Latn,en-Zsye,ja-Jpan-u-em-text", { "zh", "en-Zsye", "en-Zsym"}, 1 },
     };
 
     for (auto testCase : testCases) {
-        std::string fontLanguagesStr = "{";
-        for (size_t i = 0; i < testCase.fontLanguages.size(); ++i) {
+        std::string fontLocaleStr = "{";
+        for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
             if (i != 0) {
-                fontLanguagesStr += ", ";
+                fontLocaleStr += ", ";
             }
-            fontLanguagesStr += "\"" + testCase.fontLanguages[i] + "\"";
+            fontLocaleStr += "\"" + testCase.fontLocales[i] + "\"";
         }
-        fontLanguagesStr += "}";
-        SCOPED_TRACE("Test of user preferred languages: \"" + testCase.userPreferredLanguages +
-                     "\" with font languages: " + fontLanguagesStr);
+        fontLocaleStr += "}";
+        SCOPED_TRACE("Test of user preferred locale: \"" + testCase.userPreferredLocale +
+                     "\" with font locale: " + fontLocaleStr);
 
         std::vector<std::shared_ptr<FontFamily>> families;
 
@@ -947,27 +949,27 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
         std::shared_ptr<MinikinFont> firstFamilyMinikinFont(
                 new MinikinFontForTest(kNoGlyphFont));
         std::shared_ptr<FontFamily> firstFamily(new FontFamily(
-                FontStyle::registerLanguageList("und"), 0 /* variant */,
+                FontStyle::registerLocaleList("und"), 0 /* variant */,
                 std::vector<Font>({ Font(firstFamilyMinikinFont, FontStyle()) })));
         families.push_back(firstFamily);
 
         // Prepare font families
-        // Each font family is associated with a specified language. All font families except for
+        // Each font family is associated with a specified locale. All font families except for
         // the first font support U+9AA8.
-        std::unordered_map<MinikinFont*, int> fontLangIdxMap;
+        std::unordered_map<MinikinFont*, int> fontLocaleIdxMap;
 
-        for (size_t i = 0; i < testCase.fontLanguages.size(); ++i) {
+        for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
             std::shared_ptr<MinikinFont> minikin_font(new MinikinFontForTest(kJAFont));
             std::shared_ptr<FontFamily> family(new FontFamily(
-                    FontStyle::registerLanguageList(testCase.fontLanguages[i]), 0 /* variant */,
+                    FontStyle::registerLocaleList(testCase.fontLocales[i]), 0 /* variant */,
                     std::vector<Font>({ Font(minikin_font, FontStyle()) })));
             families.push_back(family);
-            fontLangIdxMap.insert(std::make_pair(minikin_font.get(), i));
+            fontLocaleIdxMap.insert(std::make_pair(minikin_font.get(), i));
         }
         std::shared_ptr<FontCollection> collection(new FontCollection(families));
         // Do itemize
         const FontStyle style = FontStyle(
-                FontStyle::registerLanguageList(testCase.userPreferredLanguages));
+                FontStyle::registerLocaleList(testCase.userPreferredLocale));
         std::vector<FontCollection::Run> runs;
         itemize(collection, "U+9AA8", style, &runs);
         ASSERT_EQ(1U, runs.size());
@@ -978,15 +980,15 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageScore) {
         EXPECT_NE(firstFamilyMinikinFont.get(), runs[0].fakedFont.font);
 
         // Lookup used font family by MinikinFont*.
-        const int usedLangIndex = fontLangIdxMap[runs[0].fakedFont.font];
-        EXPECT_EQ(testCase.selectedFontIndex, usedLangIndex);
+        const int usedLocaleIndex = fontLocaleIdxMap[runs[0].fakedFont.font];
+        EXPECT_EQ(testCase.selectedFontIndex, usedLocaleIndex);
     }
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_LanguageAndCoverage) {
+TEST_F(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
     struct TestCase {
         std::string testString;
-        std::string requestedLanguages;
+        std::string requestedLocales;
         std::string expectedFont;
     } testCases[] = {
         // Following test cases verify that following rules in font fallback chain.
@@ -994,12 +996,12 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageAndCoverage) {
         //   it should be selected.
         // - If the font doesn't support the given character, variation sequence or its base
         //   character, it should not be selected.
-        // - If two or more fonts match the requested languages, the font matches with the highest
-        //   priority language should be selected.
+        // - If two or more fonts match the requested locales, the font matches with the highest
+        //   priority locale should be selected.
         // - If two or more fonts get the same score, the font listed earlier in the XML file
         //   (here, kItemizeFontXml) should be selected.
 
-        // Regardless of language, the first font is always selected if it covers the code point.
+        // Regardless of locale, the first font is always selected if it covers the code point.
         { "'a'", "", kLatinFont},
         { "'a'", "en-Latn", kLatinFont},
         { "'a'", "ja-Jpan", kLatinFont},
@@ -1278,12 +1280,12 @@ TEST_F(FontCollectionItemizeTest, itemize_LanguageAndCoverage) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
 
     for (auto testCase : testCases) {
-        SCOPED_TRACE("Test for \"" + testCase.testString + "\" with languages " +
-                     testCase.requestedLanguages);
+        SCOPED_TRACE("Test for \"" + testCase.testString + "\" with locales " +
+                     testCase.requestedLocales);
 
         std::vector<FontCollection::Run> runs;
         const FontStyle style =
-                FontStyle(FontStyle::registerLanguageList(testCase.requestedLanguages));
+                FontStyle(FontStyle::registerLocaleList(testCase.requestedLocales));
         itemize(collection, testCase.testString.c_str(), style, &runs);
         ASSERT_EQ(1U, runs.size());
         EXPECT_EQ(testCase.expectedFont, getFontPath(runs[0]));

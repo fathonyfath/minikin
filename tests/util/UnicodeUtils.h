@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 namespace minikin {
 
 void ParseUnicode(uint16_t* buf, size_t buf_size, const char* src, size_t* result_size,

@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
+#include "minikin/SparseBitSet.h"
+
 #include <random>
 
 #include <gtest/gtest.h>
-#include <minikin/SparseBitSet.h>
 
 namespace minikin {
 
