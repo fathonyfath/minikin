@@ -14,46 +14,45 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_FONT_LANGUAGE_LIST_CACHE_H
-#define MINIKIN_FONT_LANGUAGE_LIST_CACHE_H
+#ifndef MINIKIN_LOCALE_LIST_CACHE_H
+#define MINIKIN_LOCALE_LIST_CACHE_H
 
 #include <unordered_map>
 
-#include <minikin/FontFamily.h>
-#include "FontLanguage.h"
+#include "Locale.h"
 
 namespace minikin {
 
-class FontLanguageListCache {
+class LocaleListCache {
 public:
-    // A special ID for the empty language list.
-    // This value must be 0 since the empty language list is inserted into mLanguageLists by
+    // A special ID for the empty locale list.
+    // This value must be 0 since the empty locale list is inserted into mLocaleLists by
     // default.
     const static uint32_t kEmptyListId = 0;
 
-    // A special ID for the invalid language list.
+    // A special ID for the invalid locale list.
     const static uint32_t kInvalidListId = (uint32_t)(-1);
 
-    // Returns language list ID for the given string representation of FontLanguages.
+    // Returns the locale list ID for the given string representation of LocaleList.
     // Caller should acquire a lock before calling the method.
-    static uint32_t getId(const std::string& languages);
+    static uint32_t getId(const std::string& locales);
 
     // Caller should acquire a lock before calling the method.
-    static const FontLanguages& getById(uint32_t id);
+    static const LocaleList& getById(uint32_t id);
 
 private:
-    FontLanguageListCache() {}  // Singleton
-    ~FontLanguageListCache() {}
+    LocaleListCache() {}  // Singleton
+    ~LocaleListCache() {}
 
     // Caller should acquire a lock before calling the method.
-    static FontLanguageListCache* getInstance();
+    static LocaleListCache* getInstance();
 
-    std::vector<FontLanguages> mLanguageLists;
+    std::vector<LocaleList> mLocaleLists;
 
-    // A map from string representation of the font language list to the ID.
-    std::unordered_map<std::string, uint32_t> mLanguageListLookupTable;
+    // A map from the string representation of the font locale list to the ID.
+    std::unordered_map<std::string, uint32_t> mLocaleListLookupTable;
 };
 
 }  // namespace minikin
 
-#endif  // MINIKIN_FONT_LANGUAGE_LIST_CACHE_H
+#endif  // MINIKIN_LOCALE_LIST_CACHE_H

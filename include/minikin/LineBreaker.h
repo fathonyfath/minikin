@@ -22,20 +22,14 @@
 #ifndef MINIKIN_LINE_BREAKER_H
 #define MINIKIN_LINE_BREAKER_H
 
-#include <gtest/gtest_prod.h>
-#include "unicode/brkiter.h"
-#include "unicode/locid.h"
-#include <cmath>
 #include <deque>
 #include <vector>
+
 #include "minikin/FontCollection.h"
-#include "minikin/Hyphenator.h"
 #include "minikin/Layout.h"
 #include "minikin/MinikinFont.h"
 
 namespace minikin {
-
-class FontLanguages;
 
 enum BreakStrategy {
     kBreakStrategy_Greedy = 0,
@@ -49,6 +43,7 @@ enum HyphenationFrequency {
     kHyphenationFrequency_Full = 2
 };
 
+class Hyphenator;
 class WordBreaker;
 
 class TabStops {
@@ -152,7 +147,7 @@ class LineBreaker {
         void addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
                 FontStyle style, size_t start, size_t end, bool isRtl);
 
-        void addReplacement(size_t start, size_t end, float width, uint32_t langListId);
+        void addReplacement(size_t start, size_t end, float width, uint32_t localeListId);
 
         size_t computeBreaks();
 
@@ -210,7 +205,7 @@ class LineBreaker {
             bool isRtl; // The direction of the bidi run containing or ending in this candidate
         };
 
-        void setLocales(uint32_t langListId, size_t restartFrom);
+        void setLocaleList(uint32_t localeListId, size_t restartFrom);
         // A locale list ID and locale ID currently used for word iterator and hyphenator.
         uint32_t mCurrentLocaleListId;
         uint64_t mCurrentLocaleId = 0;

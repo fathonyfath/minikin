@@ -20,11 +20,10 @@
 #define MINIKIN_INTERNAL_H
 
 #include <hb.h>
-
 #include <utils/Log.h>
 #include <utils/Mutex.h>
 
-#include <minikin/MinikinFont.h>
+#include "minikin/MinikinFont.h"
 
 namespace minikin {
 

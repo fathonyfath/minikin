@@ -16,19 +16,13 @@
 
 // Determine coverage of font given its raw "cmap" OpenType table
 
-#define LOG_TAG "Minikin"
+#include "minikin/CmapCoverage.h"
 
 #include <algorithm>
 #include <vector>
-using std::vector;
 
-#include <log/log.h>
-
-#include <minikin/SparseBitSet.h>
-#include <minikin/CmapCoverage.h>
+#include "minikin/SparseBitSet.h"
 #include "MinikinInternal.h"
-
-#include <MinikinInternal.h>
 
 namespace minikin {
 
@@ -51,7 +45,7 @@ static uint32_t readU32(const uint8_t* data, size_t offset) {
 
 // The start must be larger than or equal to coverage.back() if coverage is not empty.
 // Returns true if the range is appended. Otherwise returns false as an error.
-static bool addRange(vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
+static bool addRange(std::vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
     if (coverage.empty() || coverage.back() < start) {
         coverage.push_back(start);
         coverage.push_back(end);
@@ -162,7 +156,7 @@ static std::vector<uint32_t> mergeRanges(
 }
 
 // Get the coverage information out of a Format 4 subtable, storing it in the coverage vector
-static bool getCoverageFormat4(vector<uint32_t>& coverage, const uint8_t* data, size_t size) {
+static bool getCoverageFormat4(std::vector<uint32_t>& coverage, const uint8_t* data, size_t size) {
     const size_t kSegCountOffset = 6;
     const size_t kEndCountOffset = 14;
     const size_t kHeaderSize = 16;
@@ -219,7 +213,7 @@ static bool getCoverageFormat4(vector<uint32_t>& coverage, const uint8_t* data, 
 }
 
 // Get the coverage information out of a Format 12 subtable, storing it in the coverage vector
-static bool getCoverageFormat12(vector<uint32_t>& coverage, const uint8_t* data, size_t size) {
+static bool getCoverageFormat12(std::vector<uint32_t>& coverage, const uint8_t* data, size_t size) {
     const size_t kNGroupsOffset = 12;
     const size_t kFirstGroupOffset = 16;
     const size_t kGroupSize = 12;
@@ -518,7 +512,7 @@ SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_siz
         const uint8_t* tableData = cmap_data + bestTableOffset;
         const size_t tableSize = cmap_size - bestTableOffset;
         bool success;
-        vector<uint32_t> coverageVec;
+        std::vector<uint32_t> coverageVec;
         if (bestTableFormat == 4) {
             success = getCoverageFormat4(coverageVec, tableData, tableSize);
         } else {

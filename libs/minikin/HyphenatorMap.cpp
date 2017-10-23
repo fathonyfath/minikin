@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#include "FontLanguageListCache.h"
-#include "MinikinInternal.h"
 #include "HyphenatorMap.h"
 
-#include <inttypes.h>
+#include "LocaleListCache.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 
@@ -49,12 +48,12 @@ HyphenatorMap::HyphenatorMap()
 }
 
 void HyphenatorMap::addInternal(const std::string& localeStr, const Hyphenator* hyphenator) {
-    const FontLanguage locale(localeStr);
+    const Locale locale(localeStr);
     android::AutoMutex _l(gMinikinLock);
     addInternalLocked(locale, hyphenator);
 }
 
-void HyphenatorMap::addInternalLocked(const FontLanguage& locale, const Hyphenator* hyphenator) {
+void HyphenatorMap::addInternalLocked(const Locale& locale, const Hyphenator* hyphenator) {
     // Add given locale first.
     // Overwrite even if there is already a fallback entry.
     mMap[locale.getIdentifier()] = hyphenator;
@@ -62,8 +61,8 @@ void HyphenatorMap::addInternalLocked(const FontLanguage& locale, const Hyphenat
 
 void HyphenatorMap::addAliasInternal(
         const std::string& fromLocaleStr, const std::string& toLocaleStr) {
-    const FontLanguage fromLocale(fromLocaleStr);
-    const FontLanguage toLocale(toLocaleStr);
+    const Locale fromLocale(fromLocaleStr);
+    const Locale toLocale(toLocaleStr);
     android::AutoMutex _l(gMinikinLock);
     auto it = mMap.find(toLocale.getIdentifier());
     if (it == mMap.end()) {
@@ -73,7 +72,7 @@ void HyphenatorMap::addAliasInternal(
     addInternalLocked(fromLocale, it->second);
 }
 
-const Hyphenator* HyphenatorMap::lookupInternal(const FontLanguage& locale) {
+const Hyphenator* HyphenatorMap::lookupInternal(const Locale& locale) {
     const uint64_t id = locale.getIdentifier();
     android::AutoMutex _l(gMinikinLock);
     const Hyphenator* result = lookupByIdentifierLocked(id);
@@ -120,9 +119,9 @@ const Hyphenator* HyphenatorMap::lookupByIdentifierLocked(uint64_t id) const {
     return it == mMap.end() ? nullptr : it->second;
 }
 
-const Hyphenator* HyphenatorMap::lookupBySubtagLocked(const FontLanguage& locale,
+const Hyphenator* HyphenatorMap::lookupBySubtagLocked(const Locale& locale,
         SubtagBits bits) const {
-    const FontLanguage partialLocale = locale.getPartialLocale(bits);
+    const Locale partialLocale = locale.getPartialLocale(bits);
     if (!partialLocale.isSupported() || partialLocale == locale) {
         return nullptr;  // Skip the partial locale result in the same locale or not supported.
     }

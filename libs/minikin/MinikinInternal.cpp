@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 // Definitions internal to Minikin
+
 #define LOG_TAG "Minikin"
 
-#include "MinikinInternal.h"
-#include "HbFontCache.h"
-
 #include <log/log.h>
+
+#include "HbFontCache.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 

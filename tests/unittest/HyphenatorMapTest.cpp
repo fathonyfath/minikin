@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
+#include "HyphenatorMap.h"
+
 #include <gtest/gtest.h>
 
-#include "FontLanguageListCache.h"
-#include "HyphenatorMap.h"
 #include "ICUTestBase.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -133,18 +134,18 @@ protected:
 
     }
 
-    const FontLanguage& getFontLanguage(const std::string& localeStr) {
-        // In production, we reconstruct the FontLanguages from the language list ID.
+    const Locale& getLocale(const std::string& localeStr) {
+        // In production, we reconstruct the LocaleList from the locale list ID.
         // So, do it here too.
         android::AutoMutex _l(gMinikinLock);
-        const uint32_t id = FontLanguageListCache::getId(localeStr);
-        const FontLanguages& langs = FontLanguageListCache::getById(id);
-        LOG_ALWAYS_FATAL_IF(langs.size() != 1, "The input must be single locale");
-        return langs[0];
+        const uint32_t id = LocaleListCache::getId(localeStr);
+        const LocaleList& locales = LocaleListCache::getById(id);
+        MINIKIN_ASSERT(locales.size() == 1, "The input must be a single locale");
+        return locales[0];
     }
 
     const Hyphenator* lookup(const std::string& localeStr) {
-        return mMap.lookupInternal(getFontLanguage(localeStr));
+        return mMap.lookupInternal(getLocale(localeStr));
     }
 
 private:

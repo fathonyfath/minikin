@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
-
-#include "FontLanguage.h"
+#include "Locale.h"
 
 #include <algorithm>
-#include <cutils/log.h>
+
 #include <hb.h>
-#include <string.h>
-#include <unicode/uloc.h>
+
+#include "MinikinInternal.h"
 #include "StringPiece.h"
 
 namespace minikin {
@@ -151,7 +149,7 @@ static inline bool isValidRegionCode(const StringPiece& buffer) {
 }
 
 // Parse BCP 47 language identifier into internal structure
-FontLanguage::FontLanguage(const StringPiece& input) : FontLanguage() {
+Locale::Locale(const StringPiece& input) : Locale() {
     SplitIterator it(input, '-');
 
     StringPiece language = it.next();
@@ -212,7 +210,7 @@ finalize:
 }
 
 // static
-FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t length) {
+Locale::EmojiStyle Locale::resolveEmojiStyle(const char* buf, size_t length) {
     // First, lookup emoji subtag.
     // 10 is the length of "-u-em-text", which is the shortest emoji subtag,
     // unnecessary comparison can be avoided if total length is smaller than 10.
@@ -235,7 +233,7 @@ FontLanguage::EmojiStyle FontLanguage::resolveEmojiStyle(const char* buf, size_t
     return EMSTYLE_EMPTY;
 }
 
-FontLanguage::EmojiStyle FontLanguage::scriptToEmojiStyle(uint32_t script) {
+Locale::EmojiStyle Locale::scriptToEmojiStyle(uint32_t script) {
     // If no emoji subtag was provided, resolve the emoji style from script code.
     if (script == packScript('Z', 's', 'y', 'e')) {
         return EMSTYLE_EMOJI;
@@ -246,7 +244,7 @@ FontLanguage::EmojiStyle FontLanguage::scriptToEmojiStyle(uint32_t script) {
 }
 
 //static
-uint8_t FontLanguage::scriptToSubScriptBits(uint32_t script) {
+uint8_t Locale::scriptToSubScriptBits(uint32_t script) {
     uint8_t subScriptBits = 0u;
     switch (script) {
         case packScript('B', 'o', 'p', 'o'):
@@ -287,7 +285,7 @@ uint8_t FontLanguage::scriptToSubScriptBits(uint32_t script) {
     return subScriptBits;
 }
 
-std::string FontLanguage::getString() const {
+std::string Locale::getString() const {
     char buf[24];
     size_t i;
     if (mLanguage == NO_LANGUAGE) {
@@ -324,14 +322,14 @@ std::string FontLanguage::getString() const {
                 buf[i++] = '6';
                 break;
             default:
-                LOG_ALWAYS_FATAL("Must not reached.");
+                MINIKIN_ASSERT(false, "Must not reached.");
         }
     }
     return std::string(buf, i);
 }
 
-FontLanguage FontLanguage::getPartialLocale(SubtagBits bits) const {
-    FontLanguage subLocale;
+Locale Locale::getPartialLocale(SubtagBits bits) const {
+    Locale subLocale;
     if ((bits & SubtagBits::LANGUAGE) != SubtagBits::EMPTY) {
         subLocale.mLanguage = mLanguage;
     } else {
@@ -353,16 +351,16 @@ FontLanguage FontLanguage::getPartialLocale(SubtagBits bits) const {
     return subLocale;
 }
 
-bool FontLanguage::isEqualScript(const FontLanguage& other) const {
+bool Locale::isEqualScript(const Locale& other) const {
     return other.mScript == mScript;
 }
 
 // static
-bool FontLanguage::supportsScript(uint8_t providedBits, uint8_t requestedBits) {
+bool Locale::supportsScript(uint8_t providedBits, uint8_t requestedBits) {
     return requestedBits != 0 && (providedBits & requestedBits) == requestedBits;
 }
 
-bool FontLanguage::supportsHbScript(hb_script_t script) const {
+bool Locale::supportsHbScript(hb_script_t script) const {
     static_assert(unpackScript(packScript('J', 'p', 'a', 'n')) == HB_TAG('J', 'p', 'a', 'n'),
                   "The Minikin script and HarfBuzz hb_script_t have different encodings.");
     uint32_t packedScript = packScript(script);
@@ -370,7 +368,7 @@ bool FontLanguage::supportsHbScript(hb_script_t script) const {
     return supportsScript(mSubScriptBits, scriptToSubScriptBits(packedScript));
 }
 
-int FontLanguage::calcScoreFor(const FontLanguages& supported) const {
+int Locale::calcScoreFor(const LocaleList& supported) const {
     bool languageScriptMatch = false;
     bool subtagMatch = false;
     bool scriptMatch = false;
@@ -394,7 +392,7 @@ int FontLanguage::calcScoreFor(const FontLanguages& supported) const {
 
     if (supportsScript(supported.getUnionOfSubScriptBits(), mSubScriptBits)) {
         scriptMatch = true;
-        if (mLanguage == supported[0].mLanguage && supported.isAllTheSameLanguage()) {
+        if (mLanguage == supported[0].mLanguage && supported.isAllTheSameLocale()) {
             return 3;
         }
     }
@@ -409,30 +407,30 @@ int FontLanguage::calcScoreFor(const FontLanguages& supported) const {
     return 0;
 }
 
-static hb_language_t buildHbLanguage(const FontLanguage& lang) {
-    return lang.isSupported() ?
-            hb_language_from_string(lang.getString().c_str(), -1) : HB_LANGUAGE_INVALID;
+static hb_language_t buildHbLanguage(const Locale& locale) {
+    return locale.isSupported() ?
+            hb_language_from_string(locale.getString().c_str(), -1) : HB_LANGUAGE_INVALID;
 }
 
-FontLanguages::FontLanguages(std::vector<FontLanguage>&& languages)
-    : mLanguages(std::move(languages)) {
-    if (mLanguages.empty()) {
+LocaleList::LocaleList(std::vector<Locale>&& locales)
+    : mLocales(std::move(locales)) {
+    if (mLocales.empty()) {
         return;
     }
 
-    const FontLanguage& lang = mLanguages[0];
+    const Locale& firstLocale = mLocales[0];
 
-    mIsAllTheSameLanguage = true;
-    mUnionOfSubScriptBits = lang.mSubScriptBits;
-    mHbLangs.reserve(mLanguages.size());
-    mHbLangs.push_back(buildHbLanguage(lang));
-    for (size_t i = 1; i < mLanguages.size(); ++i) {
-        const FontLanguage& language = mLanguages[i];
-        mUnionOfSubScriptBits |= language.mSubScriptBits;
-        if (mIsAllTheSameLanguage && lang.mLanguage != language.mLanguage) {
-            mIsAllTheSameLanguage = false;
+    mIsAllTheSameLocale = true;
+    mUnionOfSubScriptBits = firstLocale.mSubScriptBits;
+    mHbLangs.reserve(mLocales.size());
+    mHbLangs.push_back(buildHbLanguage(firstLocale));
+    for (size_t i = 1; i < mLocales.size(); ++i) {
+        const Locale& locale = mLocales[i];
+        mUnionOfSubScriptBits |= locale.mSubScriptBits;
+        if (mIsAllTheSameLocale && firstLocale.mLanguage != locale.mLanguage) {
+            mIsAllTheSameLocale = false;
         }
-        mHbLangs.push_back(buildHbLanguage(language));
+        mHbLangs.push_back(buildHbLanguage(locale));
     }
 
 

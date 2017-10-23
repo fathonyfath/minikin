@@ -26,9 +26,8 @@
 
 namespace minikin {
 
-// Due to the limits in font fallback score calculation, we can't use anything more than 12
-// languages.
-const size_t FONT_LANGUAGES_LIMIT = 12;
+// Due to the limits in font fallback score calculation, we can't use anything more than 12 locales.
+const size_t FONT_LOCALE_LIMIT = 12;
 
 // The language or region code is encoded to 15 bits.
 constexpr uint16_t NO_LANGUAGE = 0x7fff;
@@ -36,7 +35,7 @@ constexpr uint16_t NO_REGION = 0x7fff;
 // The script code is encoded to 20 bits.
 constexpr uint32_t NO_SCRIPT = 0xfffff;
 
-class FontLanguages;
+class LocaleList;
 
 // Enum for making sub-locale from FontLangauge.
 enum class SubtagBits : uint8_t {
@@ -56,10 +55,10 @@ inline constexpr SubtagBits operator|(SubtagBits l, SubtagBits r) {
     return static_cast<SubtagBits>(static_cast<uint8_t>(l) | static_cast<uint8_t>(r));
 }
 
-// FontLanguage is a compact representation of a BCP 47 language tag. It
-// does not capture all possible information, only what directly affects
-// font rendering.
-struct FontLanguage {
+// Locale is a compact representation of a BCP 47 language tag.
+// It does not capture all possible information, only what directly affects text layout:
+// font rendering, hyphenation, word breaking, etc.
+struct Locale {
 public:
     enum EmojiStyle : uint8_t {
         EMSTYLE_EMPTY = 0,
@@ -74,8 +73,8 @@ public:
         GERMAN_1996_ORTHOGRAPHY = 0x0002,
     };
 
-    // Default constructor creates the unsupported language.
-    FontLanguage()
+    // Default constructor creates the unsupported locale.
+    Locale()
             : mScript(NO_SCRIPT),
             mLanguage(NO_LANGUAGE),
             mRegion(NO_REGION),
@@ -84,15 +83,15 @@ public:
             mEmojiStyle(EMSTYLE_EMPTY) {}
 
     // Parse from string
-    FontLanguage(const StringPiece& buf);
+    Locale(const StringPiece& buf);
 
-    bool operator==(const FontLanguage other) const {
+    bool operator==(const Locale other) const {
         return !isUnsupported() && isEqualScript(other) && mLanguage == other.mLanguage &&
                 mRegion == other.mRegion && mVariant == other.mVariant &&
                 mEmojiStyle == other.mEmojiStyle;
     }
 
-    bool operator!=(const FontLanguage other) const {
+    bool operator!=(const Locale other) const {
         return !(*this == other);
     }
 
@@ -112,7 +111,7 @@ public:
 
     EmojiStyle getEmojiStyle() const { return mEmojiStyle; }
 
-    bool isEqualScript(const FontLanguage& other) const;
+    bool isEqualScript(const Locale& other) const;
 
     // Returns true if this script supports the given script. For example, ja-Jpan supports Hira,
     // ja-Hira doesn't support Jpan.
@@ -120,20 +119,20 @@ public:
 
     std::string getString() const;
 
-    // Calculates a matching score. This score represents how well the input languages cover this
-    // language. The maximum score in the language list is returned.
+    // Calculates a matching score. This score represents how well the input locales cover this
+    // locale. The maximum score in the locale list is returned.
     // 0 = no match, 1 = script match, 2 = script and primary language match.
-    int calcScoreFor(const FontLanguages& supported) const;
+    int calcScoreFor(const LocaleList& supported) const;
 
     uint64_t getIdentifier() const {
         return ((uint64_t)mLanguage << 49) | ((uint64_t)mScript << 29) | ((uint64_t)mRegion << 14) |
                 ((uint64_t)mEmojiStyle << 12) | (uint64_t)mVariant;
     }
 
-    FontLanguage getPartialLocale(SubtagBits bits) const;
+    Locale getPartialLocale(SubtagBits bits) const;
 
 private:
-    friend class FontLanguages;  // for FontLanguages constructor
+    friend class LocaleList;  // for LocaleList constructor
 
     // ISO 15924 compliant script code. The 4 chars script code are packed into a 20 bit integer.
     // If not specified, this is kInvalidScript.
@@ -141,7 +140,7 @@ private:
 
     // ISO 639-1 or ISO 639-2 compliant language code.
     // The two- or three-letter language code is packed into a 15 bit integer.
-    // mLanguage = 0 means the FontLanguage is unsupported.
+    // mLanguage = 0 means the Locale is unsupported.
     uint16_t mLanguage;
 
     // ISO 3166-1 or UN M.49 compliant region code. The two-letter or three-digit region code is
@@ -172,35 +171,35 @@ private:
     static bool supportsScript(uint8_t providedBits, uint8_t requestedBits);
 };
 
-// An immutable list of languages.
-class FontLanguages {
+// An immutable list of locale.
+class LocaleList {
 public:
-    explicit FontLanguages(std::vector<FontLanguage>&& languages);
-    FontLanguages() : mUnionOfSubScriptBits(0), mIsAllTheSameLanguage(false) {}
-    FontLanguages(FontLanguages&&) = default;
+    explicit LocaleList(std::vector<Locale>&& locales);
+    LocaleList() : mUnionOfSubScriptBits(0), mIsAllTheSameLocale(false) {}
+    LocaleList(LocaleList&&) = default;
 
-    size_t size() const { return mLanguages.size(); }
-    bool empty() const { return mLanguages.empty(); }
-    const FontLanguage& operator[] (size_t n) const { return mLanguages[n]; }
+    size_t size() const { return mLocales.size(); }
+    bool empty() const { return mLocales.empty(); }
+    const Locale& operator[] (size_t n) const { return mLocales[n]; }
 
     hb_language_t getHbLanguage(size_t n) const { return mHbLangs[n]; }
 
 private:
-    friend struct FontLanguage;  // for calcScoreFor
+    friend struct Locale;  // for calcScoreFor
 
-    std::vector<FontLanguage> mLanguages;
+    std::vector<Locale> mLocales;
 
     // The languages to be passed to HarfBuzz shaper.
     std::vector<hb_language_t> mHbLangs;
     uint8_t mUnionOfSubScriptBits;
-    bool mIsAllTheSameLanguage;
+    bool mIsAllTheSameLocale;
 
     uint8_t getUnionOfSubScriptBits() const { return mUnionOfSubScriptBits; }
-    bool isAllTheSameLanguage() const { return mIsAllTheSameLanguage; }
+    bool isAllTheSameLocale() const { return mIsAllTheSameLocale; }
 
     // Do not copy and assign.
-    FontLanguages(const FontLanguages&) = delete;
-    void operator=(const FontLanguages&) = delete;
+    LocaleList(const LocaleList&) = delete;
+    void operator=(const LocaleList&) = delete;
 };
 
 }  // namespace minikin

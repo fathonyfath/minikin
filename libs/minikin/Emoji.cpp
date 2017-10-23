@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <minikin/Emoji.h>
+#include "minikin/Emoji.h"
 
 namespace minikin {
 

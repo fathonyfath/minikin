@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
+#include "minikin/Emoji.h"
+
 #include <gtest/gtest.h>
-
 #include <unicode/uchar.h>
-
-#include <minikin/Emoji.h>
 
 namespace minikin {
 

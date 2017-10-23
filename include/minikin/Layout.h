@@ -17,12 +17,10 @@
 #ifndef MINIKIN_LAYOUT_H
 #define MINIKIN_LAYOUT_H
 
-#include <hb.h>
-
 #include <memory>
 #include <vector>
 
-#include <minikin/FontCollection.h>
+#include "minikin/FontCollection.h"
 
 namespace minikin {
 

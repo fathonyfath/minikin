@@ -17,14 +17,12 @@
 #define LOG_TAG "Minikin"
 
 #include <libxml/tree.h>
+#include <log/log.h>
 #include <unistd.h>
 
-#include <log/log.h>
-
-#include "FontLanguage.h"
+#include "minikin/FontCollection.h"
+#include "minikin/FontFamily.h"
 #include "MinikinFontForTest.h"
-#include <minikin/FontCollection.h>
-#include <minikin/FontFamily.h>
 
 namespace minikin {
 
@@ -84,7 +82,7 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
         if (lang == nullptr) {
             family = std::make_shared<FontFamily>(variant, std::move(fonts));
         } else {
-            uint32_t langId = FontStyle::registerLanguageList(
+            uint32_t langId = FontStyle::registerLocaleList(
                     std::string((const char*)lang, xmlStrlen(lang)));
             family = std::make_shared<FontFamily>(langId, variant, std::move(fonts));
         }

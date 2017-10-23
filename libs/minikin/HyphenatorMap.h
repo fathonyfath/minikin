@@ -19,8 +19,8 @@
 
 #include <map>
 
-#include <minikin/Hyphenator.h>
-#include "FontLanguage.h"
+#include "minikin/Hyphenator.h"
+#include "Locale.h"
 
 namespace minikin {
 
@@ -36,7 +36,7 @@ public:
         getInstance().addAliasInternal(fromLocaleStr, toLocaleStr);
     }
 
-    // The returned pointer is never a dangling pointer. If nothing found for a given langauge,
+    // The returned pointer is never a dangling pointer. If nothing found for a given locale,
     // returns a hyphenator which only processes soft hyphens.
     //
     // The Hyphenator lookup works with the following rules:
@@ -46,7 +46,7 @@ public:
     // 4. If not found, try again with language + variant.
     // 5. If not found, try again with language.
     // 6. If not found, try again with script.
-    static const Hyphenator* lookup(const FontLanguage& locale) {
+    static const Hyphenator* lookup(const Locale& locale) {
         return getInstance().lookupInternal(locale);
     }
 
@@ -55,7 +55,7 @@ protected:
     HyphenatorMap(); // Use getInstance() instead.
     void addInternal(const std::string& localeStr, const Hyphenator* hyphenator);
     void addAliasInternal(const std::string& fromLocaleStr, const std::string& toLocaleStr);
-    const Hyphenator* lookupInternal(const FontLanguage& locale);
+    const Hyphenator* lookupInternal(const Locale& locale);
 
 private:
     static HyphenatorMap& getInstance() {  // Singleton.
@@ -63,9 +63,9 @@ private:
         return map;
     }
 
-    void addInternalLocked(const FontLanguage& locale, const Hyphenator* hyphenator);
+    void addInternalLocked(const Locale& locale, const Hyphenator* hyphenator);
     const Hyphenator* lookupByIdentifierLocked(uint64_t id) const;
-    const Hyphenator* lookupBySubtagLocked(const FontLanguage& locale, SubtagBits bits) const;
+    const Hyphenator* lookupBySubtagLocked(const Locale& locale, SubtagBits bits) const;
 
     const Hyphenator* mSoftHyphenOnlyHyphenator;
     std::map<uint64_t, const Hyphenator*> mMap;  // Guarded by gMinikinLock.

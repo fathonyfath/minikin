@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
-
 #include "HbFontCache.h"
 
-#include <log/log.h>
+#include <hb-ot.h>
+#include <hb.h>
 #include <utils/LruCache.h>
 
-#include <hb.h>
-#include <hb-ot.h>
-
-#include <minikin/MinikinFont.h>
+#include "minikin/MinikinFont.h"
 #include "MinikinInternal.h"
 
 namespace minikin {

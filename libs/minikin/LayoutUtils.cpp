@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
-
 #include "LayoutUtils.h"
 
 namespace minikin {
 
-const uint16_t CHAR_NBSP = 0x00A0;
+constexpr uint16_t CHAR_NBSP = 0x00A0;
 
 /*
  * Determine whether the code unit is a word space for the purposes of justification.
@@ -51,8 +49,7 @@ static bool isWordBreakBefore(uint16_t c) {
 /**
  * Return offset of previous word break. It is either < offset or == 0.
  */
-size_t getPrevWordBreakForCache(
-        const uint16_t* chars, size_t offset, size_t len) {
+size_t getPrevWordBreakForCache(const uint16_t* chars, size_t offset, size_t len) {
     if (offset == 0) return 0;
     if (offset > len) offset = len;
     if (isWordBreakBefore(chars[offset - 1])) {
@@ -69,8 +66,7 @@ size_t getPrevWordBreakForCache(
 /**
  * Return offset of next word break. It is either > offset or == len.
  */
-size_t getNextWordBreakForCache(
-        const uint16_t* chars, size_t offset, size_t len) {
+size_t getNextWordBreakForCache(const uint16_t* chars, size_t offset, size_t len) {
     if (offset >= len) return len;
     if (isWordBreakAfter(chars[offset])) {
         return offset + 1;

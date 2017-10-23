@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "minikin/Hyphenator.h"
+
 #include <benchmark/benchmark.h>
 
-#include <minikin/Hyphenator.h>
-#include <FileUtils.h>
-#include <UnicodeUtils.h>
+#include "FileUtils.h"
+#include "UnicodeUtils.h"
 
 namespace minikin {
 
 const char* enUsHyph = "/system/usr/hyphen-data/hyph-en-us.hyb";
 const int enUsMinPrefix = 2;
 const int enUsMinSuffix = 3;
-const icu::Locale& usLocale = icu::Locale::getUS();
 
 static void BM_Hyphenator_short_word(benchmark::State& state) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(

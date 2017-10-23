@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <benchmark/benchmark.h>
+
+#include "minikin/FontCollection.h"
 
 #include <memory>
 
-#include <minikin/FontCollection.h>
-#include <FontTestUtils.h>
-#include <UnicodeUtils.h>
-#include <MinikinInternal.h>
+#include <benchmark/benchmark.h>
+
+#include "FontTestUtils.h"
+#include "UnicodeUtils.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 
@@ -85,7 +87,7 @@ static void BM_FontCollection_itemize(benchmark::State& state) {
     ParseUnicode(
             buffer, 64, ITEMIZE_TEST_CASES[testIndex].itemizeText.c_str(), &utf16_length, nullptr);
     std::vector<FontCollection::Run> result;
-    FontStyle style(FontStyle::registerLanguageList(ITEMIZE_TEST_CASES[testIndex].languageTag));
+    FontStyle style(FontStyle::registerLocaleList(ITEMIZE_TEST_CASES[testIndex].languageTag));
 
     android::AutoMutex _l(gMinikinLock);
     while (state.KeepRunning()) {

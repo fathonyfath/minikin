@@ -16,17 +16,18 @@
 
 #define LOG_TAG "Minikin"
 
+#include "minikin/FontCollection.h"
+
 #include <algorithm>
 
 #include <log/log.h>
-#include "unicode/unistr.h"
-#include "unicode/unorm2.h"
+#include <unicode/unistr.h>
+#include <unicode/unorm2.h>
 
-#include "FontLanguage.h"
-#include "FontLanguageListCache.h"
+#include "minikin/Emoji.h"
+#include "Locale.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
-#include <minikin/Emoji.h>
-#include <minikin/FontCollection.h>
 
 using std::vector;
 
@@ -76,9 +77,9 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
         mSupportedAxes.insert(supportedAxes.begin(), supportedAxes.end());
     }
     nTypefaces = mFamilies.size();
-    LOG_ALWAYS_FATAL_IF(nTypefaces == 0,
+    MINIKIN_ASSERT(nTypefaces > 0,
         "Font collection must have at least one valid typeface");
-    LOG_ALWAYS_FATAL_IF(nTypefaces > 254,
+    MINIKIN_ASSERT(nTypefaces <= 254,
         "Font collection may only have up to 254 font families.");
     size_t nPages = (mMaxChar + kPageMask) >> kLogCharsPerPage;
     // TODO: Use variation selector map for mRanges construction.
@@ -112,12 +113,12 @@ const uint32_t kFirstFontScore = UINT32_MAX;
 // Calculates a font score.
 // The score of the font family is based on three subscores.
 //  - Coverage Score: How well the font family covers the given character or variation sequence.
-//  - Language Score: How well the font family is appropriate for the language.
+//  - Locale Score: How well the font family is appropriate for the locale.
 //  - Variant Score: Whether the font family matches the variant. Note that this variant is not the
 //    one in BCP47. This is our own font variant (e.g., elegant, compact).
 //
 // Then, there is a priority for these three subscores as follow:
-//   Coverage Score > Language Score > Variant Score
+//   Coverage Score > Locale Score > Variant Score
 // The returned score reflects this priority order.
 //
 // Note that there are two special scores.
@@ -125,8 +126,8 @@ const uint32_t kFirstFontScore = UINT32_MAX;
 //    base character.
 //  - kFirstFontScore: When the font is the first font family in the collection and it supports the
 //    given character or variation sequence.
-uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, int variant, uint32_t langListId,
-        const std::shared_ptr<FontFamily>& fontFamily) const {
+uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, int variant,
+        uint32_t localeListId, const std::shared_ptr<FontFamily>& fontFamily) const {
 
     const uint32_t coverageScore = calcCoverageScore(ch, vs, fontFamily);
     if (coverageScore == kFirstFontScore || coverageScore == kUnsupportedFontScore) {
@@ -134,13 +135,13 @@ uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, int variant, 
         return coverageScore;
     }
 
-    const uint32_t languageScore = calcLanguageMatchingScore(langListId, *fontFamily);
+    const uint32_t localeScore = calcLocaleMatchingScore(localeListId, *fontFamily);
     const uint32_t variantScore = calcVariantMatchingScore(variant, *fontFamily);
 
     // Subscores are encoded into 31 bits representation to meet the subscore priority.
-    // The highest 2 bits are for coverage score, then following 28 bits are for language score,
+    // The highest 2 bits are for coverage score, then following 28 bits are for locale score,
     // then the last 1 bit is for variant score.
-    return coverageScore << 29 | languageScore << 1 | variantScore;
+    return coverageScore << 29 | localeScore << 1 | variantScore;
 }
 
 // Calculates a font score based on variation sequence coverage.
@@ -176,10 +177,10 @@ uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs,
     }
 
     if (vs == EMOJI_STYLE_VS || vs == TEXT_STYLE_VS) {
-        const FontLanguages& langs = FontLanguageListCache::getById(fontFamily->langId());
+        const LocaleList& locales = LocaleListCache::getById(fontFamily->localeListId());
         bool hasEmojiFlag = false;
-        for (size_t i = 0; i < langs.size(); ++i) {
-            if (langs[i].getEmojiStyle() == FontLanguage::EMSTYLE_EMOJI) {
+        for (size_t i = 0; i < locales.size(); ++i) {
+            if (locales[i].getEmojiStyle() == Locale::EMSTYLE_EMOJI) {
                 hasEmojiFlag = true;
                 break;
             }
@@ -194,7 +195,7 @@ uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs,
     return 1;
 }
 
-// Calculate font scores based on the script matching, subtag matching and primary langauge matching.
+// Calculate font scores based on the script matching, subtag matching and primary locale matching.
 //
 // 1. If only the font's language matches or there is no matches between requested font and
 //    supported font, then the font obtains a score of 0.
@@ -203,24 +204,24 @@ uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs,
 // 3. Regarding to two elements matchings, language-and-subtag matching has a score of 4, while
 //    language-and-script obtains a socre of 3 with the same reason above.
 //
-// If two languages in the requested list have the same language score, the font matching with
-// higher priority language gets a higher score. For example, in the case the user requested
-// language list is "ja-Jpan,en-Latn". The score of for the font of "ja-Jpan" gets a higher score
-// than the font of "en-Latn".
+// If two locales in the requested list have the same locale score, the font matching with higher
+// priority locale gets a higher score. For example, in the case the user requested locale list is
+// "ja-Jpan,en-Latn". The score of for the font of "ja-Jpan" gets a higher score than the font of
+// "en-Latn".
 //
-// To achieve score calculation with priorities, the language score is determined as follows:
-//   LanguageScore = s(0) * 5^(m - 1) + s(1) * 5^(m - 2) + ... + s(m - 2) * 5 + s(m - 1)
-// Here, m is the maximum number of languages to be compared, and s(i) is the i-th language's
-// matching score. The possible values of s(i) are 0, 1, 2, 3 and 4.
-uint32_t FontCollection::calcLanguageMatchingScore(
-        uint32_t userLangListId, const FontFamily& fontFamily) {
-    const FontLanguages& langList = FontLanguageListCache::getById(userLangListId);
-    const FontLanguages& fontLanguages = FontLanguageListCache::getById(fontFamily.langId());
+// To achieve score calculation with priorities, the locale score is determined as follows:
+//   LocaleScore = s(0) * 5^(m - 1) + s(1) * 5^(m - 2) + ... + s(m - 2) * 5 + s(m - 1)
+// Here, m is the maximum number of locales to be compared, and s(i) is the i-th locale's matching
+// score. The possible values of s(i) are 0, 1, 2, 3 and 4.
+uint32_t FontCollection::calcLocaleMatchingScore(uint32_t userLocaleListId,
+        const FontFamily& fontFamily) {
+    const LocaleList& localeList = LocaleListCache::getById(userLocaleListId);
+    const LocaleList& fontLocaleList = LocaleListCache::getById(fontFamily.localeListId());
 
-    const size_t maxCompareNum = std::min(langList.size(), FONT_LANGUAGES_LIMIT);
+    const size_t maxCompareNum = std::min(localeList.size(), FONT_LOCALE_LIMIT);
     uint32_t score = 0;
     for (size_t i = 0; i < maxCompareNum; ++i) {
-        score = score * 5u + langList[i].calcScoreFor(fontLanguages);
+        score = score * 5u + localeList[i].calcScoreFor(fontLocaleList);
     }
     return score;
 }
@@ -238,7 +239,7 @@ uint32_t FontCollection::calcVariantMatchingScore(int variant, const FontFamily&
 // 3. Highest score wins, with ties resolved to the first font.
 // This method never returns nullptr.
 const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t langListId, int variant) const {
+            uint32_t localeListId, int variant) const {
     if (ch >= mMaxChar) {
         return mFamilies[0];
     }
@@ -254,7 +255,7 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
     for (size_t i = range.start; i < range.end; i++) {
         const std::shared_ptr<FontFamily>& family =
                 vs == 0 ? mFamilies[mFamilyVec[i]] : mFamilies[i];
-        const uint32_t score = calcFamilyScore(ch, vs, variant, langListId, family);
+        const uint32_t score = calcFamilyScore(ch, vs, variant, localeListId, family);
         if (score == kFirstFontScore) {
             // If the first font family supports the given character or variation sequence, always
             // use it.
@@ -274,7 +275,7 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
             if (U_SUCCESS(errorCode) && len > 0) {
                 int off = 0;
                 U16_NEXT_UNSAFE(decomposed, off, ch);
-                return getFamilyForChar(ch, vs, langListId, variant);
+                return getFamilyForChar(ch, vs, localeListId, variant);
             }
         }
         return mFamilies[0];
@@ -368,7 +369,7 @@ constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
 void FontCollection::itemize(const uint16_t *string, size_t string_size, FontStyle style,
         vector<Run>* result) const {
-    const uint32_t langListId = style.getLanguageListId();
+    const uint32_t localeListId = style.getLocaleListId();
     int variant = style.getVariant();
     const FontFamily* lastFamily = nullptr;
     Run* run = nullptr;
@@ -412,7 +413,7 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, FontSty
 
         if (!shouldContinueRun) {
             const std::shared_ptr<FontFamily>& family = getFamilyForChar(
-                    ch, isVariationSelector(nextCh) ? nextCh : 0, langListId, variant);
+                    ch, isVariationSelector(nextCh) ? nextCh : 0, localeListId, variant);
             if (utf16Pos == 0 || family.get() != lastFamily) {
                 size_t start = utf16Pos;
                 // Workaround for combining marks and emoji modifiers until we implement

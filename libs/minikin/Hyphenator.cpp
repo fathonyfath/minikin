@@ -14,22 +14,15 @@
  * limitations under the License.
  */
 
-#include <vector>
-#include <memory>
-#include <algorithm>
-#include <string>
-#include <unicode/uchar.h>
-#include <unicode/uscript.h>
-
-// HACK: for reading pattern file
-#include <fcntl.h>
-
-#define LOG_TAG "Minikin"
-#include "utils/Log.h"
-
 #include "minikin/Hyphenator.h"
 
-using std::vector;
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <unicode/uchar.h>
+#include <unicode/uscript.h>
 
 namespace minikin {
 
@@ -109,7 +102,6 @@ struct Header {
 };
 
 // static
-// TODO: Replace language/languageLength with StringPiece
 Hyphenator* Hyphenator::loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
         const std::string& locale) {
     HyphenationLocale hyphenLocale = HyphenationLocale::OTHER;
@@ -129,7 +121,7 @@ Hyphenator::Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minS
         mHyphenationLocale(hyphenLocale) {
 }
 
-void Hyphenator::hyphenate(vector<HyphenationType>* result, const uint16_t* word,
+void Hyphenator::hyphenate(std::vector<HyphenationType>* result, const uint16_t* word,
         size_t len) const {
     result->clear();
     result->resize(len);

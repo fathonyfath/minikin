@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#include <unicode/utf.h>
-#include <unicode/utf8.h>
 #include <cstdlib>
-#include <cutils/log.h>
 #include <vector>
 #include <string>
+
+#include <cutils/log.h>
+#include <unicode/utf.h>
+#include <unicode/utf8.h>
 
 namespace minikin {
 

@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
+#include "minikin/CmapCoverage.h"
+
 #include <random>
 
-#include <log/log.h>
 #include <gtest/gtest.h>
-#include <minikin/CmapCoverage.h>
-#include <minikin/SparseBitSet.h>
+#include <log/log.h>
 
+#include "minikin/SparseBitSet.h"
 #include "MinikinInternal.h"
 
 namespace minikin {

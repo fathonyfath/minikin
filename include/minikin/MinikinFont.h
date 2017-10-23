@@ -18,10 +18,9 @@
 #define MINIKIN_FONT_H
 
 #include <string>
-#include <memory>
 
-#include <minikin/FontFamily.h>
-#include <minikin/Hyphenator.h>
+#include "minikin/FontFamily.h"
+#include "minikin/Hyphenator.h"
 
 // An abstraction for platform fonts, allowing Minikin to be used with
 // multiple actual implementations of fonts.

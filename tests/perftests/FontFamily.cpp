@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include "minikin/FontFamily.h"
+
 #include <benchmark/benchmark.h>
 
-#include <minikin/FontFamily.h>
-#include "../util/MinikinFontForTest.h"
+#include "MinikinFontForTest.h"
 
 namespace minikin {
 

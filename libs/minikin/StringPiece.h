@@ -17,7 +17,7 @@
 #ifndef MINIKIN_STRING_PIECE_H
 #define MINIKIN_STRING_PIECE_H
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 
