@@ -17,6 +17,8 @@
 #ifndef MINIKIN_GRAPHEME_BREAK_H
 #define MINIKIN_GRAPHEME_BREAK_H
 
+#include <cstdint>
+
 namespace minikin {
 
 class GraphemeBreak {

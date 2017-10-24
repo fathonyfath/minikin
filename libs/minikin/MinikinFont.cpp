@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include <minikin/MinikinFont.h>
+#include "minikin/MinikinFont.h"
+
 #include "HbFontCache.h"
 #include "MinikinInternal.h"
 

@@ -14,5 +14,8 @@
  * limitations under the License.
  */
 
+#include <string>
+#include <vector>
+
 std::vector<uint8_t> readWholeFile(const std::string& filePath);
 

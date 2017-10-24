@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
+#include "minikin/GraphemeBreak.h"
+
 #include <algorithm>
+#include <cstdint>
+
 #include <unicode/uchar.h>
 #include <unicode/utf16.h>
 
-#include <minikin/GraphemeBreak.h>
-#include <minikin/Emoji.h>
-#include "MinikinInternal.h"
+#include "minikin/Emoji.h"
 
 namespace minikin {
 

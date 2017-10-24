@@ -14,35 +14,34 @@
  * limitations under the License.
  */
 
-#include <minikin/FontFamily.h>
+#include "minikin/FontFamily.h"
 
-#include <android/log.h>
 #include <gtest/gtest.h>
 
-#include "FontLanguageListCache.h"
 #include "ICUTestBase.h"
+#include "LocaleListCache.h"
 #include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
 
-typedef ICUTestBase FontLanguagesTest;
-typedef ICUTestBase FontLanguageTest;
+typedef ICUTestBase LocaleListTest;
+typedef ICUTestBase LocaleTest;
 
-static const FontLanguages& createFontLanguages(const std::string& input) {
+static const LocaleList& createLocaleList(const std::string& input) {
     android::AutoMutex _l(gMinikinLock);
-    uint32_t langId = FontLanguageListCache::getId(input);
-    return FontLanguageListCache::getById(langId);
+    uint32_t localeListId = LocaleListCache::getId(input);
+    return LocaleListCache::getById(localeListId);
 }
 
-static FontLanguage createFontLanguage(const std::string& input) {
+static Locale createLocale(const std::string& input) {
     android::AutoMutex _l(gMinikinLock);
-    uint32_t langId = FontLanguageListCache::getId(input);
-    return FontLanguageListCache::getById(langId)[0];
+    uint32_t localeListId = LocaleListCache::getId(input);
+    return LocaleListCache::getById(localeListId)[0];
 }
 
-static FontLanguage createFontLanguageWithoutICUSanitization(const std::string& input) {
-    return FontLanguage(input);
+static Locale createLocaleWithoutICUSanitization(const std::string& input) {
+    return Locale(input);
 }
 
 std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
@@ -51,32 +50,32 @@ std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
             std::vector<Font>({Font(font, FontStyle())}));
 }
 
-TEST_F(FontLanguageTest, basicTests) {
-    FontLanguage defaultLang;
-    FontLanguage emptyLang("");
-    FontLanguage english = createFontLanguage("en");
-    FontLanguage french = createFontLanguage("fr");
-    FontLanguage und = createFontLanguage("und");
-    FontLanguage undZsye = createFontLanguage("und-Zsye");
+TEST_F(LocaleTest, basicTests) {
+    Locale defaultLocale;
+    Locale emptyLocale("");
+    Locale english = createLocale("en");
+    Locale french = createLocale("fr");
+    Locale und = createLocale("und");
+    Locale undZsye = createLocale("und-Zsye");
 
     EXPECT_EQ(english, english);
     EXPECT_EQ(french, french);
 
-    EXPECT_TRUE(defaultLang != defaultLang);
-    EXPECT_TRUE(emptyLang != emptyLang);
-    EXPECT_TRUE(defaultLang != emptyLang);
-    EXPECT_TRUE(defaultLang != und);
-    EXPECT_TRUE(emptyLang != und);
-    EXPECT_TRUE(english != defaultLang);
-    EXPECT_TRUE(english != emptyLang);
+    EXPECT_TRUE(defaultLocale != defaultLocale);
+    EXPECT_TRUE(emptyLocale != emptyLocale);
+    EXPECT_TRUE(defaultLocale != emptyLocale);
+    EXPECT_TRUE(defaultLocale != und);
+    EXPECT_TRUE(emptyLocale != und);
+    EXPECT_TRUE(english != defaultLocale);
+    EXPECT_TRUE(english != emptyLocale);
     EXPECT_TRUE(english != french);
     EXPECT_TRUE(english != undZsye);
     EXPECT_TRUE(und != undZsye);
     EXPECT_TRUE(english != und);
-    EXPECT_TRUE(createFontLanguage("de-1901") != createFontLanguage("de-1996"));
+    EXPECT_TRUE(createLocale("de-1901") != createLocale("de-1996"));
 
-    EXPECT_TRUE(defaultLang.isUnsupported());
-    EXPECT_TRUE(emptyLang.isUnsupported());
+    EXPECT_TRUE(defaultLocale.isUnsupported());
+    EXPECT_TRUE(emptyLocale.isUnsupported());
 
     EXPECT_FALSE(english.isUnsupported());
     EXPECT_FALSE(french.isUnsupported());
@@ -84,87 +83,87 @@ TEST_F(FontLanguageTest, basicTests) {
     EXPECT_FALSE(undZsye.isUnsupported());
 }
 
-TEST_F(FontLanguageTest, getStringTest) {
-    EXPECT_EQ("en-Latn-US", createFontLanguage("en").getString());
-    EXPECT_EQ("en-Latn-US", createFontLanguage("en-Latn").getString());
+TEST_F(LocaleTest, getStringTest) {
+    EXPECT_EQ("en-Latn-US", createLocale("en").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("en-Latn").getString());
 
     // Capitalized language code or lowercased script should be normalized.
-    EXPECT_EQ("en-Latn-US", createFontLanguage("EN-LATN").getString());
-    EXPECT_EQ("en-Latn-US", createFontLanguage("EN-latn").getString());
-    EXPECT_EQ("en-Latn-US", createFontLanguage("en-latn").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("EN-LATN").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("EN-latn").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("en-latn").getString());
 
     // Invalid script should be kept.
-    EXPECT_EQ("en-Xyzt-US", createFontLanguage("en-xyzt").getString());
+    EXPECT_EQ("en-Xyzt-US", createLocale("en-xyzt").getString());
 
-    EXPECT_EQ("en-Latn-US", createFontLanguage("en-Latn-US").getString());
-    EXPECT_EQ("ja-Jpan-JP", createFontLanguage("ja").getString());
-    EXPECT_EQ("zh-Hant-TW", createFontLanguage("zh-TW").getString());
-    EXPECT_EQ("zh-Hant-HK", createFontLanguage("zh-HK").getString());
-    EXPECT_EQ("zh-Hant-MO", createFontLanguage("zh-MO").getString());
-    EXPECT_EQ("zh-Hans-CN", createFontLanguage("zh").getString());
-    EXPECT_EQ("zh-Hans-CN", createFontLanguage("zh-CN").getString());
-    EXPECT_EQ("zh-Hans-SG", createFontLanguage("zh-SG").getString());
-    EXPECT_EQ("und", createFontLanguage("und").getString());
-    EXPECT_EQ("und", createFontLanguage("UND").getString());
-    EXPECT_EQ("und", createFontLanguage("Und").getString());
-    EXPECT_EQ("und-Zsye", createFontLanguage("und-Zsye").getString());
-    EXPECT_EQ("und-Zsye", createFontLanguage("Und-ZSYE").getString());
-    EXPECT_EQ("und-Zsye", createFontLanguage("Und-zsye").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("en-Latn-US").getString());
+    EXPECT_EQ("ja-Jpan-JP", createLocale("ja").getString());
+    EXPECT_EQ("zh-Hant-TW", createLocale("zh-TW").getString());
+    EXPECT_EQ("zh-Hant-HK", createLocale("zh-HK").getString());
+    EXPECT_EQ("zh-Hant-MO", createLocale("zh-MO").getString());
+    EXPECT_EQ("zh-Hans-CN", createLocale("zh").getString());
+    EXPECT_EQ("zh-Hans-CN", createLocale("zh-CN").getString());
+    EXPECT_EQ("zh-Hans-SG", createLocale("zh-SG").getString());
+    EXPECT_EQ("und", createLocale("und").getString());
+    EXPECT_EQ("und", createLocale("UND").getString());
+    EXPECT_EQ("und", createLocale("Und").getString());
+    EXPECT_EQ("und-Zsye", createLocale("und-Zsye").getString());
+    EXPECT_EQ("und-Zsye", createLocale("Und-ZSYE").getString());
+    EXPECT_EQ("und-Zsye", createLocale("Und-zsye").getString());
 
-    EXPECT_EQ("es-Latn-419", createFontLanguage("es-Latn-419").getString());
+    EXPECT_EQ("es-Latn-419", createLocale("es-Latn-419").getString());
 
     // Variant
-    EXPECT_EQ("de-Latn-DE", createFontLanguage("de").getString());
-    EXPECT_EQ("de-Latn-DE-1901", createFontLanguage("de-1901").getString());
-    EXPECT_EQ("de-Latn-DE-1996", createFontLanguage("de-DE-1996").getString());
+    EXPECT_EQ("de-Latn-DE", createLocale("de").getString());
+    EXPECT_EQ("de-Latn-DE-1901", createLocale("de-1901").getString());
+    EXPECT_EQ("de-Latn-DE-1996", createLocale("de-DE-1996").getString());
 
     // Emoji subtag is dropped from getString().
-    EXPECT_EQ("es-Latn-419", createFontLanguage("es-419-u-em-emoji").getString());
-    EXPECT_EQ("es-Latn-419", createFontLanguage("es-Latn-419-u-em-emoji").getString());
+    EXPECT_EQ("es-Latn-419", createLocale("es-419-u-em-emoji").getString());
+    EXPECT_EQ("es-Latn-419", createLocale("es-Latn-419-u-em-emoji").getString());
 
     // This is not a necessary desired behavior, just known behavior.
-    EXPECT_EQ("en-Latn-US", createFontLanguage("und-Abcdefgh").getString());
+    EXPECT_EQ("en-Latn-US", createLocale("und-Abcdefgh").getString());
 }
 
-TEST_F(FontLanguageTest, testReconstruction) {
-    EXPECT_EQ("en", createFontLanguageWithoutICUSanitization("en").getString());
-    EXPECT_EQ("fil", createFontLanguageWithoutICUSanitization("fil").getString());
-    EXPECT_EQ("und", createFontLanguageWithoutICUSanitization("und").getString());
+TEST_F(LocaleTest, testReconstruction) {
+    EXPECT_EQ("en", createLocaleWithoutICUSanitization("en").getString());
+    EXPECT_EQ("fil", createLocaleWithoutICUSanitization("fil").getString());
+    EXPECT_EQ("und", createLocaleWithoutICUSanitization("und").getString());
 
-    EXPECT_EQ("en-Latn", createFontLanguageWithoutICUSanitization("en-Latn").getString());
-    EXPECT_EQ("fil-Taga", createFontLanguageWithoutICUSanitization("fil-Taga").getString());
-    EXPECT_EQ("und-Zsye", createFontLanguageWithoutICUSanitization("und-Zsye").getString());
+    EXPECT_EQ("en-Latn", createLocaleWithoutICUSanitization("en-Latn").getString());
+    EXPECT_EQ("fil-Taga", createLocaleWithoutICUSanitization("fil-Taga").getString());
+    EXPECT_EQ("und-Zsye", createLocaleWithoutICUSanitization("und-Zsye").getString());
 
-    EXPECT_EQ("en-US", createFontLanguageWithoutICUSanitization("en-US").getString());
-    EXPECT_EQ("fil-PH", createFontLanguageWithoutICUSanitization("fil-PH").getString());
-    EXPECT_EQ("es-419", createFontLanguageWithoutICUSanitization("es-419").getString());
+    EXPECT_EQ("en-US", createLocaleWithoutICUSanitization("en-US").getString());
+    EXPECT_EQ("fil-PH", createLocaleWithoutICUSanitization("fil-PH").getString());
+    EXPECT_EQ("es-419", createLocaleWithoutICUSanitization("es-419").getString());
 
-    EXPECT_EQ("en-Latn-US", createFontLanguageWithoutICUSanitization("en-Latn-US").getString());
-    EXPECT_EQ("fil-Taga-PH", createFontLanguageWithoutICUSanitization("fil-Taga-PH").getString());
-    EXPECT_EQ("es-Latn-419", createFontLanguageWithoutICUSanitization("es-Latn-419").getString());
+    EXPECT_EQ("en-Latn-US", createLocaleWithoutICUSanitization("en-Latn-US").getString());
+    EXPECT_EQ("fil-Taga-PH", createLocaleWithoutICUSanitization("fil-Taga-PH").getString());
+    EXPECT_EQ("es-Latn-419", createLocaleWithoutICUSanitization("es-Latn-419").getString());
 
     // Possible minimum/maximum values.
-    EXPECT_EQ("aa", createFontLanguageWithoutICUSanitization("aa").getString());
-    EXPECT_EQ("zz", createFontLanguageWithoutICUSanitization("zz").getString());
-    EXPECT_EQ("aa-Aaaa", createFontLanguageWithoutICUSanitization("aa-Aaaa").getString());
-    EXPECT_EQ("zz-Zzzz", createFontLanguageWithoutICUSanitization("zz-Zzzz").getString());
-    EXPECT_EQ("aaa-Aaaa-AA", createFontLanguageWithoutICUSanitization("aaa-Aaaa-AA").getString());
-    EXPECT_EQ("zzz-Zzzz-ZZ", createFontLanguageWithoutICUSanitization("zzz-Zzzz-ZZ").getString());
-    EXPECT_EQ("aaa-Aaaa-000", createFontLanguageWithoutICUSanitization("aaa-Aaaa-000").getString());
-    EXPECT_EQ("zzz-Zzzz-999", createFontLanguageWithoutICUSanitization("zzz-Zzzz-999").getString());
+    EXPECT_EQ("aa", createLocaleWithoutICUSanitization("aa").getString());
+    EXPECT_EQ("zz", createLocaleWithoutICUSanitization("zz").getString());
+    EXPECT_EQ("aa-Aaaa", createLocaleWithoutICUSanitization("aa-Aaaa").getString());
+    EXPECT_EQ("zz-Zzzz", createLocaleWithoutICUSanitization("zz-Zzzz").getString());
+    EXPECT_EQ("aaa-Aaaa-AA", createLocaleWithoutICUSanitization("aaa-Aaaa-AA").getString());
+    EXPECT_EQ("zzz-Zzzz-ZZ", createLocaleWithoutICUSanitization("zzz-Zzzz-ZZ").getString());
+    EXPECT_EQ("aaa-Aaaa-000", createLocaleWithoutICUSanitization("aaa-Aaaa-000").getString());
+    EXPECT_EQ("zzz-Zzzz-999", createLocaleWithoutICUSanitization("zzz-Zzzz-999").getString());
 }
 
-TEST_F(FontLanguageTest, ScriptEqualTest) {
-    EXPECT_TRUE(createFontLanguage("en").isEqualScript(createFontLanguage("en")));
-    EXPECT_TRUE(createFontLanguage("en-Latn").isEqualScript(createFontLanguage("en")));
-    EXPECT_TRUE(createFontLanguage("jp-Latn").isEqualScript(createFontLanguage("en-Latn")));
-    EXPECT_TRUE(createFontLanguage("en-Jpan").isEqualScript(createFontLanguage("en-Jpan")));
+TEST_F(LocaleTest, ScriptEqualTest) {
+    EXPECT_TRUE(createLocale("en").isEqualScript(createLocale("en")));
+    EXPECT_TRUE(createLocale("en-Latn").isEqualScript(createLocale("en")));
+    EXPECT_TRUE(createLocale("jp-Latn").isEqualScript(createLocale("en-Latn")));
+    EXPECT_TRUE(createLocale("en-Jpan").isEqualScript(createLocale("en-Jpan")));
 
-    EXPECT_FALSE(createFontLanguage("en-Jpan").isEqualScript(createFontLanguage("en-Hira")));
-    EXPECT_FALSE(createFontLanguage("en-Jpan").isEqualScript(createFontLanguage("en-Hani")));
+    EXPECT_FALSE(createLocale("en-Jpan").isEqualScript(createLocale("en-Hira")));
+    EXPECT_FALSE(createLocale("en-Jpan").isEqualScript(createLocale("en-Hani")));
 }
 
-TEST_F(FontLanguageTest, ScriptMatchTest) {
+TEST_F(LocaleTest, ScriptMatchTest) {
     const bool SUPPORTED = true;
     const bool NOT_SUPPORTED = false;
 
@@ -255,102 +254,102 @@ TEST_F(FontLanguageTest, ScriptMatchTest) {
                        testCase.requestedScript[2], testCase.requestedScript[3]));
         if (testCase.isSupported) {
             EXPECT_TRUE(
-                    createFontLanguage(testCase.baseScript).supportsHbScript(script))
+                    createLocale(testCase.baseScript).supportsHbScript(script))
                     << testCase.baseScript << " should support " << testCase.requestedScript;
         } else {
             EXPECT_FALSE(
-                    createFontLanguage(testCase.baseScript).supportsHbScript(script))
+                    createLocale(testCase.baseScript).supportsHbScript(script))
                     << testCase.baseScript << " shouldn't support " << testCase.requestedScript;
         }
     }
 }
 
-TEST_F(FontLanguagesTest, basicTests) {
-    FontLanguages emptyLangs;
-    EXPECT_EQ(0u, emptyLangs.size());
+TEST_F(LocaleListTest, basicTests) {
+    LocaleList emptyLocales;
+    EXPECT_EQ(0u, emptyLocales.size());
 
-    FontLanguage english = createFontLanguage("en");
-    const FontLanguages& singletonLangs = createFontLanguages("en");
-    EXPECT_EQ(1u, singletonLangs.size());
-    EXPECT_EQ(english, singletonLangs[0]);
+    Locale english = createLocale("en");
+    const LocaleList& singletonLocales = createLocaleList("en");
+    EXPECT_EQ(1u, singletonLocales.size());
+    EXPECT_EQ(english, singletonLocales[0]);
 
-    FontLanguage french = createFontLanguage("fr");
-    const FontLanguages& twoLangs = createFontLanguages("en,fr");
-    EXPECT_EQ(2u, twoLangs.size());
-    EXPECT_EQ(english, twoLangs[0]);
-    EXPECT_EQ(french, twoLangs[1]);
+    Locale french = createLocale("fr");
+    const LocaleList& twoLocales = createLocaleList("en,fr");
+    EXPECT_EQ(2u, twoLocales.size());
+    EXPECT_EQ(english, twoLocales[0]);
+    EXPECT_EQ(french, twoLocales[1]);
 }
 
-TEST_F(FontLanguagesTest, unsupportedLanguageTests) {
-    const FontLanguages& oneUnsupported = createFontLanguages("abcd-example");
+TEST_F(LocaleListTest, unsupportedLocaleuageTests) {
+    const LocaleList& oneUnsupported = createLocaleList("abcd-example");
     EXPECT_TRUE(oneUnsupported.empty());
 
-    const FontLanguages& twoUnsupporteds = createFontLanguages("abcd-example,abcd-example");
+    const LocaleList& twoUnsupporteds = createLocaleList("abcd-example,abcd-example");
     EXPECT_TRUE(twoUnsupporteds.empty());
 
-    FontLanguage english = createFontLanguage("en");
-    const FontLanguages& firstUnsupported = createFontLanguages("abcd-example,en");
+    Locale english = createLocale("en");
+    const LocaleList& firstUnsupported = createLocaleList("abcd-example,en");
     EXPECT_EQ(1u, firstUnsupported.size());
     EXPECT_EQ(english, firstUnsupported[0]);
 
-    const FontLanguages& lastUnsupported = createFontLanguages("en,abcd-example");
+    const LocaleList& lastUnsupported = createLocaleList("en,abcd-example");
     EXPECT_EQ(1u, lastUnsupported.size());
     EXPECT_EQ(english, lastUnsupported[0]);
 }
 
-TEST_F(FontLanguagesTest, repeatedLanguageTests) {
-    FontLanguage english = createFontLanguage("en");
-    FontLanguage french = createFontLanguage("fr");
-    FontLanguage canadianFrench = createFontLanguage("fr-CA");
-    FontLanguage englishInLatn = createFontLanguage("en-Latn");
+TEST_F(LocaleListTest, repeatedLocaleuageTests) {
+    Locale english = createLocale("en");
+    Locale french = createLocale("fr");
+    Locale canadianFrench = createLocale("fr-CA");
+    Locale englishInLatn = createLocale("en-Latn");
     ASSERT_TRUE(english == englishInLatn);
 
-    const FontLanguages& langs = createFontLanguages("en,en-Latn");
-    EXPECT_EQ(1u, langs.size());
-    EXPECT_EQ(english, langs[0]);
+    const LocaleList& locales = createLocaleList("en,en-Latn");
+    EXPECT_EQ(1u, locales.size());
+    EXPECT_EQ(english, locales[0]);
 
-    const FontLanguages& fr = createFontLanguages("fr,fr-FR,fr-Latn-FR");
+    const LocaleList& fr = createLocaleList("fr,fr-FR,fr-Latn-FR");
     EXPECT_EQ(1u, fr.size());
     EXPECT_EQ(french, fr[0]);
 
     // ICU appends FR to fr. The third language is dropped which is same as the first language.
-    const FontLanguages& fr2 = createFontLanguages("fr,fr-CA,fr-FR");
+    const LocaleList& fr2 = createLocaleList("fr,fr-CA,fr-FR");
     EXPECT_EQ(2u, fr2.size());
     EXPECT_EQ(french, fr2[0]);
     EXPECT_EQ(canadianFrench, fr2[1]);
 
     // The order should be kept.
-    const FontLanguages& langs2 = createFontLanguages("en,fr,en-Latn");
-    EXPECT_EQ(2u, langs2.size());
-    EXPECT_EQ(english, langs2[0]);
-    EXPECT_EQ(french, langs2[1]);
+    const LocaleList& locales2 = createLocaleList("en,fr,en-Latn");
+    EXPECT_EQ(2u, locales2.size());
+    EXPECT_EQ(english, locales2[0]);
+    EXPECT_EQ(french, locales2[1]);
 }
 
-TEST_F(FontLanguagesTest, identifierTest) {
-    EXPECT_EQ(createFontLanguage("en-Latn-US"), createFontLanguage("en-Latn-US"));
-    EXPECT_EQ(createFontLanguage("zh-Hans-CN"), createFontLanguage("zh-Hans-CN"));
-    EXPECT_EQ(createFontLanguage("en-Zsye-US"), createFontLanguage("en-Zsye-US"));
+TEST_F(LocaleListTest, identifierTest) {
+    EXPECT_EQ(createLocale("en-Latn-US"), createLocale("en-Latn-US"));
+    EXPECT_EQ(createLocale("zh-Hans-CN"), createLocale("zh-Hans-CN"));
+    EXPECT_EQ(createLocale("en-Zsye-US"), createLocale("en-Zsye-US"));
 
-    EXPECT_NE(createFontLanguage("en-Latn-US"), createFontLanguage("en-Latn-GB"));
-    EXPECT_NE(createFontLanguage("en-Latn-US"), createFontLanguage("en-Zsye-US"));
-    EXPECT_NE(createFontLanguage("es-Latn-US"), createFontLanguage("en-Latn-US"));
-    EXPECT_NE(createFontLanguage("zh-Hant-HK"), createFontLanguage("zh-Hant-TW"));
+    EXPECT_NE(createLocale("en-Latn-US"), createLocale("en-Latn-GB"));
+    EXPECT_NE(createLocale("en-Latn-US"), createLocale("en-Zsye-US"));
+    EXPECT_NE(createLocale("es-Latn-US"), createLocale("en-Latn-US"));
+    EXPECT_NE(createLocale("zh-Hant-HK"), createLocale("zh-Hant-TW"));
 }
 
-TEST_F(FontLanguagesTest, undEmojiTests) {
-    FontLanguage emoji = createFontLanguage("und-Zsye");
-    EXPECT_EQ(FontLanguage::EMSTYLE_EMOJI, emoji.getEmojiStyle());
+TEST_F(LocaleListTest, undEmojiTests) {
+    Locale emoji = createLocale("und-Zsye");
+    EXPECT_EQ(Locale::EMSTYLE_EMOJI, emoji.getEmojiStyle());
 
-    FontLanguage und = createFontLanguage("und");
-    EXPECT_EQ(FontLanguage::EMSTYLE_EMPTY, und.getEmojiStyle());
+    Locale und = createLocale("und");
+    EXPECT_EQ(Locale::EMSTYLE_EMPTY, und.getEmojiStyle());
     EXPECT_FALSE(emoji == und);
 
-    FontLanguage undExample = createFontLanguage("und-example");
-    EXPECT_EQ(FontLanguage::EMSTYLE_EMPTY, undExample.getEmojiStyle());
+    Locale undExample = createLocale("und-example");
+    EXPECT_EQ(Locale::EMSTYLE_EMPTY, undExample.getEmojiStyle());
     EXPECT_FALSE(emoji == undExample);
 }
 
-TEST_F(FontLanguagesTest, subtagEmojiTest) {
+TEST_F(LocaleListTest, subtagEmojiTest) {
     std::string subtagEmojiStrings[] = {
         // Duplicate subtag case.
         "und-Latn-u-em-emoji-u-em-text",
@@ -382,12 +381,12 @@ TEST_F(FontLanguagesTest, subtagEmojiTest) {
 
     for (auto subtagEmojiString : subtagEmojiStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmojiString + "\"");
-        FontLanguage subtagEmoji = createFontLanguage(subtagEmojiString);
-        EXPECT_EQ(FontLanguage::EMSTYLE_EMOJI, subtagEmoji.getEmojiStyle());
+        Locale subtagEmoji = createLocale(subtagEmojiString);
+        EXPECT_EQ(Locale::EMSTYLE_EMOJI, subtagEmoji.getEmojiStyle());
     }
 }
 
-TEST_F(FontLanguagesTest, subtagTextTest) {
+TEST_F(LocaleListTest, subtagTextTest) {
     std::string subtagTextStrings[] = {
         // Duplicate subtag case.
         "und-Latn-u-em-text-u-em-emoji",
@@ -419,14 +418,14 @@ TEST_F(FontLanguagesTest, subtagTextTest) {
 
     for (auto subtagTextString : subtagTextStrings) {
         SCOPED_TRACE("Test for \"" + subtagTextString + "\"");
-        FontLanguage subtagText = createFontLanguage(subtagTextString);
-        EXPECT_EQ(FontLanguage::EMSTYLE_TEXT, subtagText.getEmojiStyle());
+        Locale subtagText = createLocale(subtagTextString);
+        EXPECT_EQ(Locale::EMSTYLE_TEXT, subtagText.getEmojiStyle());
     }
 }
 
 // TODO: add more "und" language cases whose language and script are
 //       unexpectedly translated to en-Latn by ICU.
-TEST_F(FontLanguagesTest, subtagDefaultTest) {
+TEST_F(LocaleListTest, subtagDefaultTest) {
     std::string subtagDefaultStrings[] = {
         // Duplicate subtag case.
         "en-Latn-u-em-default-u-em-emoji",
@@ -455,12 +454,12 @@ TEST_F(FontLanguagesTest, subtagDefaultTest) {
 
     for (auto subtagDefaultString : subtagDefaultStrings) {
         SCOPED_TRACE("Test for \"" + subtagDefaultString + "\"");
-        FontLanguage subtagDefault = createFontLanguage(subtagDefaultString);
-        EXPECT_EQ(FontLanguage::EMSTYLE_DEFAULT, subtagDefault.getEmojiStyle());
+        Locale subtagDefault = createLocale(subtagDefaultString);
+        EXPECT_EQ(Locale::EMSTYLE_DEFAULT, subtagDefault.getEmojiStyle());
     }
 }
 
-TEST_F(FontLanguagesTest, subtagEmptyTest) {
+TEST_F(LocaleListTest, subtagEmptyTest) {
     std::string subtagEmptyStrings[] = {
         "und",
         "jp",
@@ -474,34 +473,31 @@ TEST_F(FontLanguagesTest, subtagEmptyTest) {
 
     for (auto subtagEmptyString : subtagEmptyStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmptyString + "\"");
-        FontLanguage subtagEmpty = createFontLanguage(subtagEmptyString);
-        EXPECT_EQ(FontLanguage::EMSTYLE_EMPTY, subtagEmpty.getEmojiStyle());
+        Locale subtagEmpty = createLocale(subtagEmptyString);
+        EXPECT_EQ(Locale::EMSTYLE_EMPTY, subtagEmpty.getEmojiStyle());
     }
 }
 
-TEST_F(FontLanguagesTest, registerLanguageListTest) {
-    EXPECT_EQ(0UL, FontStyle::registerLanguageList(""));
-    EXPECT_NE(0UL, FontStyle::registerLanguageList("en"));
-    EXPECT_NE(0UL, FontStyle::registerLanguageList("jp"));
-    EXPECT_NE(0UL, FontStyle::registerLanguageList("en,zh-Hans"));
+TEST_F(LocaleListTest, registerLocaleListTest) {
+    EXPECT_EQ(0UL, FontStyle::registerLocaleList(""));
+    EXPECT_NE(0UL, FontStyle::registerLocaleList("en"));
+    EXPECT_NE(0UL, FontStyle::registerLocaleList("jp"));
+    EXPECT_NE(0UL, FontStyle::registerLocaleList("en,zh-Hans"));
 
-    EXPECT_EQ(FontStyle::registerLanguageList("en"), FontStyle::registerLanguageList("en"));
-    EXPECT_NE(FontStyle::registerLanguageList("en"), FontStyle::registerLanguageList("jp"));
-    EXPECT_NE(FontStyle::registerLanguageList("de"),
-              FontStyle::registerLanguageList("de-1901"));
+    EXPECT_EQ(FontStyle::registerLocaleList("en"), FontStyle::registerLocaleList("en"));
+    EXPECT_NE(FontStyle::registerLocaleList("en"), FontStyle::registerLocaleList("jp"));
+    EXPECT_NE(FontStyle::registerLocaleList("de"), FontStyle::registerLocaleList("de-1901"));
 
-    EXPECT_EQ(FontStyle::registerLanguageList("en,zh-Hans"),
-              FontStyle::registerLanguageList("en,zh-Hans"));
-    EXPECT_NE(FontStyle::registerLanguageList("en,zh-Hans"),
-              FontStyle::registerLanguageList("zh-Hans,en"));
-    EXPECT_NE(FontStyle::registerLanguageList("en,zh-Hans"),
-              FontStyle::registerLanguageList("jp"));
-    EXPECT_NE(FontStyle::registerLanguageList("en,zh-Hans"),
-              FontStyle::registerLanguageList("en"));
-    EXPECT_NE(FontStyle::registerLanguageList("en,zh-Hans"),
-              FontStyle::registerLanguageList("en,zh-Hant"));
-    EXPECT_NE(FontStyle::registerLanguageList("de,de-1901"),
-              FontStyle::registerLanguageList("de-1901,de"));
+    EXPECT_EQ(FontStyle::registerLocaleList("en,zh-Hans"),
+              FontStyle::registerLocaleList("en,zh-Hans"));
+    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"),
+              FontStyle::registerLocaleList("zh-Hans,en"));
+    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"), FontStyle::registerLocaleList("jp"));
+    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"), FontStyle::registerLocaleList("en"));
+    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"),
+              FontStyle::registerLocaleList("en,zh-Hant"));
+    EXPECT_NE(FontStyle::registerLocaleList("de,de-1901"),
+              FontStyle::registerLocaleList("de-1901,de"));
 }
 
 // The test font has following glyphs.

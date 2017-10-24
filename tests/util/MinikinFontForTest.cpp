@@ -18,17 +18,16 @@
 
 #include "MinikinFontForTest.h"
 
-#include <minikin/MinikinFont.h>
-
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include <string>
 
 #include <log/log.h>
+
+#include "minikin/MinikinFont.h"
 
 namespace minikin {
 

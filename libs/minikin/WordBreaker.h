@@ -23,10 +23,11 @@
 #ifndef MINIKIN_WORD_BREAKER_H
 #define MINIKIN_WORD_BREAKER_H
 
-#include "FontLanguage.h"
-#include "unicode/brkiter.h"
 #include <list>
-#include <memory>
+
+#include <unicode/brkiter.h>
+
+#include "Locale.h"
 
 namespace minikin {
 
@@ -50,7 +51,7 @@ public:
         std::unique_ptr<icu::BreakIterator> breaker;
     };
     virtual ~ICULineBreakerPool() {}
-    virtual Slot acquire(const FontLanguage& locale) = 0;
+    virtual Slot acquire(const Locale& locale) = 0;
     virtual void release(Slot&& slot) = 0;
 };
 
@@ -58,7 +59,7 @@ public:
 // Since creating ICU line breaker instance takes some time. Pool it for later use.
 class ICULineBreakerPoolImpl : public ICULineBreakerPool {
 public:
-    Slot acquire(const FontLanguage& locale) override;
+    Slot acquire(const Locale& locale) override;
     void release(Slot&& slot) override;
 
     static ICULineBreakerPoolImpl& getInstance() {
@@ -91,7 +92,7 @@ public:
 
     // Advance iterator to the break just after "from" with using the new provided locale.
     // Return offset, or -1 if EOT
-    ssize_t followingWithLocale(const FontLanguage& locale, size_t from);
+    ssize_t followingWithLocale(const Locale& locale, size_t from);
 
     // Current offset of iterator, equal to 0 at BOT or last return from next()
     ssize_t current() const;

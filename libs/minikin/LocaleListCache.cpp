@@ -16,19 +16,19 @@
 
 #define LOG_TAG "Minikin"
 
-#include "FontLanguageListCache.h"
+#include "LocaleListCache.h"
 
-#include <unicode/uloc.h>
 #include <unordered_set>
 
 #include <log/log.h>
+#include <unicode/uloc.h>
 
-#include "FontLanguage.h"
+#include "Locale.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
 
-const uint32_t FontLanguageListCache::kEmptyListId;
+const uint32_t LocaleListCache::kEmptyListId;
 
 // Returns the text length of output.
 static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& locale) {
@@ -37,13 +37,13 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
         return 0;
     }
 
-    std::string localeString = locale.toString();  // ICU only understand C-style string.
+    std::string localeString = locale.toString();  // ICU only understands C-style string.
 
     size_t outLength = 0;
     UErrorCode uErr = U_ZERO_ERROR;
     outLength = uloc_canonicalize(localeString.c_str(), output, outSize, &uErr);
     if (U_FAILURE(uErr)) {
-        // unable to build a proper language identifier
+        // unable to build a proper locale identifier
         ALOGD("uloc_canonicalize(\"%s\") failed: %s", localeString.c_str(), u_errorName(uErr));
         output[0] = '\0';
         return 0;
@@ -60,7 +60,7 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
     uErr = U_ZERO_ERROR;
     uloc_addLikelySubtags(output, likelyChars, ULOC_FULLNAME_CAPACITY, &uErr);
     if (U_FAILURE(uErr)) {
-        // unable to build a proper language identifier
+        // unable to build a proper locale identifier
         ALOGD("uloc_addLikelySubtags(\"%s\") failed: %s", output, u_errorName(uErr));
         output[0] = '\0';
         return 0;
@@ -69,7 +69,7 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
     uErr = U_ZERO_ERROR;
     outLength = uloc_toLanguageTag(likelyChars, output, outSize, FALSE, &uErr);
     if (U_FAILURE(uErr)) {
-        // unable to build a proper language identifier
+        // unable to build a proper locale identifier
         ALOGD("uloc_toLanguageTag(\"%s\") failed: %s", likelyChars, u_errorName(uErr));
         output[0] = '\0';
         return 0;
@@ -77,26 +77,26 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
     return outLength;
 }
 
-static std::vector<FontLanguage> parseLanguageList(const std::string& input) {
-    std::vector<FontLanguage> result;
+static std::vector<Locale> parseLocaleList(const std::string& input) {
+    std::vector<Locale> result;
     char langTag[ULOC_FULLNAME_CAPACITY];
     std::unordered_set<uint64_t> seen;
 
     SplitIterator it(input, ',');
     while (it.hasNext()) {
-        StringPiece locale = it.next();
-        size_t length = toLanguageTag(langTag, ULOC_FULLNAME_CAPACITY, locale);
-        FontLanguage lang(StringPiece(langTag, length));
-        if (lang.isUnsupported()) {
+        StringPiece localeStr = it.next();
+        size_t length = toLanguageTag(langTag, ULOC_FULLNAME_CAPACITY, localeStr);
+        Locale locale(StringPiece(langTag, length));
+        if (locale.isUnsupported()) {
             continue;
         }
-        const bool isNewLang = seen.insert(lang.getIdentifier()).second;
-        if (!isNewLang) {
+        const bool isNewLocale = seen.insert(locale.getIdentifier()).second;
+        if (!isNewLocale) {
             continue;
         }
 
-        result.push_back(lang);
-        if (result.size() >= FONT_LANGUAGES_LIMIT) {
+        result.push_back(locale);
+        if (result.size() >= FONT_LOCALE_LIMIT) {
             break;
         }
     }
@@ -104,43 +104,43 @@ static std::vector<FontLanguage> parseLanguageList(const std::string& input) {
 }
 
 // static
-uint32_t FontLanguageListCache::getId(const std::string& languages) {
-    FontLanguageListCache* inst = FontLanguageListCache::getInstance();
+uint32_t LocaleListCache::getId(const std::string& locales) {
+    LocaleListCache* inst = LocaleListCache::getInstance();
     std::unordered_map<std::string, uint32_t>::const_iterator it =
-            inst->mLanguageListLookupTable.find(languages);
-    if (it != inst->mLanguageListLookupTable.end()) {
+            inst->mLocaleListLookupTable.find(locales);
+    if (it != inst->mLocaleListLookupTable.end()) {
         return it->second;
     }
 
-    // Given language list is not in cache. Insert it and return newly assigned ID.
-    const uint32_t nextId = inst->mLanguageLists.size();
-    FontLanguages fontLanguages(parseLanguageList(languages));
-    if (fontLanguages.empty()) {
+    // Given locale list is not in cache. Insert it and return newly assigned ID.
+    const uint32_t nextId = inst->mLocaleLists.size();
+    LocaleList fontLocales(parseLocaleList(locales));
+    if (fontLocales.empty()) {
         return kEmptyListId;
     }
-    inst->mLanguageLists.push_back(std::move(fontLanguages));
-    inst->mLanguageListLookupTable.insert(std::make_pair(languages, nextId));
+    inst->mLocaleLists.push_back(std::move(fontLocales));
+    inst->mLocaleListLookupTable.insert(std::make_pair(locales, nextId));
     return nextId;
 }
 
 // static
-const FontLanguages& FontLanguageListCache::getById(uint32_t id) {
-    FontLanguageListCache* inst = FontLanguageListCache::getInstance();
-    LOG_ALWAYS_FATAL_IF(id >= inst->mLanguageLists.size(), "Lookup by unknown language list ID.");
-    return inst->mLanguageLists[id];
+const LocaleList& LocaleListCache::getById(uint32_t id) {
+    LocaleListCache* inst = LocaleListCache::getInstance();
+    MINIKIN_ASSERT(id < inst->mLocaleLists.size(), "Lookup by unknown locale list ID.");
+    return inst->mLocaleLists[id];
 }
 
 // static
-FontLanguageListCache* FontLanguageListCache::getInstance() {
+LocaleListCache* LocaleListCache::getInstance() {
     assertMinikinLocked();
-    static FontLanguageListCache* instance = nullptr;
+    static LocaleListCache* instance = nullptr;
     if (instance == nullptr) {
-        instance = new FontLanguageListCache();
+        instance = new LocaleListCache();
 
-        // Insert an empty language list for mapping default language list to kEmptyListId.
-        // The default language list has only one FontLanguage and it is the unsupported language.
-        instance->mLanguageLists.push_back(FontLanguages());
-        instance->mLanguageListLookupTable.insert(std::make_pair("", kEmptyListId));
+        // Insert an empty locale list for mapping default locale list to kEmptyListId.
+        // The default locale list has only one Locale and it is the unsupported locale.
+        instance->mLocaleLists.push_back(LocaleList());
+        instance->mLocaleListLookupTable.insert(std::make_pair("", kEmptyListId));
     }
     return instance;
 }

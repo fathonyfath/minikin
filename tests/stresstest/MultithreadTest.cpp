@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
+#include "minikin/Layout.h"
 
 #include <condition_variable>
 #include <mutex>
@@ -22,11 +22,11 @@
 #include <thread>
 
 #include <cutils/log.h>
+#include <gtest/gtest.h>
 
-#include "MinikinInternal.h"
 #include "minikin/FontCollection.h"
-#include "minikin/Layout.h"
-#include "../util/FontTestUtils.h"
+#include "MinikinInternal.h"
+#include "FontTestUtils.h"
 
 namespace minikin {
 

@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
+#include "minikin/LineBreaker.h"
 
 #include <algorithm>
 #include <limits>
 
-#include <log/log.h>
-
-#include "FontLanguage.h"
-#include "FontLanguageListCache.h"
+#include "minikin/Layout.h"
 #include "HyphenatorMap.h"
 #include "LayoutUtils.h"
+#include "Locale.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
-#include "StringPiece.h"
 #include "WordBreaker.h"
-#include <minikin/Layout.h>
-#include <minikin/LineBreaker.h>
-
-using std::vector;
 
 namespace minikin {
 
@@ -68,9 +62,9 @@ const size_t MAX_TEXT_BUF_RETAIN = 32678;
 // Maximum amount that spaces can shrink, in justified text.
 const float SHRINKABILITY = 1.0 / 3.0;
 
-inline static const FontLanguages& getLanguages(uint32_t langListId) {
+inline static const LocaleList& getLocaleList(uint32_t localeListId) {
     android::AutoMutex _l(gMinikinLock);
-    return FontLanguageListCache::getById(langListId);
+    return LocaleListCache::getById(localeListId);
 }
 
 LineBreaker::LineBreaker() : mWordBreaker(std::make_unique<WordBreaker>()) { }
@@ -80,24 +74,24 @@ LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker)
 
 LineBreaker::~LineBreaker() {}
 
-void LineBreaker::setLocales(uint32_t langListId, size_t restartFrom) {
-    if (mCurrentLocaleListId == langListId) {
+void LineBreaker::setLocaleList(uint32_t localeListId, size_t restartFrom) {
+    if (mCurrentLocaleListId == localeListId) {
         return;
     }
 
-    const FontLanguages& newLanguages = getLanguages(langListId);
-    const FontLanguage newLocale = newLanguages.empty() ? FontLanguage() : newLanguages[0];
+    const LocaleList& newLocales = getLocaleList(localeListId);
+    const Locale newLocale = newLocales.empty() ? Locale() : newLocales[0];
     const uint64_t newLocaleId = newLocale.getIdentifier();
 
     const bool needUpdate =
         // The first time setLocale is called.
-        mCurrentLocaleListId == FontLanguageListCache::kInvalidListId ||
+        mCurrentLocaleListId == LocaleListCache::kInvalidListId ||
         // The effective locale is changed.
         newLocaleId != mCurrentLocaleId;
 
     // For now, we ignore all locales except the first valid one.
     // TODO: Support selecting the locale based on the script of the text.
-    mCurrentLocaleListId = langListId;
+    mCurrentLocaleListId = localeListId;
     mCurrentLocaleId = newLocaleId;
     if (needUpdate) {
         mWordBreaker->followingWithLocale(newLocale, restartFrom);
@@ -121,7 +115,7 @@ void LineBreaker::setText() {
     mLastConsideredGreedyCandidate = SIZE_MAX;
 
     mSpaceCount = 0;
-    mCurrentLocaleListId = FontLanguageListCache::kInvalidListId;
+    mCurrentLocaleListId = LocaleListCache::kInvalidListId;
 }
 
 // This function determines whether a character is a space that disappears at end of line.
@@ -315,7 +309,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
         }
     }
 
-    setLocales(style.getLanguageListId(), start);
+    setLocaleList(style.getLocaleListId(), start);
     size_t current = (size_t) mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
@@ -550,12 +544,12 @@ LineBreaker::ParaWidth LineBreaker::computeBreaksGreedyPartial() {
     return mLastGreedyBreak->preBreak;
 }
 
-void LineBreaker::addReplacement(size_t start, size_t end, float width, uint32_t langListId) {
+void LineBreaker::addReplacement(size_t start, size_t end, float width, uint32_t localeListId) {
     mCharWidths[start] = width;
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRun(nullptr, nullptr, FontStyle(langListId), start, end, false);
+    addStyleRun(nullptr, nullptr, FontStyle(localeListId), start, end, false);
 }
 
 // Get the width of a space. May return 0 if there are no spaces.
@@ -714,7 +708,7 @@ void LineBreaker::finish() {
     mWidth = 0;
     mCandidates.clear();
     mBestGreedyBreaks.clear();
-    mCurrentLocaleListId = FontLanguageListCache::kInvalidListId;
+    mCurrentLocaleListId = LocaleListCache::kInvalidListId;
     clearResults();
     if (mTextBuf.size() > MAX_TEXT_BUF_RETAIN) {
         mTextBuf.clear();

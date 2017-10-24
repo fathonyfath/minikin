@@ -17,7 +17,7 @@
 #ifndef MINIKIN_MEASUREMENT_H
 #define MINIKIN_MEASUREMENT_H
 
-#include <minikin/Layout.h>
+#include <cstdint>
 
 namespace minikin {
 

@@ -16,17 +16,14 @@
 
 #include "HbFontCache.h"
 
-#include <android/log.h>
-#include <gtest/gtest.h>
-#include <utils/Mutex.h>
-
 #include <memory>
 
+#include <gtest/gtest.h>
 #include <hb.h>
 
+#include "minikin/MinikinFont.h"
 #include "MinikinInternal.h"
 #include "MinikinFontForTest.h"
-#include <minikin/MinikinFont.h>
 
 namespace minikin {
 

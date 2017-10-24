@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
+#include "minikin/Hyphenator.h"
+
 #include <gtest/gtest.h>
 
+#include "FileUtils.h"
 #include "ICUTestBase.h"
-#include <minikin/Hyphenator.h>
-#include <FileUtils.h>
 
 #ifndef NELEM
 #define NELEM(x) ((sizeof(x) / sizeof((x)[0])))

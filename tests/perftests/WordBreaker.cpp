@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "WordBreaker.h"
+
 #include <benchmark/benchmark.h>
 
-#include "WordBreaker.h"
+#include "Locale.h"
 #include "UnicodeUtils.h"
-#include "FontLanguage.h"
 
 namespace minikin {
 
@@ -26,7 +27,7 @@ static void BM_WordBreaker_English(benchmark::State& state) {
         "eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
     WordBreaker wb;
-    wb.followingWithLocale(FontLanguage("en-US"), 0);
+    wb.followingWithLocale(Locale("en-US"), 0);
     std::vector<uint16_t> text = utf8ToUtf16(kLoremIpsum);
     while (state.KeepRunning()) {
         wb.setText(text.data(), text.size());

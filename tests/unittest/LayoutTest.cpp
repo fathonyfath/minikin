@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
+#include "minikin/Layout.h"
+
 #include <gtest/gtest.h>
 
-#include "ICUTestBase.h"
 #include "minikin/FontCollection.h"
-#include "minikin/Layout.h"
-#include "../util/FontTestUtils.h"
-#include "../util/UnicodeUtils.h"
+#include "FontTestUtils.h"
+#include "ICUTestBase.h"
+#include "UnicodeUtils.h"
 
 const char* SYSTEM_FONT_PATH = "/system/fonts/";
 const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";

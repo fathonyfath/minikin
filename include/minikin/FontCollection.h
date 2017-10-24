@@ -21,8 +21,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include <minikin/MinikinFont.h>
-#include <minikin/FontFamily.h>
+#include "minikin/MinikinFont.h"
+#include "minikin/FontFamily.h"
 
 namespace minikin {
 
@@ -77,16 +77,16 @@ private:
     void init(const std::vector<std::shared_ptr<FontFamily>>& typefaces);
 
     const std::shared_ptr<FontFamily>& getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t langListId, int variant) const;
+            uint32_t localeListId, int variant) const;
 
-    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, int variant, uint32_t langListId,
+    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, int variant, uint32_t localeListId,
             const std::shared_ptr<FontFamily>& fontFamily) const;
 
     uint32_t calcCoverageScore(uint32_t ch, uint32_t vs,
             const std::shared_ptr<FontFamily>& fontFamily) const;
 
-    static uint32_t calcLanguageMatchingScore(uint32_t userLangListId,
-                                              const FontFamily& fontFamily);
+    static uint32_t calcLocaleMatchingScore(uint32_t userLocaleListId,
+            const FontFamily& fontFamily);
 
     static uint32_t calcVariantMatchingScore(int variant, const FontFamily& fontFamily);
 

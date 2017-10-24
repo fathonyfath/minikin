@@ -14,22 +14,18 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
+#include "WordBreaker.h"
 
 #include <list>
 #include <map>
 
-#include <android/log.h>
-
-#include <minikin/Emoji.h>
-#include <minikin/Hyphenator.h>
-#include "FontLanguage.h"
-#include "MinikinInternal.h"
-#include "WordBreaker.h"
-#include "cutils/log.h"
-
 #include <unicode/uchar.h>
 #include <unicode/utf16.h>
+
+#include "minikin/Emoji.h"
+#include "minikin/Hyphenator.h"
+#include "Locale.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 
@@ -37,7 +33,7 @@ constexpr uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
 constexpr uint32_t CHAR_ZWJ = 0x200D;
 
 namespace {
-static icu::BreakIterator* createNewIterator(const FontLanguage& locale) {
+static icu::BreakIterator* createNewIterator(const Locale& locale) {
     // TODO: handle failure status
     UErrorCode status = U_ZERO_ERROR;
     return icu::BreakIterator::createLineInstance(locale.isUnsupported()  ?
@@ -46,7 +42,7 @@ static icu::BreakIterator* createNewIterator(const FontLanguage& locale) {
 }
 }  // namespace
 
-ICULineBreakerPool::Slot ICULineBreakerPoolImpl::acquire(const FontLanguage& locale) {
+ICULineBreakerPool::Slot ICULineBreakerPoolImpl::acquire(const Locale& locale) {
     const uint64_t id = locale.getIdentifier();
     android::AutoMutex _l(gMinikinLock);
     for (auto i = mPool.begin(); i != mPool.end(); i++) {
@@ -81,10 +77,10 @@ WordBreaker::WordBreaker() : mPool(&ICULineBreakerPoolImpl::getInstance()) {
 WordBreaker::WordBreaker(ICULineBreakerPool* pool) : mPool(pool) {
 }
 
-ssize_t WordBreaker::followingWithLocale(const FontLanguage& locale, size_t from) {
+ssize_t WordBreaker::followingWithLocale(const Locale& locale, size_t from) {
     mIcuBreaker = mPool->acquire(locale);
     UErrorCode status = U_ZERO_ERROR;
-    LOG_ALWAYS_FATAL_IF(mText == nullptr, "setText must be called first");
+    MINIKIN_ASSERT(mText != nullptr, "setText must be called first");
     // TODO: handle failure status
     mIcuBreaker.breaker->setText(&mUText, status);
     if (mInEmailOrUrl) {

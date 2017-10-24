@@ -22,11 +22,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include <hb.h>
-
 #include <utils/TypeHelpers.h>
 
-#include <minikin/SparseBitSet.h>
+#include "minikin/SparseBitSet.h"
 
 namespace minikin {
 
@@ -39,26 +37,26 @@ class FontStyle {
 public:
     FontStyle() : FontStyle(0 /* variant */, 4 /* weight */, false /* italic */) {}
     FontStyle(int weight, bool italic) : FontStyle(0 /* variant */, weight, italic) {}
-    FontStyle(uint32_t langListId)  // NOLINT(implicit)
-            : FontStyle(langListId, 0 /* variant */, 4 /* weight */, false /* italic */) {}
+    FontStyle(uint32_t localeListId)  // NOLINT(implicit)
+            : FontStyle(localeListId, 0 /* variant */, 4 /* weight */, false /* italic */) {}
 
     FontStyle(int variant, int weight, bool italic);
-    FontStyle(uint32_t langListId, int variant, int weight, bool italic);
+    FontStyle(uint32_t localeListId, int variant, int weight, bool italic);
 
     int getWeight() const { return bits & kWeightMask; }
     bool getItalic() const { return (bits & kItalicMask) != 0; }
     int getVariant() const { return (bits >> kVariantShift) & kVariantMask; }
-    uint32_t getLanguageListId() const { return mLanguageListId; }
+    uint32_t getLocaleListId() const { return mLocaleListId; }
 
     bool operator==(const FontStyle other) const {
-          return bits == other.bits && mLanguageListId == other.mLanguageListId;
+          return bits == other.bits && mLocaleListId == other.mLocaleListId;
     }
 
     android::hash_t hash() const;
 
-    // Looks up a language list from an internal cache and returns its ID.
-    // If the passed language list is not in the cache, registers it and returns newly assigned ID.
-    static uint32_t registerLanguageList(const std::string& languages);
+    // Looks up a locale list from an internal cache and returns its ID.
+    // If the passed locale list is not in the cache, registers it and returns newly assigned ID.
+    static uint32_t registerLocaleList(const std::string& locales);
 private:
     static const uint32_t kWeightMask = (1 << 4) - 1;
     static const uint32_t kItalicMask = 1 << 4;
@@ -68,7 +66,7 @@ private:
     static uint32_t pack(int variant, int weight, bool italic);
 
     uint32_t bits;
-    uint32_t mLanguageListId;
+    uint32_t mLocaleListId;
 };
 
 enum FontVariant {
@@ -124,14 +122,14 @@ class FontFamily {
 public:
     explicit FontFamily(std::vector<Font>&& fonts);
     FontFamily(int variant, std::vector<Font>&& fonts);
-    FontFamily(uint32_t langId, int variant, std::vector<Font>&& fonts);
+    FontFamily(uint32_t localeListId, int variant, std::vector<Font>&& fonts);
 
     // TODO: Good to expose FontUtil.h.
     static bool analyzeStyle(const std::shared_ptr<MinikinFont>& typeface, int* weight,
             bool* italic);
     FakedFont getClosestMatch(FontStyle style) const;
 
-    uint32_t langId() const { return mLangId; }
+    uint32_t localeListId() const { return mLocaleListId; }
     int variant() const { return mVariant; }
 
     // API's for enumerating the fonts in a family. These don't guarantee any particular order
@@ -161,7 +159,7 @@ public:
 private:
     void computeCoverage();
 
-    uint32_t mLangId;
+    uint32_t mLocaleListId;
     int mVariant;
     std::vector<Font> mFonts;
     std::unordered_set<AxisTag> mSupportedAxes;

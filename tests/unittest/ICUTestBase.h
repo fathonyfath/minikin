@@ -17,14 +17,14 @@
 #ifndef MINIKIN_TEST_ICU_TEST_BASE_H
 #define MINIKIN_TEST_ICU_TEST_BASE_H
 
-#include <gtest/gtest.h>
-#include <unicode/uclean.h>
-#include <unicode/udata.h>
-
 // low level file access for mapping ICU data
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+
+#include <gtest/gtest.h>
+#include <unicode/uclean.h>
+#include <unicode/udata.h>
 
 namespace minikin {
 

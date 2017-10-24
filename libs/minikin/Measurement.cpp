@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Minikin"
+#include "minikin/Measurement.h"
 
+#include <cfloat>
 #include <cmath>
-#include <unicode/uchar.h>
 
-#include <android/log.h>
-
-#include <minikin/GraphemeBreak.h>
-#include <minikin/Measurement.h>
+#include "minikin/GraphemeBreak.h"
 
 namespace minikin {
 
