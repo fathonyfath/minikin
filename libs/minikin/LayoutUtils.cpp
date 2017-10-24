@@ -18,13 +18,12 @@
 
 namespace minikin {
 
-constexpr uint16_t CHAR_NBSP = 0x00A0;
-
 /*
  * Determine whether the code unit is a word space for the purposes of justification.
+ * TODO: Support NBSP and other stretchable whitespace (b/34013491 and b/68204709).
  */
 bool isWordSpace(uint16_t code_unit) {
-    return code_unit == ' ' || code_unit == CHAR_NBSP;
+    return code_unit == ' ';
 }
 
 /**
