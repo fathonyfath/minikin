@@ -46,16 +46,18 @@ struct LayoutOverhang {
 // Internal state used during layout operation
 struct LayoutContext;
 
-enum {
-    kBidi_LTR = 0,
-    kBidi_RTL = 1,
-    kBidi_Default_LTR = 2,
-    kBidi_Default_RTL = 3,
-    kBidi_Force_LTR = 4,
-    kBidi_Force_RTL = 5,
-
-    kBidi_Mask = 0x7
+// Must be the same value with Paint.java
+enum class Bidi : uint8_t {
+    LTR         = 0b0000,  // Must be same with Paint.BIDI_LTR
+    RTL         = 0b0001,  // Must be same with Paint.BIDI_RTL
+    DEFAULT_LTR = 0b0010,  // Must be same with Paint.BIDI_DEFAULT_LTR
+    DEFAULT_RTL = 0b0011,  // Must be same with Paint.BIDI_DEFAULT_RTL
+    FORCE_LTR   = 0b0100,  // Must be same with Paint.BIDI_FORCE_LTR
+    FORCE_RTL   = 0b0101,  // Must be same with Paint.BIDI_FORCE_RTL
 };
+
+inline bool isRtl(Bidi bidi) {  return static_cast<uint8_t>(bidi) & 0b0001; }
+inline bool isOverride(Bidi bidi) { return static_cast<uint8_t>(bidi) & 0b0100; }
 
 // Lifecycle and threading assumptions for Layout:
 // The object is assumed to be owned by a single thread; multiple threads
@@ -77,11 +79,11 @@ public:
     void dump() const;
 
     void doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection);
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs);
 

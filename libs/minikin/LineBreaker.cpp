@@ -209,7 +209,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 // lastBreak is the index of the previous break point and lastBreakWidth is the width seen until
 //     that point.
 // bidiFlags keep the bidi flags to determine the direction of text for layout and other
-//     calculations. It may only be kBidi_Force_RTL or kBidi_Force_LTR.
+//     calculations. It may only be Bidi::FORCE_RTL or Bidi::FORCE_LTR.
 //
 // The following parameters are needed to be passed to addWordBreak:
 // postBreak is the width that would be seen if we decide to break at the end of the word (so it
@@ -220,8 +220,8 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
         size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
-        size_t postSpaceCount, float hyphenPenalty, int bidiFlags) {
-    const bool isRtl = (bidiFlags == kBidi_Force_RTL);
+        size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags) {
+    const bool isRtlWord = isRtl(bidiFlags);
     const size_t wordStart = mWordBreaker->wordStart();
     const size_t wordEnd = mWordBreaker->wordEnd();
     if (wordStart < runStart || wordEnd <= wordStart) {
@@ -250,11 +250,11 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
                 mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
         const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
-        LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtl);
+        LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtlWord);
         // TODO: This ignores potential overhang from a previous word, e.g. in "R table" if the
         // right overhang of the R is larger than the advance of " ta-". In such cases, we need to
         // take the existing overhang into account.
-        const float firstOverhang = isRtl ? overhang.left : overhang.right;
+        const float firstOverhang = isRtlWord ? overhang.left : overhang.right;
 
         paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
         const size_t secondPartLen = afterWord - j;
@@ -267,11 +267,11 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         // is being calculated, the width of the whole word would be subtracted and the width of the
         // second part would be added.
         const ParaWidth hyphPreBreak = postBreak - secondPartWidth;
-        overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtl);
-        const float secondOverhang = isRtl ? overhang.right : overhang.left;
+        overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtlWord);
+        const float secondOverhang = isRtlWord ? overhang.right : overhang.left;
 
         addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang,
-                postSpaceCount, postSpaceCount, hyphenPenalty, hyph, isRtl);
+                postSpaceCount, postSpaceCount, hyphenPenalty, hyph, isRtlWord);
 
         paint->hyphenEdit = HyphenEdit::NO_EDIT;
     }
@@ -285,7 +285,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 // to addWordBreak.
 void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
         FontStyle style, size_t start, size_t end, bool isRtl) {
-    const int bidiFlags = isRtl ? kBidi_Force_RTL : kBidi_Force_LTR;
+    const Bidi bidiFlags = isRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {

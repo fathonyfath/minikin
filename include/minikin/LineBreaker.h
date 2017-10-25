@@ -216,7 +216,7 @@ class LineBreaker {
         void addHyphenationCandidates(MinikinPaint* paint,
                 const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
                 size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
-                size_t postSpaceCount, float hyphenPenalty, int bidiFlags);
+                size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 float firstOverhang, float secondOverhang,
