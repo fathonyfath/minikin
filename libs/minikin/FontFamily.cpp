@@ -33,31 +33,6 @@
 
 namespace minikin {
 
-FontStyle::FontStyle(int variant, int weight, bool italic)
-        : FontStyle(LocaleListCache::kEmptyListId, variant, weight, italic) {
-}
-
-FontStyle::FontStyle(uint32_t localeListId, int variant, int weight, bool italic)
-        : bits(pack(variant, weight, italic)), mLocaleListId(localeListId) {
-}
-
-android::hash_t FontStyle::hash() const {
-    uint32_t hash = android::JenkinsHashMix(0, bits);
-    hash = android::JenkinsHashMix(hash, mLocaleListId);
-    return android::JenkinsHashWhiten(hash);
-}
-
-// static
-uint32_t FontStyle::registerLocaleList(const std::string& locales) {
-    android::AutoMutex _l(gMinikinLock);
-    return LocaleListCache::getId(locales);
-}
-
-// static
-uint32_t FontStyle::pack(int variant, int weight, bool italic) {
-    return (weight & kWeightMask) | (italic ? kItalicMask : 0) | (variant << kVariantShift);
-}
-
 Font::Font(const std::shared_ptr<MinikinFont>& typeface, FontStyle style)
     : typeface(typeface), style(style) {
 }
@@ -90,14 +65,15 @@ Font::Font(const Font& o) {
 }
 
 // static
-FontFamily::FontFamily(std::vector<Font>&& fonts) : FontFamily(0 /* variant */, std::move(fonts)) {
+FontFamily::FontFamily(std::vector<Font>&& fonts)
+      : FontFamily(FontVariant::DEFAULT, std::move(fonts)) {
 }
 
-FontFamily::FontFamily(int variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(FontVariant variant, std::vector<Font>&& fonts)
     : FontFamily(LocaleListCache::kEmptyListId, variant, std::move(fonts)) {
 }
 
-FontFamily::FontFamily(uint32_t localeListId, int variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(uint32_t localeListId, FontVariant variant, std::vector<Font>&& fonts)
     : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
     computeCoverage();
 }
@@ -114,8 +90,8 @@ bool FontFamily::analyzeStyle(const std::shared_ptr<MinikinFont>& typeface, int*
 // Compute a matching metric between two styles - 0 is an exact match
 static int computeMatch(FontStyle style1, FontStyle style2) {
     if (style1 == style2) return 0;
-    int score = abs(style1.getWeight() - style2.getWeight());
-    if (style1.getItalic() != style2.getItalic()) {
+    int score = abs(style1.weight / 100 - style2.weight / 100);
+    if (style1.slant != style2.slant) {
         score += 2;
     }
     return score;
@@ -125,9 +101,8 @@ static FontFakery computeFakery(FontStyle wanted, FontStyle actual) {
     // If desired weight is semibold or darker, and 2 or more grades
     // higher than actual (for example, medium 500 -> bold 700), then
     // select fake bold.
-    int wantedWeight = wanted.getWeight();
-    bool isFakeBold = wantedWeight >= 6 && (wantedWeight - actual.getWeight()) >= 2;
-    bool isFakeItalic = wanted.getItalic() && !actual.getItalic();
+    bool isFakeBold = wanted.weight >= 600 && (wanted.weight - actual.weight) >= 200;
+    bool isFakeItalic = wanted.slant == FontSlant::ITALIC && actual.slant == FontSlant::UPRIGHT;
     return FontFakery(isFakeBold, isFakeItalic);
 }
 

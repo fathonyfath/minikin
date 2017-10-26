@@ -37,7 +37,7 @@ bool analyzeStyle(const uint8_t* os2_data, size_t os2_size, int* weight, bool* i
         return false;
     }
     uint16_t weightClass = readU16(os2_data, kUsWeightClassOffset);
-    *weight = weightClass / 100;
+    *weight = weightClass;
     uint16_t fsSelection = readU16(os2_data, kFsSelectionOffset);
     *italic = (fsSelection & kItalicFlag) != 0;
     return true;

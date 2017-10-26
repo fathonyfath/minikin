@@ -33,7 +33,7 @@ class MinikinFont;
 // Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
 struct MinikinPaint {
     MinikinPaint() : size(0), scaleX(0), skewX(0), letterSpacing(0), wordSpacing(0),
-            paintFlags(0), hyphenEdit(), fontFeatureSettings() { }
+            paintFlags(0), localeListId(0), hyphenEdit(), fontFeatureSettings() { }
 
     bool skipCache() const {
         return !fontFeatureSettings.empty();
@@ -45,8 +45,22 @@ struct MinikinPaint {
     float letterSpacing;
     float wordSpacing;
     uint32_t paintFlags;
+    uint32_t localeListId;
+    FontStyle fontStyle;
     HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
+
+    void copyFrom(const MinikinPaint& paint) {
+        *this = paint;
+    }
+
+    MinikinPaint(MinikinPaint&&) = default;
+    MinikinPaint& operator=(MinikinPaint&&) = default;
+
+private:
+    // Forbid implicit copy and assign. Use copyFrom instead.
+    MinikinPaint(const MinikinPaint&) = default;
+    MinikinPaint& operator=(const MinikinPaint&) = default;
 };
 
 // Only a few flags affect layout, but those that do should have values

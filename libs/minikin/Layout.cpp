@@ -72,7 +72,6 @@ static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
 
 struct LayoutContext {
     MinikinPaint paint;
-    FontStyle style;
     std::vector<hb_font_t*> hbFonts;  // parallel to mFaces
 
     void clearHbFonts() {
@@ -89,14 +88,13 @@ struct LayoutContext {
 class LayoutCacheKey {
 public:
     LayoutCacheKey(const std::shared_ptr<FontCollection>& collection, const MinikinPaint& paint,
-            FontStyle style, const uint16_t* chars, size_t start, size_t count, size_t nchars,
-            bool dir)
+            const uint16_t* chars, size_t start, size_t count, size_t nchars, bool dir)
             : mChars(chars), mNchars(nchars),
-            mStart(start), mCount(count), mId(collection->getId()), mStyle(style),
+            mStart(start), mCount(count), mId(collection->getId()), mStyle(paint.fontStyle),
             mSize(paint.size), mScaleX(paint.scaleX), mSkewX(paint.skewX),
             mLetterSpacing(paint.letterSpacing),
-            mPaintFlags(paint.paintFlags), mHyphenEdit(paint.hyphenEdit), mIsRtl(dir),
-            mHash(computeHash()) {
+            mPaintFlags(paint.paintFlags), mLocaleListId(paint.localeListId),
+            mHyphenEdit(paint.hyphenEdit), mIsRtl(dir), mHash(computeHash()) {
     }
     bool operator==(const LayoutCacheKey &other) const;
 
@@ -135,6 +133,7 @@ private:
     float mSkewX;
     float mLetterSpacing;
     int32_t mPaintFlags;
+    uint32_t mLocaleListId;
     HyphenEdit mHyphenEdit;
     bool mIsRtl;
     // Note: any fields added to MinikinPaint must also be reflected here.
@@ -226,6 +225,7 @@ bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
             && mSkewX == other.mSkewX
             && mLetterSpacing == other.mLetterSpacing
             && mPaintFlags == other.mPaintFlags
+            && mLocaleListId == other.mLocaleListId
             && mHyphenEdit == other.mHyphenEdit
             && mIsRtl == other.mIsRtl
             && mNchars == other.mNchars
@@ -242,6 +242,7 @@ android::hash_t LayoutCacheKey::computeHash() const {
     hash = android::JenkinsHashMix(hash, android::hash_type(mSkewX));
     hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
     hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mLocaleListId));
     hash = android::JenkinsHashMix(hash, android::hash_type(mHyphenEdit.getHyphen()));
     hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
     hash = android::JenkinsHashMixShorts(hash, mChars, mNchars);
@@ -583,13 +584,12 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
 }
 
 void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx;
-    ctx.style = style;
-    ctx.paint = paint;
+    ctx.paint.copyFrom(paint);
 
     reset();
     mAdvances.resize(count, 0);
@@ -604,14 +604,13 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
 }
 
 float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx;
-    ctx.style = style;
-    ctx.paint = paint;
+    ctx.paint.copyFrom(paint);
 
     float advance = 0;
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
@@ -693,7 +692,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
         const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
     LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
-    LayoutCacheKey key(collection, ctx->paint, ctx->style, buf, start, count, bufSize, isRtl);
+    LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl);
 
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
 
@@ -896,7 +895,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
         bool isRtl, LayoutContext* ctx, const std::shared_ptr<FontCollection>& collection) {
     hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
     std::vector<FontCollection::Run> items;
-    collection->itemize(buf + start, count, ctx->style, &items);
+    collection->itemize(buf + start, count, ctx->paint.fontStyle, ctx->paint.localeListId, &items);
 
     std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing
@@ -976,7 +975,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             hb_buffer_clear_contents(buffer);
             hb_buffer_set_script(buffer, script);
             hb_buffer_set_direction(buffer, isRtl? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-            const LocaleList& localeList = LocaleListCache::getById(ctx->style.getLocaleListId());
+            const LocaleList& localeList = LocaleListCache::getById(ctx->paint.localeListId);
             if (localeList.size() != 0) {
                 hb_language_t hbLanguage = localeList.getHbLanguage(0);
                 for (size_t i = 0; i < localeList.size(); ++i) {

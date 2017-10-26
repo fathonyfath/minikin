@@ -218,7 +218,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 //     word (and like postBreak it doesn't count any line-ending space after the word).
 // hyphenPenalty is the amount of penalty for hyphenation.
 void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
-        const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
+        const std::shared_ptr<FontCollection>& typeface, size_t runStart,
         size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
         size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags) {
     const bool isRtlWord = isRtl(bidiFlags);
@@ -247,7 +247,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         advances.resize(firstPartLen);
         overhangs.resize(firstPartLen);
         const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
-                mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
+                mTextBuf.size(), bidiFlags, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
         const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
         LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtlWord);
@@ -261,7 +261,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         advances.resize(secondPartLen);
         overhangs.resize(secondPartLen);
         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
-                mTextBuf.size(), bidiFlags, style, *paint, typeface, advances.data(),
+                mTextBuf.size(), bidiFlags, *paint, typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
         // hyphPreBreak is calculated like this so that when the line width for a future line break
         // is being calculated, the width of the whole word would be subtracted and the width of the
@@ -283,14 +283,15 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addWordBreak.
-void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-        FontStyle style, size_t start, size_t end, bool isRtl) {
+void LineBreaker::addStyleRunInternal(MinikinPaint* paint,
+        const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end, bool isRtl,
+        uint32_t localeListId) {
     const Bidi bidiFlags = isRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {
         Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
-                style, *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
+                *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
                 mCharOverhangs.data() + start);
 
         // a heuristic that seems to perform well
@@ -309,7 +310,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
         }
     }
 
-    setLocaleList(style.getLocaleListId(), start);
+    setLocaleList(localeListId, start);
     size_t current = (size_t) mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
@@ -378,7 +379,7 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
                 adjustSecondOverhang(maxBackwardOverhang);
             }
             if (hyphenate) {
-                addHyphenationCandidates(paint, typeface, style, start, afterWord, lastBreak,
+                addHyphenationCandidates(paint, typeface, start, afterWord, lastBreak,
                         lastBreakWidth, postBreak, postSpaceCount, hyphenPenalty,
                         bidiFlags);
             }
@@ -551,7 +552,7 @@ void LineBreaker::addReplacement(size_t start, size_t end, float width, uint32_t
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRun(nullptr, nullptr, FontStyle(localeListId), start, end, false);
+    addStyleRunInternal(nullptr, nullptr, start, end, false, localeListId);
 }
 
 // Get the width of a space. May return 0 if there are no spaces.

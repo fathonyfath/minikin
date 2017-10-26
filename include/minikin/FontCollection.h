@@ -38,7 +38,7 @@ public:
     };
 
     void itemize(const uint16_t *string, size_t string_length, FontStyle style,
-            std::vector<Run>* result) const;
+            uint32_t localeListId, std::vector<Run>* result) const;
 
     // Returns true if there is a glyph for the code point and variation selector pair.
     // Returns false if no fonts have a glyph for the code point and variation
@@ -77,9 +77,9 @@ private:
     void init(const std::vector<std::shared_ptr<FontFamily>>& typefaces);
 
     const std::shared_ptr<FontFamily>& getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t localeListId, int variant) const;
+            uint32_t localeListId, FontVariant variant) const;
 
-    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, int variant, uint32_t localeListId,
+    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, FontVariant variant, uint32_t localeListId,
             const std::shared_ptr<FontFamily>& fontFamily) const;
 
     uint32_t calcCoverageScore(uint32_t ch, uint32_t vs,
@@ -88,7 +88,7 @@ private:
     static uint32_t calcLocaleMatchingScore(uint32_t userLocaleListId,
             const FontFamily& fontFamily);
 
-    static uint32_t calcVariantMatchingScore(int variant, const FontFamily& fontFamily);
+    static uint32_t calcVariantMatchingScore(FontVariant variant, const FontFamily& fontFamily);
 
     // static for allocating unique id's
     static uint32_t sNextId;

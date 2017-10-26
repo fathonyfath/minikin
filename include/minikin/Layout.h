@@ -79,13 +79,12 @@ public:
     void dump() const;
 
     void doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection);
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
-        const std::shared_ptr<FontCollection>& collection, float* advances,
-        MinikinExtent* extents, LayoutOverhang* overhangs);
+        Bidi bidiFlags, const MinikinPaint &paint, const std::shared_ptr<FontCollection>& collection,
+        float* advances, MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // public accessors
     size_t nGlyphs() const;

@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "minikin/LocaleList.h"
 #include "ICUTestBase.h"
 #include "LocaleListCache.h"
 #include "MinikinFontForTest.h"
@@ -479,25 +480,21 @@ TEST_F(LocaleListTest, subtagEmptyTest) {
 }
 
 TEST_F(LocaleListTest, registerLocaleListTest) {
-    EXPECT_EQ(0UL, FontStyle::registerLocaleList(""));
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("en"));
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("jp"));
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("en,zh-Hans"));
+    EXPECT_EQ(0UL, registerLocaleList(""));
+    EXPECT_NE(0UL, registerLocaleList("en"));
+    EXPECT_NE(0UL, registerLocaleList("jp"));
+    EXPECT_NE(0UL, registerLocaleList("en,zh-Hans"));
 
-    EXPECT_EQ(FontStyle::registerLocaleList("en"), FontStyle::registerLocaleList("en"));
-    EXPECT_NE(FontStyle::registerLocaleList("en"), FontStyle::registerLocaleList("jp"));
-    EXPECT_NE(FontStyle::registerLocaleList("de"), FontStyle::registerLocaleList("de-1901"));
+    EXPECT_EQ(registerLocaleList("en"), registerLocaleList("en"));
+    EXPECT_NE(registerLocaleList("en"), registerLocaleList("jp"));
+    EXPECT_NE(registerLocaleList("de"), registerLocaleList("de-1901"));
 
-    EXPECT_EQ(FontStyle::registerLocaleList("en,zh-Hans"),
-              FontStyle::registerLocaleList("en,zh-Hans"));
-    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"),
-              FontStyle::registerLocaleList("zh-Hans,en"));
-    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"), FontStyle::registerLocaleList("jp"));
-    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"), FontStyle::registerLocaleList("en"));
-    EXPECT_NE(FontStyle::registerLocaleList("en,zh-Hans"),
-              FontStyle::registerLocaleList("en,zh-Hant"));
-    EXPECT_NE(FontStyle::registerLocaleList("de,de-1901"),
-              FontStyle::registerLocaleList("de-1901,de"));
+    EXPECT_EQ(registerLocaleList("en,zh-Hans"), registerLocaleList("en,zh-Hans"));
+    EXPECT_NE(registerLocaleList("en,zh-Hans"), registerLocaleList("zh-Hans,en"));
+    EXPECT_NE(registerLocaleList("en,zh-Hans"), registerLocaleList("jp"));
+    EXPECT_NE(registerLocaleList("en,zh-Hans"), registerLocaleList("en"));
+    EXPECT_NE(registerLocaleList("en,zh-Hans"), registerLocaleList("en,zh-Hant"));
+    EXPECT_NE(registerLocaleList("de,de-1901"), registerLocaleList("de-1901,de"));
 }
 
 // The test font has following glyphs.
@@ -691,6 +688,132 @@ TEST_F(FontFamilyTest, coverageTableSelectionTest) {
     EXPECT_TRUE(unicodeEnc4Font->hasGlyph(0x0061, 0));
 
     EXPECT_TRUE(unicodeEnc4Font->hasGlyph(0x1F926, 0));
+}
+
+const char* slantToString(FontSlant slant) {
+    if (slant == FontSlant::ITALIC) {
+        return "ITALIC";
+    } else {
+        return "UPRIGHT";
+    }
+}
+
+const char* variantToString(FontVariant variant) {
+    switch (variant) {
+        case FontVariant::DEFAULT:
+            return "DEFAULT";
+        case FontVariant::COMPACT:
+            return "COMPACT";
+        case FontVariant::ELEGANT:
+            return "ELEGANT";
+        default:
+            MINIKIN_NOT_REACHED("Unknown variant");
+    }
+}
+
+std::string fontStyleToString(const FontStyle& style) {
+    char buf[64] = {};
+    snprintf(buf, sizeof(buf), "FontStyle(weight=%d, slant=%s, variant=%s)",
+             style.weight, slantToString(style.slant),
+             variantToString(style.variant));
+    return buf;
+}
+
+TEST_F(FontFamilyTest, closestMatch) {
+    constexpr char ROBOTO[] = "/system/fonts/Roboto-Regular.ttf";
+
+    constexpr FontWeight THIN = FontWeight::THIN;
+    constexpr FontWeight LIGHT = FontWeight::LIGHT;
+    constexpr FontWeight NORMAL = FontWeight::NORMAL;
+    constexpr FontWeight MEDIUM = FontWeight::MEDIUM;
+    constexpr FontWeight BOLD = FontWeight::BOLD;
+    constexpr FontWeight BLACK = FontWeight::BLACK;
+
+    constexpr FontSlant UPRIGHT = FontSlant::UPRIGHT;
+    constexpr FontSlant ITALIC = FontSlant::ITALIC;
+
+    const std::vector<FontStyle> STANDARD_SET = {
+          FontStyle(NORMAL, UPRIGHT),  // 0
+          FontStyle(BOLD, UPRIGHT),    // 1
+          FontStyle(NORMAL, ITALIC),   // 2
+          FontStyle(BOLD, ITALIC),     // 3
+    };
+
+    const std::vector<FontStyle> FULL_SET = {
+          FontStyle(THIN, UPRIGHT),    // 0
+          FontStyle(LIGHT, UPRIGHT),   // 1
+          FontStyle(NORMAL, UPRIGHT),  // 2
+          FontStyle(MEDIUM, UPRIGHT),  // 3
+          FontStyle(BOLD, UPRIGHT),    // 4
+          FontStyle(BLACK, UPRIGHT),   // 5
+          FontStyle(THIN, ITALIC),     // 6
+          FontStyle(LIGHT, ITALIC),    // 7
+          FontStyle(NORMAL, ITALIC),   // 8
+          FontStyle(MEDIUM, ITALIC),   // 9
+          FontStyle(BOLD, ITALIC),     // 10
+          FontStyle(BLACK, ITALIC),    // 11
+    };
+    struct TestCase {
+        FontStyle wantedStyle;
+        std::vector<FontStyle> familyStyles;
+        size_t expectedIndex;
+    } testCases[] = {
+        { FontStyle(), { FontStyle() } , 0 },
+
+        // Exact matches
+        { FontStyle(BOLD), { FontStyle(NORMAL), FontStyle(BOLD) }, 1 },
+        { FontStyle(BOLD), { FontStyle(LIGHT), FontStyle(BOLD) }, 1 },
+        { FontStyle(LIGHT), { FontStyle(NORMAL), FontStyle(LIGHT) }, 1 },
+        { FontStyle(LIGHT), { FontStyle(BOLD), FontStyle(LIGHT) }, 1 },
+        { FontStyle(NORMAL), { FontStyle(NORMAL), FontStyle(LIGHT) }, 0 },
+        { FontStyle(NORMAL), { FontStyle(NORMAL), FontStyle(BOLD) }, 0 },
+        { FontStyle(LIGHT), { FontStyle(LIGHT), FontStyle(NORMAL), FontStyle(BOLD) }, 0 },
+        { FontStyle(NORMAL), { FontStyle(LIGHT), FontStyle(NORMAL), FontStyle(BOLD) }, 1 },
+        { FontStyle(BOLD), { FontStyle(LIGHT), FontStyle(NORMAL), FontStyle(BOLD) }, 2 },
+
+        { FontStyle(UPRIGHT), { FontStyle(UPRIGHT), FontStyle(ITALIC) }, 0 },
+        { FontStyle(ITALIC), { FontStyle(UPRIGHT), FontStyle(ITALIC) }, 1 },
+
+        { FontStyle(NORMAL, UPRIGHT), STANDARD_SET, 0 },
+        { FontStyle(BOLD, UPRIGHT), STANDARD_SET, 1 },
+        { FontStyle(NORMAL, ITALIC), STANDARD_SET, 2 },
+        { FontStyle(BOLD, ITALIC), STANDARD_SET, 3 },
+
+        { FontStyle(NORMAL, UPRIGHT), FULL_SET, 2 },
+        { FontStyle(BOLD, UPRIGHT), FULL_SET, 4 },
+        { FontStyle(NORMAL, ITALIC), FULL_SET, 8 },
+        { FontStyle(BOLD, ITALIC), FULL_SET, 10 },
+
+        // TODO: Add fallback expectations. (b/68814338)
+    };
+
+    for (const TestCase& testCase : testCases) {
+        std::vector<std::shared_ptr<MinikinFont>> dummyFonts;
+        std::vector<Font> fonts;
+        for (auto familyStyle : testCase.familyStyles) {
+            std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(ROBOTO));
+            dummyFonts.push_back(dummyFont);
+            fonts.push_back(Font(dummyFont, familyStyle));
+        }
+
+        FontFamily family(std::move(fonts));
+        FakedFont closest = family.getClosestMatch(testCase.wantedStyle);
+
+        size_t idx = dummyFonts.size();
+        for (size_t i = 0; i < dummyFonts.size(); i++) {
+            if (dummyFonts[i].get() == closest.font) {
+                idx = i;
+                break;
+            }
+        }
+        ASSERT_NE(idx, dummyFonts.size()) << "The selected font is unknown.";
+        EXPECT_EQ(testCase.expectedIndex, idx)
+            << "Input Style: " << fontStyleToString(testCase.wantedStyle) << std::endl
+            << "Actual Families' Style: "
+            << fontStyleToString(testCase.familyStyles[idx]) << std::endl
+            << "Expected Families' Style: "
+            << fontStyleToString(testCase.familyStyles[testCase.expectedIndex]) << std::endl;
+    }
 }
 
 }  // namespace minikin

@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "minikin/LocaleList.h"
 #include "ICUTestBase.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -27,9 +28,9 @@ namespace minikin {
 typedef ICUTestBase LocaleListCacheTest;
 
 TEST_F(LocaleListCacheTest, getId) {
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("en"));
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("jp"));
-    EXPECT_NE(0UL, FontStyle::registerLocaleList("en,zh-Hans"));
+    EXPECT_NE(0UL, registerLocaleList("en"));
+    EXPECT_NE(0UL, registerLocaleList("jp"));
+    EXPECT_NE(0UL, registerLocaleList("en,zh-Hans"));
 
     android::AutoMutex _l(gMinikinLock);
     EXPECT_EQ(0UL, LocaleListCache::getId(""));
