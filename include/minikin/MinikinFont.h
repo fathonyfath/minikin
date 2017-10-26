@@ -32,21 +32,19 @@ class MinikinFont;
 // Possibly move into own .h file?
 // Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
 struct MinikinPaint {
-    MinikinPaint() : font(nullptr), size(0), scaleX(0), skewX(0), letterSpacing(0), wordSpacing(0),
-            paintFlags(0), fakery(), hyphenEdit(), fontFeatureSettings() { }
+    MinikinPaint() : size(0), scaleX(0), skewX(0), letterSpacing(0), wordSpacing(0),
+            paintFlags(0), hyphenEdit(), fontFeatureSettings() { }
 
     bool skipCache() const {
         return !fontFeatureSettings.empty();
     }
 
-    MinikinFont *font;
     float size;
     float scaleX;
     float skewX;
     float letterSpacing;
     float wordSpacing;
     uint32_t paintFlags;
-    FontFakery fakery;
     HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
 };
@@ -110,12 +108,17 @@ public:
     virtual ~MinikinFont();
 
     virtual float GetHorizontalAdvance(uint32_t glyph_id,
-        const MinikinPaint &paint) const = 0;
+                                       const MinikinPaint& paint,
+                                       const FontFakery& fakery) const = 0;
 
-    virtual void GetBounds(MinikinRect* bounds, uint32_t glyph_id,
-        const MinikinPaint &paint) const = 0;
+    virtual void GetBounds(MinikinRect* bounds,
+                           uint32_t glyph_id,
+                           const MinikinPaint &paint,
+                           const FontFakery& fakery) const = 0;
 
-    virtual void GetFontExtent(MinikinExtent* extent, const MinikinPaint &paint) const = 0;
+    virtual void GetFontExtent(MinikinExtent* extent,
+                               const MinikinPaint& paint,
+                               const FontFakery& fakery) const = 0;
 
     // Override if font can provide access to raw data
     virtual const void* GetFontData() const {
