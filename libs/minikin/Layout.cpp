@@ -40,7 +40,25 @@
 
 namespace minikin {
 
-const int kDirection_Mask = 0x1;
+static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
+    switch (bidi) {
+        case Bidi::LTR:
+            return 0x00;
+        case Bidi::RTL:
+            return 0x01;
+        case Bidi::DEFAULT_LTR:
+            return UBIDI_DEFAULT_LTR;
+        case Bidi::DEFAULT_RTL:
+            return UBIDI_DEFAULT_RTL;
+        case Bidi::FORCE_LTR:
+        case Bidi::FORCE_RTL:
+            MINIKIN_NOT_REACHED("FORCE_LTR/FORCE_RTL can not be converted to UBiDiLevel.");
+            return 0x00;
+        default:
+            MINIKIN_NOT_REACHED("Unknown Bidi value.");
+            return 0x00;
+    }
+}
 
 struct LayoutContext {
     MinikinPaint paint;
@@ -437,7 +455,7 @@ public:
         void updateRunInfo();
     };
 
-    BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, int bidiFlags);
+    BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags);
 
     ~BidiText() {
         if (mBidi) {
@@ -506,10 +524,10 @@ void BidiText::Iter::updateRunInfo() {
     mRunInfo.mIsRtl = (runDir == UBIDI_RTL);
 }
 
-BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, int bidiFlags)
+BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags)
     : mStart(start), mEnd(start + count), mBufSize(bufSize), mBidi(NULL), mRunCount(1),
-      mIsRtl((bidiFlags & kDirection_Mask) != 0) {
-    if (bidiFlags == kBidi_Force_LTR || bidiFlags == kBidi_Force_RTL) {
+      mIsRtl(isRtl(bidiFlags)) {
+    if (isOverride(bidiFlags)) {
         // force single run.
         return;
     }
@@ -526,24 +544,21 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
         return;
     }
 
-    UBiDiLevel bidiReq = bidiFlags;
-    if (bidiFlags == kBidi_Default_LTR) {
-        bidiReq = UBIDI_DEFAULT_LTR;
-    } else if (bidiFlags == kBidi_Default_RTL) {
-        bidiReq = UBIDI_DEFAULT_RTL;
-    }
+    const UBiDiLevel bidiReq = bidiToUBidiLevel(bidiFlags);
+
     ubidi_setPara(mBidi, reinterpret_cast<const UChar*>(buf), mBufSize, bidiReq, NULL, &status);
     if (!U_SUCCESS(status)) {
         ALOGE("error calling ubidi_setPara, status = %d", status);
         return;
     }
-    const int paraDir = ubidi_getParaLevel(mBidi) & kDirection_Mask;
+    // RTL paragraphs get an odd level, while LTR paragraphs get an even level,
+    const bool paraIsRTL = ubidi_getParaLevel(mBidi) & 0x01;
     const ssize_t rc = ubidi_countRuns(mBidi, &status);
     if (!U_SUCCESS(status) || rc < 0) {
         ALOGW("error counting bidi runs, status = %d", status);
     }
     if (!U_SUCCESS(status) || rc <= 0) {
-        mIsRtl = (paraDir == kBidi_RTL);
+        mIsRtl = paraIsRTL;
         return;
     }
     if (rc == 1) {
@@ -555,7 +570,7 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
 }
 
 void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection) {
     android::AutoMutex _l(gMinikinLock);
 
@@ -576,7 +591,7 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
 }
 
 float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        int bidiFlags, const FontStyle &style, const MinikinPaint &paint,
+        Bidi bidiFlags, const FontStyle &style, const MinikinPaint &paint,
         const std::shared_ptr<FontCollection>& collection, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
     android::AutoMutex _l(gMinikinLock);

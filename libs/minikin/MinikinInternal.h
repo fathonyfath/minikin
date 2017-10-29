@@ -44,6 +44,8 @@ hb_blob_t* getFontTable(const MinikinFont* minikinFont, uint32_t tag);
 #define MINIKIN_ASSERT(cond, ...) ((void)0)
 #endif
 
+#define MINIKIN_NOT_REACHED(...) MINIKIN_ASSERT(false, __VA_ARGS__);
+
 constexpr uint32_t MAX_UNICODE_CODE_POINT = 0x10FFFF;
 
 constexpr uint32_t VS1 = 0xFE00;
