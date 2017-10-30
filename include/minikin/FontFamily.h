@@ -37,7 +37,7 @@ class FontStyle {
 public:
     FontStyle() : FontStyle(0 /* variant */, 4 /* weight */, false /* italic */) {}
     FontStyle(int weight, bool italic) : FontStyle(0 /* variant */, weight, italic) {}
-    FontStyle(uint32_t localeListId)  // NOLINT(implicit)
+    explicit FontStyle(uint32_t localeListId)
             : FontStyle(localeListId, 0 /* variant */, 4 /* weight */, false /* italic */) {}
 
     FontStyle(int variant, int weight, bool italic);
@@ -74,10 +74,6 @@ enum FontVariant {
     VARIANT_COMPACT = 1,
     VARIANT_ELEGANT = 2,
 };
-
-inline android::hash_t hash_type(const FontStyle &style) {
-    return style.hash();
-}
 
 // attributes representing transforms (fake bold, fake italic) to match styles
 class FontFakery {
