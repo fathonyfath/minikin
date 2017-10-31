@@ -226,14 +226,14 @@ android::hash_t LayoutCacheKey::computeHash() const {
     uint32_t hash = android::JenkinsHashMix(0, mId);
     hash = android::JenkinsHashMix(hash, mStart);
     hash = android::JenkinsHashMix(hash, mCount);
-    hash = android::JenkinsHashMix(hash, hash_type(mStyle));
-    hash = android::JenkinsHashMix(hash, hash_type(mSize));
-    hash = android::JenkinsHashMix(hash, hash_type(mScaleX));
-    hash = android::JenkinsHashMix(hash, hash_type(mSkewX));
-    hash = android::JenkinsHashMix(hash, hash_type(mLetterSpacing));
-    hash = android::JenkinsHashMix(hash, hash_type(mPaintFlags));
-    hash = android::JenkinsHashMix(hash, hash_type(mHyphenEdit.getHyphen()));
-    hash = android::JenkinsHashMix(hash, hash_type(mIsRtl));
+    hash = android::JenkinsHashMix(hash, mStyle.hash());
+    hash = android::JenkinsHashMix(hash, android::hash_type(mSize));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mScaleX));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mSkewX));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mHyphenEdit.getHyphen()));
+    hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
     hash = android::JenkinsHashMixShorts(hash, mChars, mNchars);
     return android::JenkinsHashWhiten(hash);
 }
