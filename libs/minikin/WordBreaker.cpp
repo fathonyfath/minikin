@@ -299,8 +299,8 @@ ssize_t WordBreaker::wordEnd() const {
         ssize_t ix = result;
         U16_PREV(mText, mLast, ix, c);
         const int32_t gc_mask = U_GET_GC_MASK(c);
-        // strip trailing space and punctuation
-        if ((gc_mask & (U_GC_ZS_MASK | U_GC_P_MASK)) == 0) {
+        // strip trailing spaces, punctuation and control characters
+        if ((gc_mask & (U_GC_ZS_MASK | U_GC_P_MASK | U_GC_CC_MASK)) == 0) {
             break;
         }
         result = ix;

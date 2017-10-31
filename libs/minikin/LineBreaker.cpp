@@ -337,6 +337,8 @@ void LineBreaker::addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCol
             if (mFirstTabIndex == INT_MAX) {
                 mFirstTabIndex = static_cast<int>(i);
             }
+            // No need to update afterWord since tab characters can not be an end of word character
+            // in WordBreaker. See the implementation of WordBreaker::wordEnd.
         } else {
             if (isWordSpace(c)) {
                 mSpaceCount += 1;

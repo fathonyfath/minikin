@@ -16,6 +16,8 @@
 
 #include "WordBreaker.h"
 
+#include <cstdio>
+
 #include <gtest/gtest.h>
 #include <unicode/locid.h>
 #include <unicode/uclean.h>
@@ -515,6 +517,42 @@ TEST_F(WordBreakerTest, setLocaleInsideUrl) {
     EXPECT_EQ(29, breaker.next());  // after "World"
     EXPECT_EQ(24, breaker.wordStart());
     EXPECT_EQ(29, breaker.wordEnd());
+}
+
+// b/68669534
+TEST_F(WordBreakerTest, spaceAfterSpace) {
+    const std::vector<uint16_t> SPACES = {
+        '\t',  // TAB
+        0x1680,  // OGHAM SPACE MARK
+        0x3000,  // IDEOGRAPHIC SPACE
+    };
+
+    constexpr uint16_t CHAR_SPACE = 0x0020;
+
+    for (uint16_t sp : SPACES) {
+        char msg[64] = {};
+        snprintf(msg, sizeof(msg), "Test Space: U+%04X", sp);
+        SCOPED_TRACE(msg);
+
+        std::vector<uint16_t> buf = {'a', CHAR_SPACE, sp, 'b'};
+        WordBreaker breaker;
+        breaker.setText(buf.data(), buf.size());
+
+        EXPECT_EQ(0, breaker.current());
+        EXPECT_EQ(2, breaker.followingWithLocale(Locale("en-US"), 0));  // after "a "
+        EXPECT_EQ(0, breaker.wordStart());
+        EXPECT_EQ(1, breaker.wordEnd());
+
+        EXPECT_EQ(2, breaker.current());
+        EXPECT_EQ(3, breaker.next());  // after CHAR_SPACE character.
+        EXPECT_EQ(2, breaker.wordStart());
+        EXPECT_EQ(2, breaker.wordEnd());
+
+        EXPECT_EQ(3, breaker.current());
+        EXPECT_EQ(4, breaker.next());  // after sp character.
+        EXPECT_EQ(3, breaker.wordStart());
+        EXPECT_EQ(4, breaker.wordEnd());
+    }
 }
 
 class TestableICULineBreakerPoolImpl : public ICULineBreakerPoolImpl {

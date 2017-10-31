@@ -458,6 +458,26 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
     }
 }
 
+// b/68669534
+TEST_F(LineBreakerTest, CrashFix_Space_Tab) {
+    const uint32_t enUSLocaleListId = getLocaleListId("en-US");
+    const Locale& enUSLocale = getLocaleList(enUSLocaleListId)[0];
+
+    const std::string text = "a \tb";
+    LocaleIteratorMap map;
+    map[enUSLocale] = "a |\t|b";
+
+    MockICULineBreakerPoolImpl impl(std::move(map));
+    TestableLineBreaker b(&impl);
+    setupLineBreaker(&b, text);
+    b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+
+    MinikinPaint paint;
+    b.addStyleRun(&paint, mCollection, FontStyle(enUSLocaleListId), 0, text.size(), false);
+
+    b.computeBreaks();  // Make sure no crash happens.
+}
+
 class LocaleTraceICULineBreakerPoolImpl : public ICULineBreakerPool {
 public:
     LocaleTraceICULineBreakerPoolImpl() : mAcquireCallCount(0) {}
