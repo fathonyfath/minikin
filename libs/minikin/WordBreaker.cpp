@@ -29,9 +29,6 @@
 
 namespace minikin {
 
-constexpr uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
-constexpr uint32_t CHAR_ZWJ = 0x200D;
-
 namespace {
 static icu::BreakIterator* createNewIterator(const Locale& locale) {
     // TODO: handle failure status

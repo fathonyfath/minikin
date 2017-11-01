@@ -71,7 +71,10 @@ static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
 }
 
 struct LayoutContext {
-    MinikinPaint paint;
+    LayoutContext(const MinikinPaint& paint) : paint(paint) {}
+
+    const MinikinPaint& paint;
+
     std::vector<hb_font_t*> hbFonts;  // parallel to mFaces
 
     void clearHbFonts() {
@@ -88,13 +91,14 @@ struct LayoutContext {
 class LayoutCacheKey {
 public:
     LayoutCacheKey(const std::shared_ptr<FontCollection>& collection, const MinikinPaint& paint,
-            const uint16_t* chars, size_t start, size_t count, size_t nchars, bool dir)
+            const uint16_t* chars, size_t start, size_t count, size_t nchars, bool dir,
+            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
             : mChars(chars), mNchars(nchars),
             mStart(start), mCount(count), mId(collection->getId()), mStyle(paint.fontStyle),
             mSize(paint.size), mScaleX(paint.scaleX), mSkewX(paint.skewX),
             mLetterSpacing(paint.letterSpacing),
             mPaintFlags(paint.paintFlags), mLocaleListId(paint.localeListId),
-            mHyphenEdit(paint.hyphenEdit), mIsRtl(dir), mHash(computeHash()) {
+            mStartHyphen(startHyphen), mEndHyphen(endHyphen), mIsRtl(dir), mHash(computeHash()) {
     }
     bool operator==(const LayoutCacheKey &other) const;
 
@@ -118,7 +122,8 @@ public:
         layout->mExtents.resize(mCount);
         layout->mClusterBounds.resize(mCount);
         ctx->clearHbFonts();
-        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, collection);
+        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen,
+                collection);
     }
 
 private:
@@ -134,7 +139,8 @@ private:
     float mLetterSpacing;
     int32_t mPaintFlags;
     uint32_t mLocaleListId;
-    HyphenEdit mHyphenEdit;
+    StartHyphenEdit mStartHyphen;
+    EndHyphenEdit mEndHyphen;
     bool mIsRtl;
     // Note: any fields added to MinikinPaint must also be reflected here.
     // TODO: language matching (possibly integrate into style)
@@ -226,7 +232,8 @@ bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
             && mLetterSpacing == other.mLetterSpacing
             && mPaintFlags == other.mPaintFlags
             && mLocaleListId == other.mLocaleListId
-            && mHyphenEdit == other.mHyphenEdit
+            && mStartHyphen == other.mStartHyphen
+            && mEndHyphen == other.mEndHyphen
             && mIsRtl == other.mIsRtl
             && mNchars == other.mNchars
             && !memcmp(mChars, other.mChars, mNchars * sizeof(uint16_t));
@@ -243,7 +250,8 @@ android::hash_t LayoutCacheKey::computeHash() const {
     hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
     hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
     hash = android::JenkinsHashMix(hash, android::hash_type(mLocaleListId));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mHyphenEdit.getHyphen()));
+    hash = android::JenkinsHashMix(hash, android::hash_type(
+            static_cast<uint8_t>(packHyphenEdit(mStartHyphen, mEndHyphen))));
     hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
     hash = android::JenkinsHashMixShorts(hash, mChars, mNchars);
     return android::JenkinsHashWhiten(hash);
@@ -588,8 +596,7 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
         const std::shared_ptr<FontCollection>& collection) {
     android::AutoMutex _l(gMinikinLock);
 
-    LayoutContext ctx;
-    ctx.paint.copyFrom(paint);
+    LayoutContext ctx(paint);
 
     reset();
     mAdvances.resize(count, 0);
@@ -598,19 +605,19 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
 
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
         doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize, runInfo.mIsRtl, &ctx,
-                start, collection, this, nullptr, nullptr, nullptr);
+                start, startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
+                collection, this, nullptr, nullptr, nullptr);
     }
     ctx.clearHbFonts();
 }
 
 float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        Bidi bidiFlags, const MinikinPaint &paint,
-        const std::shared_ptr<FontCollection>& collection, float* advances,
+        Bidi bidiFlags, const MinikinPaint &paint, StartHyphenEdit startHyphen,
+        EndHyphenEdit endHyphen, const std::shared_ptr<FontCollection>& collection, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
     android::AutoMutex _l(gMinikinLock);
 
-    LayoutContext ctx;
-    ctx.paint.copyFrom(paint);
+    LayoutContext ctx(paint);
 
     float advance = 0;
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
@@ -619,7 +626,7 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
         LayoutOverhang* overhangsForRun = overhangs ? overhangs + offset : nullptr;
         advance += doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize,
-                runInfo.mIsRtl, &ctx, 0, collection, NULL, advancesForRun,
+                runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, collection, NULL, advancesForRun,
                 extentsForRun, overhangsForRun);
     }
 
@@ -629,9 +636,9 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
 
 float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, size_t dstStart,
+        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
         const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
-    const uint32_t originalHyphen = ctx->paint.hyphenEdit.getHyphen();
     float advance = 0;
     if (!isRtl) {
         // left to right
@@ -640,19 +647,14 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
         size_t wordend;
         for (size_t iter = start; iter < start + count; iter = wordend) {
             wordend = getNextWordBreakForCache(buf, iter, bufSize);
-            // Only apply hyphen to the first or last word in the string.
-            uint32_t hyphen = originalHyphen;
-            if (iter != start) { // Not the first word
-                hyphen &= ~HyphenEdit::MASK_START_OF_LINE;
-            }
-            if (wordend < start + count) { // Not the last word
-                hyphen &= ~HyphenEdit::MASK_END_OF_LINE;
-            }
-            ctx->paint.hyphenEdit = hyphen;
             const size_t wordcount = std::min(start + count, wordend) - iter;
             const size_t offset = iter - start;
             advance += doLayoutWord(buf + wordstart, iter - wordstart, wordcount,
-                    wordend - wordstart, isRtl, ctx, iter - dstStart, collection, layout,
+                    wordend - wordstart, isRtl, ctx, iter - dstStart,
+                    // Only apply hyphen to the first or last word in the string.
+                    iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
+                    wordend >= start + count ? endHyphen : EndHyphenEdit::NO_EDIT,
+                    collection, layout,
                     advances ? advances + offset : nullptr,
                     extents ? extents + offset : nullptr,
                     overhangs ? overhangs + offset : nullptr);
@@ -665,19 +667,15 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
         size_t wordend = end == 0 ? 0 : getNextWordBreakForCache(buf, end - 1, bufSize);
         for (size_t iter = end; iter > start; iter = wordstart) {
             wordstart = getPrevWordBreakForCache(buf, iter, bufSize);
-            // Only apply hyphen to the first (rightmost) or last (leftmost) word in the string.
-            uint32_t hyphen = originalHyphen;
-            if (wordstart > start) { // Not the first word
-                hyphen &= ~HyphenEdit::MASK_START_OF_LINE;
-            }
-            if (iter != end) { // Not the last word
-                hyphen &= ~HyphenEdit::MASK_END_OF_LINE;
-            }
-            ctx->paint.hyphenEdit = hyphen;
             size_t bufStart = std::max(start, wordstart);
             const size_t offset = bufStart - start;
             advance += doLayoutWord(buf + wordstart, bufStart - wordstart, iter - bufStart,
-                    wordend - wordstart, isRtl, ctx, bufStart - dstStart, collection, layout,
+                    wordend - wordstart, isRtl, ctx, bufStart - dstStart,
+                    // Only apply hyphen to the first (rightmost) or last (leftmost) word in the
+                    // string.
+                    wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
+                    iter == end ? endHyphen : EndHyphenEdit::NO_EDIT,
+                    collection, layout,
                     advances ? advances + offset : nullptr,
                     extents ? extents + offset : nullptr,
                     overhangs ? overhangs + offset : nullptr);
@@ -689,10 +687,12 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
 
 float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, size_t bufStart,
+        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
         const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs) {
     LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
-    LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl);
+    LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl, startHyphen,
+                       endHyphen);
 
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
 
@@ -753,8 +753,6 @@ static void addFeatures(const std::string &str, std::vector<hb_feature_t>* featu
     }
 }
 
-static const hb_codepoint_t CHAR_HYPHEN = 0x2010; /* HYPHEN */
-
 static inline hb_codepoint_t determineHyphenChar(hb_codepoint_t preferredHyphen, hb_font_t* font) {
     hb_codepoint_t glyph;
     if (preferredHyphen == 0x058A /* ARMENIAN_HYPHEN */
@@ -779,13 +777,14 @@ static inline hb_codepoint_t determineHyphenChar(hb_codepoint_t preferredHyphen,
     return preferredHyphen;
 }
 
-static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, hb_font_t* font, uint32_t hyphen,
-        uint32_t cluster) {
-    const uint32_t* hyphenStr = HyphenEdit::getHyphenString(hyphen);
-    while (*hyphenStr != 0) {
-        hb_codepoint_t hyphenChar = determineHyphenChar(*hyphenStr, font);
-        hb_buffer_add(buffer, hyphenChar, cluster);
-        hyphenStr++;
+template <typename HyphenEdit>
+static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, hb_font_t* font,
+        HyphenEdit hyphen, uint32_t cluster) {
+    const uint32_t* chars;
+    size_t size;
+    std::tie(chars, size) = getHyphenString(hyphen);
+    for (size_t i = 0; i < size; i++) {
+        hb_buffer_add(buffer, determineHyphenChar(chars[i], font), cluster);
     }
 }
 
@@ -794,16 +793,14 @@ static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, hb_font_t* font, uin
 static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
         const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         ssize_t scriptRunStart, ssize_t scriptRunEnd,
-        HyphenEdit hyphenEdit, hb_font_t* hbFont) {
+        StartHyphenEdit inStartHyphen, EndHyphenEdit inEndHyphen, hb_font_t* hbFont) {
 
     // Only hyphenate the very first script run for starting hyphens.
-    const uint32_t startHyphen = (scriptRunStart == 0)
-            ? hyphenEdit.getStart()
-            : HyphenEdit::NO_EDIT;
+    const StartHyphenEdit startHyphen = (scriptRunStart == 0)
+            ? inStartHyphen : StartHyphenEdit::NO_EDIT;
     // Only hyphenate the very last script run for ending hyphens.
-    const uint32_t endHyphen = (static_cast<size_t>(scriptRunEnd) == count)
-            ? hyphenEdit.getEnd()
-            : HyphenEdit::NO_EDIT;
+    const EndHyphenEdit endHyphen = (static_cast<size_t>(scriptRunEnd) == count)
+            ? inEndHyphen : EndHyphenEdit::NO_EDIT;
 
     // In the following code, we drop the pre-context and/or post-context if there is a
     // hyphen edit at that end. This is not absolutely necessary, since HarfBuzz uses
@@ -819,10 +816,10 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
 
     // We don't have any start-of-line replacement edit yet, so we don't need to check for
     // those.
-    if (HyphenEdit::isInsertion(startHyphen)) {
+    if (isInsertion(startHyphen)) {
         // A cluster value of zero guarantees that the inserted hyphen will be in the same
         // cluster with the next codepoint, since there is no pre-context.
-        addHyphenToHbBuffer(buffer, hbFont, startHyphen, 0 /* cluster value */);
+        addHyphenToHbBuffer(buffer, hbFont, startHyphen, 0 /* cluster */);
     }
 
     const uint16_t* hbText;
@@ -830,8 +827,8 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
     unsigned int hbItemOffset;
     unsigned int hbItemLength = scriptRunEnd - scriptRunStart; // This is >= 1.
 
-    const bool hasEndInsertion = HyphenEdit::isInsertion(endHyphen);
-    const bool hasEndReplacement = HyphenEdit::isReplacement(endHyphen);
+    const bool hasEndInsertion = isInsertion(endHyphen);
+    const bool hasEndReplacement = isReplacement(endHyphen);
     if (hasEndReplacement) {
         // Skip the last code unit while copying the buffer for HarfBuzz if it's a replacement. We
         // don't need to worry about non-BMP characters yet since replacements are only done for
@@ -839,7 +836,7 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
         hbItemLength -= 1;
     }
 
-    if (startHyphen == HyphenEdit::NO_EDIT) {
+    if (startHyphen == StartHyphenEdit::NO_EDIT) {
         // No edit at the beginning. Use the whole pre-context.
         hbText = buf;
         hbItemOffset = start + scriptRunStart;
@@ -850,7 +847,7 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
         hbItemOffset = 0;
     }
 
-    if (endHyphen == HyphenEdit::NO_EDIT) {
+    if (endHyphen == EndHyphenEdit::NO_EDIT) {
         // No edit at the end, use the whole post-context.
         hbTextLength = (buf + bufSize) - hbText;
     } else {
@@ -892,7 +889,8 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer,
 
 
 void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        bool isRtl, LayoutContext* ctx, const std::shared_ptr<FontCollection>& collection) {
+        bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+        const std::shared_ptr<FontCollection>& collection) {
     hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
     std::vector<FontCollection::Run> items;
     collection->itemize(buf + start, count, ctx->paint.fontStyle, ctx->paint.localeListId, &items);
@@ -991,7 +989,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                 buffer,
                 buf, start, count, bufSize,
                 scriptRunStart, scriptRunEnd,
-                ctx->paint.hyphenEdit, hbFont);
+                startHyphen, endHyphen, hbFont);
 
             hb_shape(hbFont, buffer, features.empty() ? NULL : &features[0], features.size());
             unsigned int numGlyphs;

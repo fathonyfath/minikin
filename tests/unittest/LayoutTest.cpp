@@ -397,7 +397,7 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with no hyphen edit");
         text = utf8ToUtf16("oneword");
         MinikinPaint paint;
-        paint.hyphenEdit = HyphenEdit::NO_EDIT;
+        paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT);
         layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
@@ -405,7 +405,7 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the end");
         text = utf8ToUtf16("oneword");
         MinikinPaint paint;
-        paint.hyphenEdit = HyphenEdit::INSERT_HYPHEN_AT_END;
+        paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN);
         layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
@@ -413,7 +413,8 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen replacement at the end");
         text = utf8ToUtf16("oneword");
         MinikinPaint paint;
-        paint.hyphenEdit = HyphenEdit::REPLACE_WITH_HYPHEN_AT_END;
+        paint.hyphenEdit = packHyphenEdit(
+                StartHyphenEdit::NO_EDIT, EndHyphenEdit::REPLACE_WITH_HYPHEN);
         layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
@@ -421,7 +422,7 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the start");
         text = utf8ToUtf16("oneword");
         MinikinPaint paint;
-        paint.hyphenEdit = HyphenEdit::INSERT_HYPHEN_AT_START;
+        paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::INSERT_HYPHEN, EndHyphenEdit::NO_EDIT);
         layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
@@ -429,7 +430,8 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the both ends");
         text = utf8ToUtf16("oneword");
         MinikinPaint paint;
-        paint.hyphenEdit = HyphenEdit::INSERT_HYPHEN_AT_START | HyphenEdit::INSERT_HYPHEN_AT_END;
+        paint.hyphenEdit = packHyphenEdit(
+                StartHyphenEdit::INSERT_HYPHEN, EndHyphenEdit::INSERT_HYPHEN);
         layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
         EXPECT_EQ(90.0f, layout.getAdvance());
     }

@@ -152,6 +152,8 @@ class LineBreaker {
                 bool isRtl) {
             addStyleRunInternal(paint, typeface, start, end, isRtl, paint->localeListId);
         }
+        void addStyleRun(const MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
+                size_t start, size_t end, bool isRtl, uint32_t localeListId);
 
         void addReplacement(size_t start, size_t end, float width, uint32_t localeListId);
 
@@ -216,14 +218,14 @@ class LineBreaker {
         uint32_t mCurrentLocaleListId;
         uint64_t mCurrentLocaleId = 0;
 
-        void addStyleRunInternal(MinikinPaint* paint,
+        void addStyleRunInternal(const MinikinPaint* paint,
                 const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
                 bool isRtl, uint32_t localeListId);
 
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
 
-        void addHyphenationCandidates(MinikinPaint* paint,
+        void addHyphenationCandidates(const MinikinPaint* paint,
                 const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
                 size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
                 size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags);
@@ -294,7 +296,7 @@ class LineBreaker {
         void addGreedyBreak(size_t breakIndex);
 
         // Push an actual break to the output. Takes care of setting flags for tab, etc.
-        void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
+        void pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit);
 
         void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end);
 
