@@ -54,13 +54,16 @@ MinikinFontForTest::~MinikinFontForTest() {
 }
 
 float MinikinFontForTest::GetHorizontalAdvance(uint32_t /* glyph_id */,
-        const MinikinPaint& /* paint */) const {
+                                               const MinikinPaint& /* paint */,
+                                               const FontFakery& /* fakery */) const {
     // TODO: Make mock value configurable if necessary.
     return 10.0f;
 }
 
-void MinikinFontForTest::GetBounds(MinikinRect* bounds, uint32_t /* glyph_id */,
-        const MinikinPaint& /* paint */) const {
+void MinikinFontForTest::GetBounds(MinikinRect* bounds,
+                                   uint32_t /* glyph_id */,
+                                   const MinikinPaint& /* paint */,
+                                   const FontFakery& /* fakery */) const {
     // TODO: Make mock values configurable if necessary.
     bounds->mLeft = 0.0f;
     bounds->mTop = 0.0f;
@@ -68,7 +71,9 @@ void MinikinFontForTest::GetBounds(MinikinRect* bounds, uint32_t /* glyph_id */,
     bounds->mBottom = 10.0f;
 }
 
-void MinikinFontForTest::GetFontExtent(MinikinExtent* extent, const MinikinPaint& /* paint */) const {
+void MinikinFontForTest::GetFontExtent(MinikinExtent* extent,
+                                       const MinikinPaint& /* paint */,
+                                       const FontFakery& /* fakery */) const {
     extent->ascent = -10.0f;
     extent->descent = 20.0f;
     extent->line_gap = 0.0f;

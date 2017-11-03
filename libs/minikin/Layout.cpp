@@ -40,6 +40,16 @@
 
 namespace minikin {
 
+namespace {
+
+struct SkiaArguments {
+    const MinikinFont* font;
+    const MinikinPaint* paint;
+    FontFakery fakery;
+};
+
+}  // namespace
+
 static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
     switch (bidi) {
         case Bidi::LTR:
@@ -265,8 +275,8 @@ void Layout::reset() {
 
 static hb_position_t harfbuzzGetGlyphHorizontalAdvance(hb_font_t* /* hbFont */, void* fontData,
         hb_codepoint_t glyph, void* /* userData */) {
-    MinikinPaint* paint = reinterpret_cast<MinikinPaint*>(fontData);
-    float advance = paint->font->GetHorizontalAdvance(glyph, *paint);
+    SkiaArguments* args = reinterpret_cast<SkiaArguments*>(fontData);
+    float advance = args->font->GetHorizontalAdvance(glyph, *args->paint, args->fakery);
     return 256 * advance + 0.5;
 }
 
@@ -327,19 +337,22 @@ void Layout::dump() const {
     }
 }
 
-int Layout::findFace(const FakedFont& face, LayoutContext* ctx) {
+int Layout::findOrPushBackFace(const FakedFont& face, LayoutContext* ctx) {
     unsigned int ix;
     for (ix = 0; ix < mFaces.size(); ix++) {
         if (mFaces[ix].font == face.font) {
             return ix;
         }
     }
+
     mFaces.push_back(face);
-    // Note: ctx == NULL means we're copying from the cache, no need to create
-    // corresponding hb_font object.
-    if (ctx != NULL) {
+    // Note: ctx == nullptr means we're copying from the cache, no need to create corresponding
+    // hb_font object.
+    if (ctx != nullptr) {
         hb_font_t* font = getHbFontLocked(face.font);
-        hb_font_set_funcs(font, getHbFontFuncs(isColorBitmapFont(font)), &ctx->paint, 0);
+        hb_font_set_funcs(font, getHbFontFuncs(isColorBitmapFont(font)),
+                          new SkiaArguments({face.font, &ctx->paint, face.fakery}),
+                          [] (void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
         ctx->hbFonts.push_back(font);
     }
     return ix;
@@ -909,17 +922,16 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             isRtl ? run_ix >= 0 : run_ix < static_cast<int>(items.size());
             isRtl ? --run_ix : ++run_ix) {
         FontCollection::Run &run = items[run_ix];
-        if (run.fakedFont.font == NULL) {
+        const FakedFont& fakedFont = run.fakedFont;
+        if (fakedFont.font == NULL) {
             ALOGE("no font for run starting u+%04x length %d", buf[run.start], run.end - run.start);
             continue;
         }
-        int font_ix = findFace(run.fakedFont, ctx);
-        ctx->paint.font = mFaces[font_ix].font;
-        ctx->paint.fakery = mFaces[font_ix].fakery;
+        const int font_ix = findOrPushBackFace(fakedFont, ctx);
         hb_font_t* hbFont = ctx->hbFonts[font_ix];
 
         MinikinExtent verticalExtent;
-        ctx->paint.font->GetFontExtent(&verticalExtent, ctx->paint);
+        fakedFont.font->GetFontExtent(&verticalExtent, ctx->paint, fakedFont.fakery);
         std::fill(&mExtents[run.start], &mExtents[run.end], verticalExtent);
 
         hb_font_set_ppem(hbFont, size * scaleX, size);
@@ -1030,7 +1042,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                     glyphBounds.mBottom =
                             roundf(HBFixedToFloat(-extents.y_bearing - extents.height));
                 } else {
-                    ctx->paint.font->GetBounds(&glyphBounds, glyph_ix, ctx->paint);
+                    fakedFont.font->GetBounds(&glyphBounds, glyph_ix, ctx->paint, fakedFont.fakery);
                 }
                 glyphBounds.offset(xoff, yoff);
 
@@ -1064,7 +1076,7 @@ void Layout::appendLayout(Layout* src, size_t start, float extraAdvance) {
         fontMap = new int[src->mFaces.size()];
     }
     for (size_t i = 0; i < src->mFaces.size(); i++) {
-        int font_ix = findFace(src->mFaces[i], NULL);
+        int font_ix = findOrPushBackFace(src->mFaces[i], nullptr);
         fontMap[i] = font_ix;
     }
     int x0 = mAdvance;
