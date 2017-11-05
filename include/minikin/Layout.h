@@ -124,8 +124,9 @@ public:
 private:
     friend class LayoutCacheKey;
 
-    // Find a face in the mFaces vector, or create a new entry
-    int findFace(const FakedFont& face, LayoutContext* ctx);
+    // Find a face in the mFaces vector. If not found, push back the entry to mFaces.
+    // If ctx is provided, push back hb_font_t to LayoutContext::hbFonts as well.
+    int findOrPushBackFace(const FakedFont& face, LayoutContext* ctx);
 
     // Clears layout, ready to be used again
     void reset();
