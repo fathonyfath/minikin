@@ -81,6 +81,9 @@ class LineBreaker {
                 // Called to find out the width for the line.
                 virtual float getLineWidth(size_t lineNo) = 0;
 
+                // Called to find out the minimum line width.
+                virtual float getMinLineWidth() = 0;
+
                 // Called to find out the available left-side padding for the line.
                 virtual float getLeftPadding(size_t lineNo) = 0;
 
@@ -293,7 +296,7 @@ class LineBreaker {
         // Push an actual break to the output. Takes care of setting flags for tab, etc.
         void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
 
-        void addDesperateBreaks(ParaWidth existingPreBreak, size_t start, size_t end);
+        void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end);
 
         bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
 
@@ -324,6 +327,11 @@ class LineBreaker {
         //
 
         void computeBreaksOptimal();
+
+        void addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
+                size_t postSpaceCount, bool isRtl, size_t start, size_t end);
+
+        void addAllDesperateBreaksOptimal();
 
         // Data used to compute optimal line breaks
         struct OptimalBreaksData {

@@ -36,8 +36,7 @@ constexpr uint16_t CHAR_NBSP = 0x00A0;
 // constants are larger than any reasonable actual width score.
 const float SCORE_INFTY = std::numeric_limits<float>::max();
 const float SCORE_OVERFULL = 1e12f;
-// TODO: re-enable when adding support for desperate line breaks in optimal line breaking.
-// const float SCORE_DESPERATE = 1e10f;
+const float SCORE_DESPERATE = 1e10f;
 
 // Multiplier for hyphen penalty on last line.
 const float LAST_LINE_PENALTY_MULTIPLIER = 4.0f;
@@ -400,10 +399,10 @@ void LineBreaker::addStyleRunInternal(MinikinPaint* paint,
     }
 }
 
-// Add desperate breaks.
+// Add desperate breaks for the greedy algorithm.
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
 // are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
-void LineBreaker::addDesperateBreaks(ParaWidth existingPreBreak, size_t start, size_t end) {
+void LineBreaker::addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end) {
     ParaWidth width = mCharWidths[start];
     for (size_t i = start + 1; i < end; i++) {
         const float w = mCharWidths[i];
@@ -501,7 +500,8 @@ void LineBreaker::considerGreedyBreakCandidate(size_t candIndex) {
             // space. So we need to consider desperate breaks.
 
             // Add desperate breaks starting immediately after the last break.
-            addDesperateBreaks(mLastGreedyBreak->preBreak, mLastGreedyBreak->offset, cand->offset);
+            addDesperateBreaksGreedy(mLastGreedyBreak->preBreak, mLastGreedyBreak->offset,
+                    cand->offset);
             break;
         } else {
             // Break at the best known break.
@@ -590,6 +590,70 @@ void LineBreaker::computeBreaksGreedy() {
     }
 }
 
+// Add desperate breaks for the optimal algorithm.
+// Note: these breaks are based on the shaping of the (non-broken) original text; they
+// are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
+void LineBreaker::addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
+        size_t postSpaceCount, bool isRtl, size_t start, size_t end) {
+    ParaWidth width = existingPreBreak + mCharWidths[start];
+    for (size_t i = start + 1; i < end; i++) {
+        const float w = mCharWidths[i];
+        if (w > 0) { // Add desperate breaks only before grapheme clusters.
+            out->push_back({i /* offset */, width /* preBreak */, width /* postBreak */,
+                    0.0 /* firstOverhang */, 0.0 /* secondOverhang */,
+                    SCORE_DESPERATE /* penalty */,
+                    // postSpaceCount doesn't include trailing spaces.
+                    postSpaceCount /* preSpaceCount */, postSpaceCount /* postSpaceCount */,
+                    HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN /* hyphenType */,
+                    isRtl /* isRtl */});
+            width += w;
+        }
+    }
+}
+
+void LineBreaker::addAllDesperateBreaksOptimal() {
+    const ParaWidth minLineWidth = mLineWidthDelegate->getMinLineWidth();
+    size_t firstDesperateIndex = 0;
+    const size_t nCand = mCandidates.size();
+    for (size_t i = 1; i < nCand; i++) {
+        const ParaWidth requiredWidth = mCandidates[i].postBreak - mCandidates[i - 1].preBreak;
+        if (requiredWidth > minLineWidth) {
+            // A desperate break is needed.
+            firstDesperateIndex = i;
+            break;
+        }
+    }
+    if (firstDesperateIndex == 0) { // No desperate breaks needed.
+        return;
+    }
+
+    // This temporary holds an expanded list of candidates, which will be later copied back into
+    // mCandidates. The beginning of mCandidates, where there are no desparate breaks, is skipped.
+    std::vector<Candidate> expandedCandidates;
+    const size_t nRemainingCandidates = nCand - firstDesperateIndex;
+    expandedCandidates.reserve(nRemainingCandidates + 1); // At least one more is needed.
+    for (size_t i = firstDesperateIndex; i < nCand; i++) {
+        const Candidate& previousCand = mCandidates[i - 1];
+        const Candidate& thisCand = mCandidates[i];
+        const ParaWidth requiredWidth = thisCand.postBreak - previousCand.preBreak;
+        if (requiredWidth > minLineWidth) {
+            addDesperateBreaksOptimal(&expandedCandidates, previousCand.preBreak,
+                    thisCand.postSpaceCount, thisCand.isRtl, previousCand.offset /* start */,
+                    thisCand.offset /* end */);
+        }
+        expandedCandidates.push_back(thisCand);
+    }
+
+    mCandidates.reserve(firstDesperateIndex + expandedCandidates.size());
+    // Iterator to the first candidate to insert from expandedCandidates. The candidates before this
+    // would simply be copied.
+    auto firstToInsert = expandedCandidates.begin() + nRemainingCandidates;
+    // Copy until the end of mCandidates.
+    std::copy(expandedCandidates.begin(), firstToInsert, mCandidates.begin() + firstDesperateIndex);
+    // Insert the rest.
+    mCandidates.insert(mCandidates.end(), firstToInsert, expandedCandidates.end());
+}
+
 // Follow "prev" links in mCandidates array, and copy to result arrays.
 void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData) {
     // clear output vectors.
@@ -615,7 +679,6 @@ void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& brea
     std::reverse(mFlags.begin(), mFlags.end());
 }
 
-//TODO: Support desperate breaks in optimal line breaking.
 void LineBreaker::computeBreaksOptimal() {
     size_t active = 0;
     const size_t nCand = mCandidates.size();
@@ -701,6 +764,7 @@ size_t LineBreaker::computeBreaks() {
     if (mStrategy == kBreakStrategy_Greedy) {
         computeBreaksGreedy();
     } else {
+        addAllDesperateBreaksOptimal();
         computeBreaksOptimal();
     }
     return mBreaks.size();

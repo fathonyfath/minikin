@@ -218,6 +218,9 @@ public:
     float getLineWidth(size_t) override {
         return mWidth;
     }
+    float getMinLineWidth() override {
+        return mWidth;
+    }
     float getLeftPadding(size_t) override {
         return 0;
     }
