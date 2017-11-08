@@ -20,12 +20,19 @@
 
 #include <hb.h>
 
+#include "minikin/LocaleList.h"
 #include "MinikinInternal.h"
+#include "LocaleListCache.h"
 #include "StringPiece.h"
 
 namespace minikin {
 
 constexpr uint32_t FIVE_BITS = 0x1f;
+
+uint32_t registerLocaleList(const std::string& locales) {
+    android::AutoMutex _l(gMinikinLock);
+    return LocaleListCache::getId(locales);
+}
 
 // Check if a language code supports emoji according to its subtag
 static bool isEmojiSubtag(const char* buf, size_t bufLen, const char* subtag, size_t subtagLen) {

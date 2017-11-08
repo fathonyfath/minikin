@@ -81,6 +81,9 @@ class LineBreaker {
                 // Called to find out the width for the line.
                 virtual float getLineWidth(size_t lineNo) = 0;
 
+                // Called to find out the minimum line width.
+                virtual float getMinLineWidth() = 0;
+
                 // Called to find out the available left-side padding for the line.
                 virtual float getLeftPadding(size_t lineNo) = 0;
 
@@ -144,8 +147,11 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        void addStyleRun(MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-                FontStyle style, size_t start, size_t end, bool isRtl);
+        inline void addStyleRun(MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
+                bool isRtl) {
+            addStyleRunInternal(paint, typeface, start, end, isRtl, paint->localeListId);
+        }
 
         void addReplacement(size_t start, size_t end, float width, uint32_t localeListId);
 
@@ -210,12 +216,16 @@ class LineBreaker {
         uint32_t mCurrentLocaleListId;
         uint64_t mCurrentLocaleId = 0;
 
+        void addStyleRunInternal(MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
+                bool isRtl, uint32_t localeListId);
+
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
 
         void addHyphenationCandidates(MinikinPaint* paint,
-                const std::shared_ptr<FontCollection>& typeface, FontStyle style, size_t runStart,
-                size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
+                const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
+                size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
                 size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
@@ -286,7 +296,7 @@ class LineBreaker {
         // Push an actual break to the output. Takes care of setting flags for tab, etc.
         void pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit);
 
-        void addDesperateBreaks(ParaWidth existingPreBreak, size_t start, size_t end);
+        void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end);
 
         bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
 
@@ -317,6 +327,11 @@ class LineBreaker {
         //
 
         void computeBreaksOptimal();
+
+        void addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
+                size_t postSpaceCount, bool isRtl, size_t start, size_t end);
+
+        void addAllDesperateBreaksOptimal();
 
         // Data used to compute optimal line breaks
         struct OptimalBreaksData {

@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/FontFamily.h"
+#include "minikin/LocaleList.h"
 #include "FontTestUtils.h"
 #include "ICUTestBase.h"
 #include "Locale.h"
@@ -54,17 +55,36 @@ const char kNoCmapFormat14Font[] =  kTestFontDir "VariationSelectorTest-Regular.
 
 typedef ICUTestBase FontCollectionItemizeTest;
 
-// Utility function for calling itemize function.
+// Utility functions for calling itemize function.
 void itemize(const std::shared_ptr<FontCollection>& collection, const char* str, FontStyle style,
-        std::vector<FontCollection::Run>* result) {
+             const std::string& localeList, std::vector<FontCollection::Run>* result) {
     const size_t BUF_SIZE = 256;
     uint16_t buf[BUF_SIZE];
     size_t len;
 
     result->clear();
     ParseUnicode(buf, BUF_SIZE, str, &len, NULL);
+    const uint32_t localeListId = registerLocaleList(localeList);
     android::AutoMutex _l(gMinikinLock);
-    collection->itemize(buf, len, style, result);
+    collection->itemize(buf, len, style, localeListId, result);
+}
+
+// Overloaded version for default font style.
+void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
+             const std::string& localeList, std::vector<FontCollection::Run>* result) {
+    itemize(collection, str, FontStyle(), localeList, result);
+}
+
+// Overloaded version for empty locale list id.
+void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
+             FontStyle style, std::vector<FontCollection::Run>* result) {
+    itemize(collection, str, style, "", result);
+}
+
+// Overloaded version for default font style and empty locale list id.
+void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
+             std::vector<FontCollection::Run>* result) {
+    itemize(collection, str, FontStyle(), "", result);
 }
 
 // Utility function to obtain font path associated with run.
@@ -84,9 +104,9 @@ TEST_F(FontCollectionItemizeTest, itemize_latin) {
     std::vector<FontCollection::Run> runs;
 
     const FontStyle kRegularStyle = FontStyle();
-    const FontStyle kItalicStyle = FontStyle(4, true);
-    const FontStyle kBoldStyle = FontStyle(7, false);
-    const FontStyle kBoldItalicStyle = FontStyle(7, true);
+    const FontStyle kItalicStyle = FontStyle(FontSlant::ITALIC);
+    const FontStyle kBoldStyle = FontStyle(FontWeight::BOLD);
+    const FontStyle kBoldItalicStyle = FontStyle(FontWeight::BOLD, FontSlant::ITALIC);
 
     itemize(collection, "'a' 'b' 'c' 'd' 'e'", kRegularStyle, &runs);
     ASSERT_EQ(1U, runs.size());
@@ -155,15 +175,13 @@ TEST_F(FontCollectionItemizeTest, itemize_newline) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kRegularStyle = FontStyle();
-
-    itemize(collection, "'a' U+000A", kRegularStyle, &runs);
+    itemize(collection, "'a' U+000A", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+000A", kRegularStyle, &runs);
+    itemize(collection, "U+000A", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -176,36 +194,34 @@ TEST_F(FontCollectionItemizeTest, itemize_combining) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kRegularStyle = FontStyle();
-
-    itemize(collection, "'a' U+0301", kRegularStyle, &runs);
+    itemize(collection, "'a' U+0301", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
     // CHEROKEE LETTER A, COMBINING ACUTE ACCENT
-    itemize(collection, "U+13A0 U+0301", kRegularStyle, &runs);
+    itemize(collection, "U+13A0 U+0301", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kCherokeeFont, getFontPath(runs[0]));
 
     // CHEROKEE LETTER A, COMBINING ACUTE ACCENT, COMBINING ACUTE ACCENT
-    itemize(collection, "U+13A0 U+0301 U+0301", kRegularStyle, &runs);
+    itemize(collection, "U+13A0 U+0301 U+0301", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kCherokeeFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+0301", kRegularStyle, &runs);
+    itemize(collection, "U+0301", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
     // COMBINING ACUTE ACCENT, CHEROKEE LETTER A, COMBINING ACUTE ACCENT
-    itemize(collection, "U+0301 U+13A0 U+0301", kRegularStyle, &runs);
+    itemize(collection, "U+0301 U+13A0 U+0301", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -219,7 +235,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    itemize(collection, "U+1F469 U+1F467", FontStyle(), &runs);
+    itemize(collection, "U+1F469 U+1F467", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
@@ -229,7 +245,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
 
     // U+20E3(COMBINING ENCLOSING KEYCAP) must be in the same run with preceding
     // character if the font supports.
-    itemize(collection, "'0' U+20E3", FontStyle(), &runs);
+    itemize(collection, "'0' U+20E3", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -237,7 +253,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeBold());
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 
-    itemize(collection, "U+1F470 U+20E3", FontStyle(), &runs);
+    itemize(collection, "U+1F470 U+20E3", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
@@ -245,7 +261,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeBold());
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 
-    itemize(collection, "U+242EE U+1F470 U+20E3", FontStyle(), &runs);
+    itemize(collection, "U+242EE U+1F470 U+20E3", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -261,7 +277,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
 
     // Currently there is no fonts which has a glyph for 'a' + U+20E3, so they
     // are splitted into two.
-    itemize(collection, "'a' U+20E3", FontStyle(), &runs);
+    itemize(collection, "'a' U+20E3", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -280,12 +296,8 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kJAStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"));
-    FontStyle kUSStyle = FontStyle(FontStyle::registerLocaleList("en_US"));
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
-
     // All Japanese Hiragana characters.
-    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kUSStyle, &runs);
+    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", "ja-JP", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
@@ -294,7 +306,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 
     // All Korean Hangul characters.
-    itemize(collection, "U+B300 U+D55C U+BBFC U+AD6D", kUSStyle, &runs);
+    itemize(collection, "U+B300 U+D55C U+BBFC U+AD6D", "en-US", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
@@ -304,7 +316,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
 
     // All Han characters ja, zh-Hans font having.
     // Japanese font should be selected if the specified language is Japanese.
-    itemize(collection, "U+81ED U+82B1 U+5FCD", kJAStyle, &runs);
+    itemize(collection, "U+81ED U+82B1 U+5FCD", "ja-JP", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
@@ -314,7 +326,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
 
     // Simplified Chinese font should be selected if the specified language is Simplified
     // Chinese.
-    itemize(collection, "U+81ED U+82B1 U+5FCD", kZH_HansStyle, &runs);
+    itemize(collection, "U+81ED U+82B1 U+5FCD", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
@@ -324,7 +336,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
 
     // Fallbacks to other fonts if there is no glyph in the specified language's
     // font. There is no character U+4F60 in Japanese.
-    itemize(collection, "U+81ED U+4F60 U+5FCD", kJAStyle, &runs);
+    itemize(collection, "U+81ED U+4F60 U+5FCD", "ja-JP", &runs);
     ASSERT_EQ(3U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -345,7 +357,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     EXPECT_FALSE(runs[2].fakedFont.fakery.isFakeItalic());
 
     // Tone mark.
-    itemize(collection, "U+4444 U+302D", FontStyle(), &runs);
+    itemize(collection, "U+4444 U+302D", "", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -356,7 +368,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     // Both zh-Hant and ja fonts support U+242EE, but zh-Hans doesn't.
     // Here, ja and zh-Hant font should have the same score but ja should be selected since it is
     // listed before zh-Hant.
-    itemize(collection, "U+242EE", kZH_HansStyle, &runs);
+    itemize(collection, "U+242EE", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -369,9 +381,7 @@ TEST_F(FontCollectionItemizeTest, itemize_mixed) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kUSStyle = FontStyle(FontStyle::registerLocaleList("en_US"));
-
-    itemize(collection, "'a' U+4F60 'b' U+4F60 'c'", kUSStyle, &runs);
+    itemize(collection, "'a' U+4F60 'b' U+4F60 'c'", "en-US", &runs);
     ASSERT_EQ(5U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -412,24 +422,22 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     // Chinese font. Also a glyph for U+242EE is provided by both Japanese and
     // Traditional Chinese font.  To avoid effects of device default locale,
     // explicitly specify the locale.
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
-    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLocaleList("zh_Hant"));
 
     // U+4FAE is available in both zh_Hans and ja font, but U+4FAE,U+FE00 is
     // only available in ja font.
-    itemize(collection, "U+4FAE", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kZH_HansFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+4FAE U+FE00", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE U+FE00", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+4FAE U+4FAE U+FE00", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE U+4FAE U+FE00", "zh-Hans", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -438,7 +446,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     EXPECT_EQ(3, runs[1].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[1]));
 
-    itemize(collection, "U+4FAE U+4FAE U+FE00 U+4FAE", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE U+4FAE U+FE00 U+4FAE", "zh-Hans", &runs);
     ASSERT_EQ(3U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -451,14 +459,14 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     EXPECT_EQ(kZH_HansFont, getFontPath(runs[2]));
 
     // Validation selector after validation selector.
-    itemize(collection, "U+4FAE U+FE00 U+FE00", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE U+FE00 U+FE00", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[1]));
 
     // No font supports U+242EE U+FE0E.
-    itemize(collection, "U+4FAE U+FE0E", kZH_HansStyle, &runs);
+    itemize(collection, "U+4FAE U+FE0E", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -467,19 +475,19 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     // Surrogate pairs handling.
     // U+242EE is available in ja font and zh_Hant font.
     // U+242EE U+FE00 is available only in ja font.
-    itemize(collection, "U+242EE", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+242EE U+FE00", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+FE00", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+242EE U+242EE U+FE00", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+242EE U+FE00", "zh-Hant", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -488,7 +496,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     EXPECT_EQ(5, runs[1].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[1]));
 
-    itemize(collection, "U+242EE U+242EE U+FE00 U+242EE", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+242EE U+FE00 U+242EE", "zh-Hant", &runs);
     ASSERT_EQ(3U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -501,27 +509,27 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[2]));
 
     // Validation selector after validation selector.
-    itemize(collection, "U+242EE U+FE00 U+FE00", kZH_HansStyle, &runs);
+    itemize(collection, "U+242EE U+FE00 U+FE00", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
     // No font supports U+242EE U+FE0E
-    itemize(collection, "U+242EE U+FE0E", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+FE0E", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[0]));
 
     // Isolated variation selector supplement.
-    itemize(collection, "U+FE00", FontStyle(), &runs);
+    itemize(collection, "U+FE00", "", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_TRUE(runs[0].fakedFont.font == nullptr || kLatinFont == getFontPath(runs[0]));
 
-    itemize(collection, "U+FE00", kZH_HantStyle, &runs);
+    itemize(collection, "U+FE00", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -529,14 +537,14 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
 
     // First font family (Regular.ttf) supports U+203C but doesn't support U+203C U+FE0F.
     // Emoji.ttf font supports U+203C U+FE0F.  Emoji.ttf should be selected.
-    itemize(collection, "U+203C U+FE0F", kZH_HantStyle, &runs);
+    itemize(collection, "U+203C U+FE0F", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
 
     // First font family (Regular.ttf) supports U+203C U+FE0E.
-    itemize(collection, "U+203C U+FE0E", kZH_HantStyle, &runs);
+    itemize(collection, "U+203C U+FE0E", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -551,24 +559,22 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     // Chinese font. Also a glyph for U+242EE is provided by both Japanese and
     // Traditional Chinese font.  To avoid effects of device default locale,
     // explicitly specify the locale.
-    FontStyle kZH_HansStyle = FontStyle(FontStyle::registerLocaleList("zh_Hans"));
-    FontStyle kZH_HantStyle = FontStyle(FontStyle::registerLocaleList("zh_Hant"));
 
     // U+845B is available in both zh_Hans and ja font, but U+845B,U+E0100 is
     // only available in ja font.
-    itemize(collection, "U+845B", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kZH_HansFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+845B U+E0100", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B U+E0100", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+845B U+845B U+E0100", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B U+845B U+E0100", "zh-Hans", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -577,7 +583,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     EXPECT_EQ(4, runs[1].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[1]));
 
-    itemize(collection, "U+845B U+845B U+E0100 U+845B", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B U+845B U+E0100 U+845B", "zh-Hans", &runs);
     ASSERT_EQ(3U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -590,14 +596,14 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     EXPECT_EQ(kZH_HansFont, getFontPath(runs[2]));
 
     // Validation selector after validation selector.
-    itemize(collection, "U+845B U+E0100 U+E0100", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B U+E0100 U+E0100", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
     // No font supports U+845B U+E01E0.
-    itemize(collection, "U+845B U+E01E0", kZH_HansStyle, &runs);
+    itemize(collection, "U+845B U+E01E0", "zh-Hans", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
@@ -607,19 +613,19 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     // Surrogate pairs handling.
     // U+242EE is available in ja font and zh_Hant font.
     // U+242EE U+E0100 is available only in ja font.
-    itemize(collection, "U+242EE", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+242EE U+E0101", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+E0101", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+242EE U+242EE U+E0101", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+242EE U+E0101", "zh-Hant", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -628,7 +634,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     EXPECT_EQ(6, runs[1].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[1]));
 
-    itemize(collection, "U+242EE U+242EE U+E0101 U+242EE", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+242EE U+E0101 U+242EE", "zh-Hant", &runs);
     ASSERT_EQ(3U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -641,27 +647,27 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[2]));
 
     // Validation selector after validation selector.
-    itemize(collection, "U+242EE U+E0100 U+E0100", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+E0100 U+E0100", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(6, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
     // No font supports U+242EE U+E01E0.
-    itemize(collection, "U+242EE U+E01E0", kZH_HantStyle, &runs);
+    itemize(collection, "U+242EE U+E01E0", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
     EXPECT_EQ(kZH_HantFont, getFontPath(runs[0]));
 
     // Isolated variation selector supplement.
-    itemize(collection, "U+E0100", FontStyle(), &runs);
+    itemize(collection, "U+E0100", "", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_TRUE(runs[0].fakedFont.font == nullptr || kLatinFont == getFontPath(runs[0]));
 
-    itemize(collection, "U+E0100", kZH_HantStyle, &runs);
+    itemize(collection, "U+E0100", "zh-Hant", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -673,39 +679,38 @@ TEST_F(FontCollectionItemizeTest, itemize_no_crash) {
     std::vector<FontCollection::Run> runs;
 
     // Broken Surrogate pairs. Check only not crashing.
-    itemize(collection, "'a' U+D83D 'a'", FontStyle(), &runs);
-    itemize(collection, "'a' U+DC69 'a'", FontStyle(), &runs);
-    itemize(collection, "'a' U+D83D U+D83D 'a'", FontStyle(), &runs);
-    itemize(collection, "'a' U+DC69 U+DC69 'a'", FontStyle(), &runs);
+    itemize(collection, "'a' U+D83D 'a'", &runs);
+    itemize(collection, "'a' U+DC69 'a'", &runs);
+    itemize(collection, "'a' U+D83D U+D83D 'a'", &runs);
+    itemize(collection, "'a' U+DC69 U+DC69 'a'", &runs);
 
     // Isolated variation selector. Check only not crashing.
-    itemize(collection, "U+FE00 U+FE00", FontStyle(), &runs);
-    itemize(collection, "U+E0100 U+E0100", FontStyle(), &runs);
-    itemize(collection, "U+FE00 U+E0100", FontStyle(), &runs);
-    itemize(collection, "U+E0100 U+FE00", FontStyle(), &runs);
+    itemize(collection, "U+FE00 U+FE00", &runs);
+    itemize(collection, "U+E0100 U+E0100", &runs);
+    itemize(collection, "U+FE00 U+E0100", &runs);
+    itemize(collection, "U+E0100 U+FE00", &runs);
 
     // Tone mark only. Check only not crashing.
-    itemize(collection, "U+302D", FontStyle(), &runs);
-    itemize(collection, "U+302D U+302D", FontStyle(), &runs);
+    itemize(collection, "U+302D", &runs);
+    itemize(collection, "U+302D U+302D", &runs);
 
     // Tone mark and variation selector mixed. Check only not crashing.
-    itemize(collection, "U+FE00 U+302D U+E0100", FontStyle(), &runs);
+    itemize(collection, "U+FE00 U+302D U+E0100", &runs);
 }
 
 TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kJABoldStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 7, false);
-    FontStyle kJAItalicStyle = FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 5, true);
-    FontStyle kJABoldItalicStyle =
-           FontStyle(FontStyle::registerLocaleList("ja_JP"), 0, 7, true);
+    FontStyle kBoldStyle(FontWeight::BOLD);
+    FontStyle kItalicStyle(FontSlant::ITALIC);
+    FontStyle kBoldItalicStyle(FontWeight::BOLD, FontSlant::ITALIC);
 
     // Currently there is no italic or bold font for Japanese. FontFakery has
     // the differences between desired and actual font style.
 
     // All Japanese Hiragana characters.
-    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kJABoldStyle, &runs);
+    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kBoldStyle, "ja-JP", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
@@ -714,7 +719,7 @@ TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 
     // All Japanese Hiragana characters.
-    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kJAItalicStyle, &runs);
+    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kItalicStyle, "ja-JP", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
@@ -723,7 +728,7 @@ TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     EXPECT_TRUE(runs[0].fakedFont.fakery.isFakeItalic());
 
     // All Japanese Hiragana characters.
-    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kJABoldItalicStyle, &runs);
+    itemize(collection, "U+3042 U+3044 U+3046 U+3048 U+304A", kBoldItalicStyle, "ja-JP", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
@@ -740,12 +745,12 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
 
     std::vector<std::shared_ptr<FontFamily>> families;
     std::shared_ptr<MinikinFont> font(new MinikinFontForTest(kLatinFont));
-    std::shared_ptr<FontFamily> family1(new FontFamily(VARIANT_DEFAULT,
+    std::shared_ptr<FontFamily> family1(new FontFamily(FontVariant::DEFAULT,
             std::vector<Font>{ Font(font, FontStyle()) }));
     families.push_back(family1);
 
     std::shared_ptr<MinikinFont> font2(new MinikinFontForTest(kVSTestFont));
-    std::shared_ptr<FontFamily> family2(new FontFamily(VARIANT_DEFAULT,
+    std::shared_ptr<FontFamily> family2(new FontFamily(FontVariant::DEFAULT,
             std::vector<Font>{ Font(font2, FontStyle()) }));
     families.push_back(family2);
 
@@ -753,7 +758,7 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
 
     std::vector<FontCollection::Run> runs;
 
-    itemize(collection, "U+717D U+FE02", FontStyle(), &runs);
+    itemize(collection, "U+717D U+FE02", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -764,63 +769,61 @@ TEST_F(FontCollectionItemizeTest, itemize_format_chars) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
-    itemize(collection, "'a' U+061C 'b'", kDefaultFontStyle, &runs);
+    itemize(collection, "'a' U+061C 'b'", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "'a' U+200D 'b'", kDefaultFontStyle, &runs);
+    itemize(collection, "'a' U+200D 'b'", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+3042 U+061C U+3042", kDefaultFontStyle, &runs);
+    itemize(collection, "U+3042 U+061C U+3042", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+061C 'b'", kDefaultFontStyle, &runs);
+    itemize(collection, "U+061C 'b'", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+061C U+3042", kDefaultFontStyle, &runs);
+    itemize(collection, "U+061C U+3042", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+061C", kDefaultFontStyle, &runs);
+    itemize(collection, "U+061C", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+061C U+061C U+061C", kDefaultFontStyle, &runs);
+    itemize(collection, "U+061C U+061C U+061C", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+200D U+20E3", kDefaultFontStyle, &runs);
+    itemize(collection, "U+200D U+20E3", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+200D", kDefaultFontStyle, &runs);
+    itemize(collection, "U+200D", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+20E3", kDefaultFontStyle, &runs);
+    itemize(collection, "U+20E3", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
@@ -949,7 +952,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::shared_ptr<MinikinFont> firstFamilyMinikinFont(
                 new MinikinFontForTest(kNoGlyphFont));
         std::shared_ptr<FontFamily> firstFamily(new FontFamily(
-                FontStyle::registerLocaleList("und"), 0 /* variant */,
+                registerLocaleList("und"), FontVariant::DEFAULT,
                 std::vector<Font>({ Font(firstFamilyMinikinFont, FontStyle()) })));
         families.push_back(firstFamily);
 
@@ -961,17 +964,15 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
             std::shared_ptr<MinikinFont> minikin_font(new MinikinFontForTest(kJAFont));
             std::shared_ptr<FontFamily> family(new FontFamily(
-                    FontStyle::registerLocaleList(testCase.fontLocales[i]), 0 /* variant */,
+                    registerLocaleList(testCase.fontLocales[i]), FontVariant::DEFAULT,
                     std::vector<Font>({ Font(minikin_font, FontStyle()) })));
             families.push_back(family);
             fontLocaleIdxMap.insert(std::make_pair(minikin_font.get(), i));
         }
         std::shared_ptr<FontCollection> collection(new FontCollection(families));
         // Do itemize
-        const FontStyle style = FontStyle(
-                FontStyle::registerLocaleList(testCase.userPreferredLocale));
         std::vector<FontCollection::Run> runs;
-        itemize(collection, "U+9AA8", style, &runs);
+        itemize(collection, "U+9AA8", testCase.userPreferredLocale, &runs);
         ASSERT_EQ(1U, runs.size());
         ASSERT_NE(nullptr, runs[0].fakedFont.font);
 
@@ -1284,9 +1285,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
                      testCase.requestedLocales);
 
         std::vector<FontCollection::Run> runs;
-        const FontStyle style =
-                FontStyle(FontStyle::registerLocaleList(testCase.requestedLocales));
-        itemize(collection, testCase.testString.c_str(), style, &runs);
+        itemize(collection, testCase.testString.c_str(), testCase.requestedLocales, &runs);
         ASSERT_EQ(1U, runs.size());
         EXPECT_EQ(testCase.expectedFont, getFontPath(runs[0]));
     }
@@ -1296,11 +1295,9 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
     // U+00A9 is a text default emoji which is only available in TextEmojiFont.ttf.
     // TextEmojiFont.ttf should be selected.
-    itemize(collection, "U+00A9 U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+00A9 U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1308,7 +1305,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+00A9 is a text default emoji which is only available in ColorEmojiFont.ttf.
     // ColorEmojiFont.ttf should be selected.
-    itemize(collection, "U+00AE U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+00AE U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1317,7 +1314,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+203C is a text default emoji which is available in both TextEmojiFont.ttf and
     // ColorEmojiFont.ttf. TextEmojiFont.ttf should be selected.
-    itemize(collection, "U+203C U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+203C U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1325,7 +1322,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+2049 is a text default emoji which is not available either TextEmojiFont.ttf or
     // ColorEmojiFont.ttf. No font should be selected.
-    itemize(collection, "U+2049 U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+2049 U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1333,7 +1330,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+231A is a emoji default emoji which is available only in TextEmojifFont.
     // TextEmojiFont.ttf sohuld be selected.
-    itemize(collection, "U+231A U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+231A U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1341,7 +1338,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+231B is a emoji default emoji which is available only in ColorEmojiFont.ttf.
     // ColorEmojiFont.ttf should be selected.
-    itemize(collection, "U+231B U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+231B U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1351,7 +1348,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
     // U+23E9 is a emoji default emoji which is available in both TextEmojiFont.ttf and
     // ColorEmojiFont.ttf. TextEmojiFont.ttf should be selected even if U+23E9 is emoji default
     // emoji since U+FE0E is appended.
-    itemize(collection, "U+23E9 U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+23E9 U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1359,7 +1356,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+23EA is a emoji default emoji but which is not available in either TextEmojiFont.ttf or
     // ColorEmojiFont.ttf. No font should be selected.
-    itemize(collection, "U+23EA U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+23EA U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1367,7 +1364,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
 
     // U+26FA U+FE0E is specified but ColorTextMixedEmojiFont has a variation sequence U+26F9 U+FE0F
     // in its cmap, so ColorTextMixedEmojiFont should be selected instaed of ColorEmojiFont.
-    itemize(collection, "U+26FA U+FE0E", kDefaultFontStyle, &runs);
+    itemize(collection, "U+26FA U+FE0E", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1378,11 +1375,9 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
     // U+00A9 is a text default emoji which is available only in TextEmojiFont.ttf.
     // TextEmojiFont.ttf shoudl be selected.
-    itemize(collection, "U+00A9 U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+00A9 U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1391,7 +1386,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+00AE is a text default emoji which is available only in ColorEmojiFont.ttf.
     // ColorEmojiFont.ttf should be selected.
-    itemize(collection, "U+00AE U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+00AE U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1400,7 +1395,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
     // U+203C is a text default emoji which is available in both TextEmojiFont.ttf and
     // ColorEmojiFont.ttf. ColorEmojiFont.ttf should be selected even if U+203C is a text default
     // emoji since U+FF0F is appended.
-    itemize(collection, "U+203C U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+203C U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1408,7 +1403,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+2049 is a text default emoji which is not available in either TextEmojiFont.ttf or
     // ColorEmojiFont.ttf. No font should be selected.
-    itemize(collection, "U+2049 U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+2049 U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1416,7 +1411,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+231A is a emoji default emoji which is available only in TextEmojiFont.ttf.
     // TextEmojiFont.ttf should be selected.
-    itemize(collection, "U+231A U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+231A U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1425,7 +1420,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+231B is a emoji default emoji which is available only in ColorEmojiFont.ttf.
     // ColorEmojiFont.ttf should be selected.
-    itemize(collection, "U+231B U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+231B U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1433,7 +1428,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+23E9 is a emoji default emoji which is available in both TextEmojiFont.ttf and
     // ColorEmojiFont.ttf. ColorEmojiFont.ttf should be selected.
-    itemize(collection, "U+23E9 U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+23E9 U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1441,7 +1436,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+23EA is a emoji default emoji which is not available in either TextEmojiFont.ttf or
     // ColorEmojiFont.ttf. No font should be selected.
-    itemize(collection, "U+23EA U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+23EA U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1449,7 +1444,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
 
     // U+26F9 U+FE0F is specified but ColorTextMixedEmojiFont has a variation sequence U+26F9 U+FE0F
     // in its cmap, so ColorTextMixedEmojiFont should be selected instaed of ColorEmojiFont.
-    itemize(collection, "U+26F9 U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+26F9 U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1460,24 +1455,22 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_with_skinTone) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
     // TextEmoji font is selected since it is listed before ColorEmoji font.
-    itemize(collection, "U+261D", kDefaultFontStyle, &runs);
+    itemize(collection, "U+261D", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(1, runs[0].end);
     EXPECT_EQ(kTextEmojiFont, getFontPath(runs[0]));
 
     // If skin tone is specified, it should be colored.
-    itemize(collection, "U+261D U+1F3FD", kDefaultFontStyle, &runs);
+    itemize(collection, "U+261D U+1F3FD", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
     EXPECT_EQ(kColorEmojiFont, getFontPath(runs[0]));
 
     // Still color font is selected if an emoji variation selector is specified.
-    itemize(collection, "U+261D U+FE0F U+1F3FD", kDefaultFontStyle, &runs);
+    itemize(collection, "U+261D U+FE0F U+1F3FD", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
@@ -1485,7 +1478,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_with_skinTone) {
 
     // Text font should be selected if a text variation selector is specified and skin tone is
     // rendered by itself.
-    itemize(collection, "U+261D U+FE0E U+1F3FD", kDefaultFontStyle, &runs);
+    itemize(collection, "U+261D U+FE0E U+1F3FD", &runs);
     ASSERT_EQ(2U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
@@ -1499,16 +1492,14 @@ TEST_F(FontCollectionItemizeTest, itemize_PrivateUseArea) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
     // Should not set nullptr to the result run. (Issue 26808815)
-    itemize(collection, "U+FEE10", kDefaultFontStyle, &runs);
+    itemize(collection, "U+FEE10", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(2, runs[0].end);
     EXPECT_EQ(kNoGlyphFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+FEE40 U+FE4C5", kDefaultFontStyle, &runs);
+    itemize(collection, "U+FEE40 U+FE4C5", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
@@ -1519,21 +1510,19 @@ TEST_F(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
-    const FontStyle kDefaultFontStyle;
-
-    itemize(collection, "U+1F469 U+200D U+1F373", kDefaultFontStyle, &runs);
+    itemize(collection, "U+1F469 U+200D U+1F373", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
     EXPECT_EQ(kColorEmojiFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+1F469 U+200D U+2695 U+FE0F", kDefaultFontStyle, &runs);
+    itemize(collection, "U+1F469 U+200D U+2695 U+FE0F", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(5, runs[0].end);
     EXPECT_EQ(kColorEmojiFont, getFontPath(runs[0]));
 
-    itemize(collection, "U+1F469 U+200D U+2695", kDefaultFontStyle, &runs);
+    itemize(collection, "U+1F469 U+200D U+2695", &runs);
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(4, runs[0].end);
@@ -1542,8 +1531,6 @@ TEST_F(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
 
 // For b/29585939
 TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
-    const FontStyle kDefaultFontStyle;
-
     std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
     std::shared_ptr<MinikinFont> fontA(new MinikinFontForTest(kZH_HansFont));
     std::shared_ptr<MinikinFont> fontB(new MinikinFontForTest(kZH_HansFont));
@@ -1566,17 +1553,15 @@ TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
     // Both fontA/fontB support U+35A8 but don't support U+35A8 U+E0100. The first font should be
     // selected.
     std::vector<FontCollection::Run> runs;
-    itemize(collection, "U+35A8 U+E0100", kDefaultFontStyle, &runs);
+    itemize(collection, "U+35A8 U+E0100", &runs);
     EXPECT_EQ(fontA.get(), runs[0].fakedFont.font);
 
-    itemize(reversedCollection, "U+35A8 U+E0100", kDefaultFontStyle, &runs);
+    itemize(reversedCollection, "U+35A8 U+E0100", &runs);
     EXPECT_EQ(fontB.get(), runs[0].fakedFont.font);
 }
 
 // For b/29585939
 TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
-    const FontStyle kDefaultFontStyle;
-
     std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
     std::shared_ptr<MinikinFont> hasCmapFormat14Font(
             new MinikinFontForTest(kHasCmapFormat14Font));
@@ -1601,10 +1586,10 @@ TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     // Both hasCmapFormat14Font/noCmapFormat14Font support U+5380 but don't support U+5380 U+E0100.
     // The first font should be selected.
     std::vector<FontCollection::Run> runs;
-    itemize(collection, "U+5380 U+E0100", kDefaultFontStyle, &runs);
+    itemize(collection, "U+5380 U+E0100", &runs);
     EXPECT_EQ(hasCmapFormat14Font.get(), runs[0].fakedFont.font);
 
-    itemize(reversedCollection, "U+5380 U+E0100", kDefaultFontStyle, &runs);
+    itemize(reversedCollection, "U+5380 U+E0100", &runs);
     EXPECT_EQ(noCmapFormat14Font.get(), runs[0].fakedFont.font);
 }
 

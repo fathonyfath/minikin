@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_FONT_LANGUAGE_H
-#define MINIKIN_FONT_LANGUAGE_H
+#ifndef MINIKIN_LOCALE_LIST_H
+#define MINIKIN_LOCALE_LIST_H
 
 #include <string>
 #include <vector>
@@ -204,4 +204,4 @@ private:
 
 }  // namespace minikin
 
-#endif  // MINIKIN_FONT_LANGUAGE_H
+#endif  // MINIKIN_LOCALE_LIST_H

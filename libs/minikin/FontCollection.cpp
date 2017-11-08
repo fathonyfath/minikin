@@ -126,7 +126,7 @@ const uint32_t kFirstFontScore = UINT32_MAX;
 //    base character.
 //  - kFirstFontScore: When the font is the first font family in the collection and it supports the
 //    given character or variation sequence.
-uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, int variant,
+uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, FontVariant variant,
         uint32_t localeListId, const std::shared_ptr<FontFamily>& fontFamily) const {
 
     const uint32_t coverageScore = calcCoverageScore(ch, vs, fontFamily);
@@ -229,8 +229,10 @@ uint32_t FontCollection::calcLocaleMatchingScore(uint32_t userLocaleListId,
 // Calculates a font score based on variant ("compact" or "elegant") matching.
 //  - Returns 1 if the font doesn't have variant or the variant matches with the text style.
 //  - No score if the font has a variant but it doesn't match with the text style.
-uint32_t FontCollection::calcVariantMatchingScore(int variant, const FontFamily& fontFamily) {
-    return (fontFamily.variant() == 0 || fontFamily.variant() == variant) ? 1 : 0;
+uint32_t FontCollection::calcVariantMatchingScore(FontVariant variant,
+                                                  const FontFamily& fontFamily) {
+    const FontVariant familyVariant = fontFamily.variant();
+    return (familyVariant == FontVariant::DEFAULT || familyVariant == variant) ? 1 : 0;
 }
 
 // Implement heuristic for choosing best-match font. Here are the rules:
@@ -239,7 +241,7 @@ uint32_t FontCollection::calcVariantMatchingScore(int variant, const FontFamily&
 // 3. Highest score wins, with ties resolved to the first font.
 // This method never returns nullptr.
 const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t localeListId, int variant) const {
+            uint32_t localeListId, FontVariant variant) const {
     if (ch >= mMaxChar) {
         return mFamilies[0];
     }
@@ -368,9 +370,8 @@ bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
 constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
 void FontCollection::itemize(const uint16_t *string, size_t string_size, FontStyle style,
-        vector<Run>* result) const {
-    const uint32_t localeListId = style.getLocaleListId();
-    int variant = style.getVariant();
+        uint32_t localeListId, vector<Run>* result) const {
+    minikin::FontVariant variant = style.variant;
     const FontFamily* lastFamily = nullptr;
     Run* run = nullptr;
 

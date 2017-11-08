@@ -22,6 +22,7 @@
 
 #include "minikin/FontCollection.h"
 #include "minikin/FontFamily.h"
+#include "minikin/LocaleList.h"
 #include "MinikinFontForTest.h"
 
 namespace minikin {
@@ -37,12 +38,12 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
         }
 
         xmlChar* variantXmlch = xmlGetProp(familyNode, (const xmlChar*)"variant");
-        int variant = VARIANT_DEFAULT;
+        FontVariant variant = FontVariant::DEFAULT;
         if (variantXmlch) {
             if (xmlStrcmp(variantXmlch, (const xmlChar*)"elegant") == 0) {
-                variant = VARIANT_ELEGANT;
+                variant = FontVariant::ELEGANT;
             } else if (xmlStrcmp(variantXmlch, (const xmlChar*)"compact") == 0) {
-                variant = VARIANT_COMPACT;
+                variant = FontVariant::COMPACT;
             }
         }
 
@@ -52,9 +53,10 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
                 continue;
             }
 
-            int weight = atoi((const char*)(xmlGetProp(fontNode, (const xmlChar*)"weight"))) / 100;
-            bool italic = xmlStrcmp(
-                    xmlGetProp(fontNode, (const xmlChar*)"style"), (const xmlChar*)"italic") == 0;
+            FontWeight weight = static_cast<FontWeight>(
+                    atoi((const char*)(xmlGetProp(fontNode, (const xmlChar*)"weight"))));
+            FontSlant italic = static_cast<FontSlant>(xmlStrcmp(
+                    xmlGetProp(fontNode, (const xmlChar*)"style"), (const xmlChar*)"italic") == 0);
             xmlChar* index = xmlGetProp(familyNode, (const xmlChar*)"index");
 
             xmlChar* fontFileName = xmlNodeListGetString(doc, fontNode->xmlChildrenNode, 1);
@@ -82,8 +84,7 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
         if (lang == nullptr) {
             family = std::make_shared<FontFamily>(variant, std::move(fonts));
         } else {
-            uint32_t langId = FontStyle::registerLocaleList(
-                    std::string((const char*)lang, xmlStrlen(lang)));
+            uint32_t langId = registerLocaleList(std::string((const char*)lang, xmlStrlen(lang)));
             family = std::make_shared<FontFamily>(langId, variant, std::move(fonts));
         }
         families.push_back(family);

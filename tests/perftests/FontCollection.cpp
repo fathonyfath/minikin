@@ -20,6 +20,7 @@
 
 #include <benchmark/benchmark.h>
 
+#include "minikin/LocaleList.h"
 #include "FontTestUtils.h"
 #include "UnicodeUtils.h"
 #include "MinikinInternal.h"
@@ -87,12 +88,13 @@ static void BM_FontCollection_itemize(benchmark::State& state) {
     ParseUnicode(
             buffer, 64, ITEMIZE_TEST_CASES[testIndex].itemizeText.c_str(), &utf16_length, nullptr);
     std::vector<FontCollection::Run> result;
-    FontStyle style(FontStyle::registerLocaleList(ITEMIZE_TEST_CASES[testIndex].languageTag));
+    FontStyle style;
+    uint32_t localeListId = registerLocaleList(ITEMIZE_TEST_CASES[testIndex].languageTag);
 
     android::AutoMutex _l(gMinikinLock);
     while (state.KeepRunning()) {
         result.clear();
-        collection->itemize(buffer, utf16_length, style, &result);
+        collection->itemize(buffer, utf16_length, style, localeListId, &result);
     }
 }
 

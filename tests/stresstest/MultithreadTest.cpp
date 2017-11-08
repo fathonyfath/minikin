@@ -76,8 +76,7 @@ static void thread_main(int tid) {
             // Generates 10 of 3-letter words so that the word sometimes hit the cache.
             Layout layout;
             std::vector<uint16_t> text = generateTestText(&mt, 3, 10);
-            layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, FontStyle(),
-                    paint, collection);
+            layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, collection);
             std::vector<float> advances(text.size());
             layout.getAdvances(advances.data());
             for (size_t k = 0; k < advances.size(); ++k) {
