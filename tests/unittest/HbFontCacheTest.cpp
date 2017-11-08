@@ -51,8 +51,6 @@ TEST_F(HbFontCacheTest, getHbFontLockedTest) {
     EXPECT_NE(nullptr, getHbFontLocked(fontB.get()));
     EXPECT_NE(nullptr, getHbFontLocked(fontC.get()));
 
-    EXPECT_NE(nullptr, getHbFontLocked(nullptr));
-
     // Must return same object if same font object is passed.
     EXPECT_EQ(getHbFontLocked(fontA.get()), getHbFontLocked(fontA.get()));
     EXPECT_EQ(getHbFontLocked(fontB.get()), getHbFontLocked(fontB.get()));

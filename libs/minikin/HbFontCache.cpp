@@ -82,15 +82,6 @@ void purgeHbFontLocked(const MinikinFont* minikinFont) {
 // responsible for calling hb_font_destroy() on it.
 hb_font_t* getHbFontLocked(const MinikinFont* minikinFont) {
     assertMinikinLocked();
-    // TODO: get rid of nullFaceFont
-    static hb_font_t* nullFaceFont = nullptr;
-    if (minikinFont == nullptr) {
-        if (nullFaceFont == nullptr) {
-            nullFaceFont = hb_font_create(nullptr);
-        }
-        return hb_font_reference(nullFaceFont);
-    }
-
     HbFontCache* fontCache = getFontCacheLocked();
     const int32_t fontId = minikinFont->GetUniqueId();
     hb_font_t* font = fontCache->get(fontId);
