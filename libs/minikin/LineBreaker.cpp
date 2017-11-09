@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "minikin/Characters.h"
 #include "minikin/Layout.h"
 #include "HyphenatorMap.h"
 #include "LayoutUtils.h"
@@ -28,9 +29,6 @@
 #include "WordBreaker.h"
 
 namespace minikin {
-
-constexpr uint16_t CHAR_TAB = 0x0009;
-constexpr uint16_t CHAR_NBSP = 0x00A0;
 
 // Large scores in a hierarchy; we prefer desperate breaks to an overfull line. All these
 // constants are larger than any reasonable actual width score.
@@ -216,10 +214,10 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 // postSpaceCount is the number of spaces that would be seen if we decide to break at the end of the
 //     word (and like postBreak it doesn't count any line-ending space after the word).
 // hyphenPenalty is the amount of penalty for hyphenation.
-void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
-        const std::shared_ptr<FontCollection>& typeface, size_t runStart,
-        size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak,
-        size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags) {
+void LineBreaker::addHyphenationCandidates(const MinikinPaint* paint,
+        const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
+        size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak, size_t postSpaceCount,
+        float hyphenPenalty, Bidi bidiFlags) {
     const bool isRtlWord = isRtl(bidiFlags);
     const size_t wordStart = mWordBreaker->wordStart();
     const size_t wordEnd = mWordBreaker->wordEnd();
@@ -241,12 +239,12 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
             continue;
         }
 
-        paint->hyphenEdit = HyphenEdit::editForThisLine(hyph);
         const size_t firstPartLen = j - lastBreak;
         advances.resize(firstPartLen);
         overhangs.resize(firstPartLen);
         const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
-                mTextBuf.size(), bidiFlags, *paint, typeface, advances.data(),
+                mTextBuf.size(), bidiFlags, *paint, StartHyphenEdit::NO_EDIT, editForThisLine(hyph),
+                typeface, advances.data(),
                 nullptr /* extent */, overhangs.data());
         const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
         LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtlWord);
@@ -255,13 +253,12 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
         // take the existing overhang into account.
         const float firstOverhang = isRtlWord ? overhang.left : overhang.right;
 
-        paint->hyphenEdit = HyphenEdit::editForNextLine(hyph);
         const size_t secondPartLen = afterWord - j;
         advances.resize(secondPartLen);
         overhangs.resize(secondPartLen);
         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
-                mTextBuf.size(), bidiFlags, *paint, typeface, advances.data(),
-                nullptr /* extent */, overhangs.data());
+                mTextBuf.size(), bidiFlags, *paint, editForNextLine(hyph), EndHyphenEdit::NO_EDIT,
+                typeface, advances.data(), nullptr /* extent */, overhangs.data());
         // hyphPreBreak is calculated like this so that when the line width for a future line break
         // is being calculated, the width of the whole word would be subtracted and the width of the
         // second part would be added.
@@ -271,8 +268,6 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 
         addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang,
                 postSpaceCount, postSpaceCount, hyphenPenalty, hyph, isRtlWord);
-
-        paint->hyphenEdit = HyphenEdit::NO_EDIT;
     }
 }
 
@@ -282,7 +277,7 @@ void LineBreaker::addHyphenationCandidates(MinikinPaint* paint,
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addWordBreak.
-void LineBreaker::addStyleRunInternal(MinikinPaint* paint,
+void LineBreaker::addStyleRunInternal(const MinikinPaint* paint,
         const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end, bool isRtl,
         uint32_t localeListId) {
     const Bidi bidiFlags = isRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
@@ -411,8 +406,8 @@ void LineBreaker::addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t st
             if (!fitsOnCurrentLine(newWidth, 0.0, 0.0)) {
                 constexpr HyphenationType hyphen = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
                 pushBreak(i, width, computeMaxExtent(mLastGreedyBreak->offset, i),
-                        HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType)
-                                | HyphenEdit::editForThisLine(hyphen));
+                        packHyphenEdit(editForNextLine(mLastGreedyBreak->hyphenType),
+                                editForThisLine(hyphen)));
 
                 existingPreBreak += width;
                 // Only set the fields that will be later read.
@@ -471,8 +466,8 @@ void LineBreaker::addGreedyBreak(size_t breakIndex) {
     pushBreak(candidate.offset,
             candidate.postBreak - mLastGreedyBreak->preBreak,
             computeMaxExtent(mLastGreedyBreak->offset, candidate.offset),
-            HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType)
-                    | HyphenEdit::editForThisLine(candidate.hyphenType));
+            packHyphenEdit(editForNextLine(mLastGreedyBreak->hyphenType),
+                    editForThisLine(candidate.hyphenType)));
     mLastGreedyBreak = &candidate;
 }
 
@@ -516,7 +511,7 @@ void LineBreaker::considerGreedyBreakCandidate(size_t candIndex) {
     insertGreedyBreakCandidate(candIndex, cand->penalty);
 }
 
-void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, uint8_t hyphenEdit) {
+void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit) {
     mBreaks.push_back(offset);
     mWidths.push_back(width);
     mAscents.push_back(extent.ascent);
@@ -585,7 +580,8 @@ void LineBreaker::computeBreaksGreedy() {
         pushBreak(lastCandidate->offset,
                 lastCandidate->postBreak - mLastGreedyBreak->preBreak,
                 computeMaxExtent(mLastGreedyBreak->offset, lastCandidate->offset),
-                HyphenEdit::editForNextLine(mLastGreedyBreak->hyphenType));
+                packHyphenEdit(editForNextLine(mLastGreedyBreak->hyphenType),
+                        EndHyphenEdit::NO_EDIT));
         // No need to update mLastGreedyBreak because we're done.
     }
 }
@@ -668,11 +664,11 @@ void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& brea
         MinikinExtent extent = computeMaxExtent(mCandidates[prev].offset, mCandidates[i].offset);
         mAscents.push_back(extent.ascent);
         mDescents.push_back(extent.descent);
-        int flags = HyphenEdit::editForThisLine(mCandidates[i].hyphenType);
-        if (prev > 0) {
-            flags |= HyphenEdit::editForNextLine(mCandidates[prev].hyphenType);
-        }
-        mFlags.push_back(flags);
+
+        const HyphenEdit edit = packHyphenEdit(
+                prev == 0 ? StartHyphenEdit::NO_EDIT : editForNextLine(mCandidates[prev].hyphenType),
+                editForThisLine(mCandidates[i].hyphenType));
+        mFlags.push_back(static_cast<int>(edit));
     }
     std::reverse(mBreaks.begin(), mBreaks.end());
     std::reverse(mWidths.begin(), mWidths.end());

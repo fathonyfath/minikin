@@ -22,6 +22,9 @@
 #define MINIKIN_HYPHENATOR_H
 
 #include <string>
+#include <vector>
+
+#include "minikin/Characters.h"
 
 namespace minikin {
 
@@ -62,61 +65,103 @@ enum class HyphenationType : uint8_t {
     BREAK_AND_INSERT_HYPHEN_AND_ZWJ = 8
 };
 
-// The hyphen edit represents an edit to the string when a word is
-// hyphenated. The most common hyphen edit is adding a "-" at the end
-// of a syllable, but nonstandard hyphenation allows for more choices.
-// Note that a HyphenEdit can hold two types of edits at the same time,
+// The hyphen edit represents an edit to the string when a word is hyphenated.
+// The most common hyphen edit is adding a "-" at the end of a syllable, but nonstandard hyphenation
+// allows for more choices.
 // One at the beginning of the string/line and one at the end.
-class HyphenEdit {
-public:
-    static const uint32_t NO_EDIT = 0x00;
+enum class EndHyphenEdit : uint8_t {
+    // Note that everything inserting characters must have a value greater than or equal to
+    // INSERT_HYPHEN.
+    NO_EDIT                = 0b000,
+    REPLACE_WITH_HYPHEN    = 0b001,
 
-    static const uint32_t INSERT_HYPHEN_AT_END = 0x01;
-    static const uint32_t INSERT_ARMENIAN_HYPHEN_AT_END = 0x02;
-    static const uint32_t INSERT_MAQAF_AT_END = 0x03;
-    static const uint32_t INSERT_UCAS_HYPHEN_AT_END = 0x04;
-    static const uint32_t INSERT_ZWJ_AND_HYPHEN_AT_END = 0x05;
-    static const uint32_t REPLACE_WITH_HYPHEN_AT_END = 0x06;
-    static const uint32_t BREAK_AT_END = 0x07;
-
-    static const uint32_t INSERT_HYPHEN_AT_START = 0x01 << 3;
-    static const uint32_t INSERT_ZWJ_AT_START = 0x02 << 3;
-    static const uint32_t BREAK_AT_START = 0x03 << 3;
-
-    // Keep in sync with the definitions in the Java code at:
-    // frameworks/base/graphics/java/android/graphics/Paint.java
-    static const uint32_t MASK_END_OF_LINE = 0x07;
-    static const uint32_t MASK_START_OF_LINE = 0x03 << 3;
-
-    inline static bool isReplacement(uint32_t hyph) {
-        return hyph == REPLACE_WITH_HYPHEN_AT_END;
-    }
-
-    inline static bool isInsertion(uint32_t hyph) {
-        return (hyph == INSERT_HYPHEN_AT_END
-                || hyph == INSERT_ARMENIAN_HYPHEN_AT_END
-                || hyph == INSERT_MAQAF_AT_END
-                || hyph == INSERT_UCAS_HYPHEN_AT_END
-                || hyph == INSERT_ZWJ_AND_HYPHEN_AT_END
-                || hyph == INSERT_HYPHEN_AT_START
-                || hyph == INSERT_ZWJ_AT_START);
-    }
-
-    const static uint32_t* getHyphenString(uint32_t hyph);
-    static uint32_t editForThisLine(HyphenationType type);
-    static uint32_t editForNextLine(HyphenationType type);
-
-    HyphenEdit() : hyphen(NO_EDIT) { }
-    HyphenEdit(uint32_t hyphenInt) : hyphen(hyphenInt) { }  // NOLINT(implicit)
-    uint32_t getHyphen() const { return hyphen; }
-    bool operator==(const HyphenEdit &other) const { return hyphen == other.hyphen; }
-
-    uint32_t getEnd() const { return hyphen & MASK_END_OF_LINE; }
-    uint32_t getStart() const { return hyphen & MASK_START_OF_LINE; }
-
-private:
-    uint32_t hyphen;
+    INSERT_HYPHEN          = 0b010,
+    INSERT_ARMENIAN_HYPHEN = 0b011,
+    INSERT_MAQAF           = 0b100,
+    INSERT_UCAS_HYPHEN     = 0b101,
+    INSERT_ZWJ_AND_HYPHEN  = 0b110,
 };
+
+enum class StartHyphenEdit : uint8_t {
+    NO_EDIT       = 0b00,
+
+    INSERT_HYPHEN = 0b01,
+    INSERT_ZWJ    = 0b10,
+};
+
+typedef uint8_t HyphenEdit;
+constexpr uint8_t START_BITS_SHIFT = 3;
+// The following two masks must keep in sync with the definitions in the Java code at:
+// frameworks/base/graphics/java/android/graphics/Paint.java
+constexpr uint8_t MASK_END_OF_LINE   = 0b00111;
+constexpr uint8_t MASK_START_OF_LINE = 0b11000;
+
+inline HyphenEdit packHyphenEdit(StartHyphenEdit start, EndHyphenEdit end) {
+    return static_cast<uint8_t>(start) << START_BITS_SHIFT | static_cast<uint8_t>(end);
+}
+
+inline EndHyphenEdit endHyphenEdit(HyphenEdit hyphenEdit) {
+    return static_cast<EndHyphenEdit>(hyphenEdit & MASK_END_OF_LINE);
+}
+
+inline StartHyphenEdit startHyphenEdit(HyphenEdit hyphenEdit) {
+    return static_cast<StartHyphenEdit>(hyphenEdit >> START_BITS_SHIFT);
+}
+
+inline bool isReplacement(EndHyphenEdit hyph) {
+    return hyph == EndHyphenEdit::REPLACE_WITH_HYPHEN;
+}
+
+inline bool isInsertion(StartHyphenEdit hyph) {
+    return hyph != StartHyphenEdit::NO_EDIT;
+}
+
+inline bool isInsertion(EndHyphenEdit hyph) {
+    return static_cast<uint8_t>(hyph) >= static_cast<uint8_t>(EndHyphenEdit::INSERT_HYPHEN);
+}
+
+template<typename T, size_t size> constexpr size_t ARRAYSIZE(T const (&)[size]) { return size; }
+constexpr uint32_t HYPHEN_STR_ZWJ[] = {CHAR_ZWJ};
+constexpr uint32_t HYPHEN_STR_HYPHEN[] = {CHAR_HYPHEN};
+constexpr uint32_t HYPHEN_STR_ARMENIAN_HYPHEN[] = {CHAR_ARMENIAN_HYPHEN};
+constexpr uint32_t HYPHEN_STR_MAQAF[] = {CHAR_MAQAF};
+constexpr uint32_t HYPHEN_STR_UCAS_HYPHEN[] = {CHAR_UCAS_HYPHEN};
+constexpr uint32_t HYPHEN_STR_ZWJ_AND_HYPHEN[] = {CHAR_ZWJ, CHAR_HYPHEN};
+constexpr std::pair<const uint32_t*, size_t> EMPTY_HYPHEN_STR(nullptr, 0);
+#define MAKE_HYPHEN_STR(chars) std::make_pair((chars), ARRAYSIZE(chars))
+
+inline std::pair<const uint32_t*, size_t> getHyphenString(StartHyphenEdit hyph) {
+    if (hyph == StartHyphenEdit::INSERT_ZWJ) {
+        return MAKE_HYPHEN_STR(HYPHEN_STR_ZWJ);
+    } else if (hyph == StartHyphenEdit::INSERT_HYPHEN) {
+        return MAKE_HYPHEN_STR(HYPHEN_STR_HYPHEN);
+    } else {
+        return EMPTY_HYPHEN_STR;
+    }
+}
+
+inline std::pair<const uint32_t*, size_t> getHyphenString(EndHyphenEdit hyph) {
+    switch (hyph) {
+        case EndHyphenEdit::REPLACE_WITH_HYPHEN:  // fall through
+        case EndHyphenEdit::INSERT_HYPHEN:
+            return MAKE_HYPHEN_STR(HYPHEN_STR_HYPHEN);
+        case EndHyphenEdit::INSERT_ARMENIAN_HYPHEN:
+            return MAKE_HYPHEN_STR(HYPHEN_STR_ARMENIAN_HYPHEN);
+        case EndHyphenEdit::INSERT_MAQAF:
+            return MAKE_HYPHEN_STR(HYPHEN_STR_MAQAF);
+        case EndHyphenEdit::INSERT_UCAS_HYPHEN:
+            return MAKE_HYPHEN_STR(HYPHEN_STR_UCAS_HYPHEN);
+        case EndHyphenEdit::INSERT_ZWJ_AND_HYPHEN:
+            return MAKE_HYPHEN_STR(HYPHEN_STR_ZWJ_AND_HYPHEN);
+        case EndHyphenEdit::NO_EDIT:
+        default:
+            return EMPTY_HYPHEN_STR;
+    }
+}
+#undef MAKE_HYPHEN_STR
+
+EndHyphenEdit editForThisLine(HyphenationType type);
+StartHyphenEdit editForNextLine(HyphenationType type);
 
 // hyb file header; implementation details are in the .cpp file
 struct Header;

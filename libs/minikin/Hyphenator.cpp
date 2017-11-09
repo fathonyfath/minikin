@@ -24,12 +24,9 @@
 #include <unicode/uchar.h>
 #include <unicode/uscript.h>
 
-namespace minikin {
+#include "minikin/Characters.h"
 
-static const uint16_t CHAR_HYPHEN_MINUS = 0x002D;
-static const uint16_t CHAR_SOFT_HYPHEN = 0x00AD;
-static const uint16_t CHAR_MIDDLE_DOT = 0x00B7;
-static const uint16_t CHAR_HYPHEN = 0x2010;
+namespace minikin {
 
 // The following are structs that correspond to tables inside the hyb file format
 
@@ -161,65 +158,35 @@ bool Hyphenator::isLineBreakingHyphen(uint32_t c) {
             c == 0x2E40);  // DOUBLE HYPHEN
 }
 
-const static uint32_t HYPHEN_STR[] = {0x2010, 0};
-const static uint32_t ARMENIAN_HYPHEN_STR[] = {0x058A, 0};
-const static uint32_t MAQAF_STR[] = {0x05BE, 0};
-const static uint32_t UCAS_HYPHEN_STR[] = {0x1400, 0};
-const static uint32_t ZWJ_STR[] = {0x200D, 0};
-const static uint32_t ZWJ_AND_HYPHEN_STR[] = {0x200D, 0x2010, 0};
-
-const uint32_t* HyphenEdit::getHyphenString(uint32_t hyph) {
-    switch (hyph) {
-        case INSERT_HYPHEN_AT_END:
-        case REPLACE_WITH_HYPHEN_AT_END:
-        case INSERT_HYPHEN_AT_START:
-            return HYPHEN_STR;
-        case INSERT_ARMENIAN_HYPHEN_AT_END:
-            return ARMENIAN_HYPHEN_STR;
-        case INSERT_MAQAF_AT_END:
-            return MAQAF_STR;
-        case INSERT_UCAS_HYPHEN_AT_END:
-            return UCAS_HYPHEN_STR;
-        case INSERT_ZWJ_AND_HYPHEN_AT_END:
-            return ZWJ_AND_HYPHEN_STR;
-        case INSERT_ZWJ_AT_START:
-            return ZWJ_STR;
-        default:
-            return nullptr;
-    }
-}
-
-uint32_t HyphenEdit::editForThisLine(HyphenationType type) {
+EndHyphenEdit editForThisLine(HyphenationType type) {
     switch (type) {
-        case HyphenationType::DONT_BREAK:
-            return NO_EDIT;
         case HyphenationType::BREAK_AND_INSERT_HYPHEN:
-            return INSERT_HYPHEN_AT_END;
+            return EndHyphenEdit::INSERT_HYPHEN;
         case HyphenationType::BREAK_AND_INSERT_ARMENIAN_HYPHEN:
-            return INSERT_ARMENIAN_HYPHEN_AT_END;
+            return EndHyphenEdit::INSERT_ARMENIAN_HYPHEN;
         case HyphenationType::BREAK_AND_INSERT_MAQAF:
-            return INSERT_MAQAF_AT_END;
+            return EndHyphenEdit::INSERT_MAQAF;
         case HyphenationType::BREAK_AND_INSERT_UCAS_HYPHEN:
-            return INSERT_UCAS_HYPHEN_AT_END;
+            return EndHyphenEdit::INSERT_UCAS_HYPHEN;
         case HyphenationType::BREAK_AND_REPLACE_WITH_HYPHEN:
-            return REPLACE_WITH_HYPHEN_AT_END;
+            return EndHyphenEdit::REPLACE_WITH_HYPHEN;
         case HyphenationType::BREAK_AND_INSERT_HYPHEN_AND_ZWJ:
-            return INSERT_ZWJ_AND_HYPHEN_AT_END;
+            return EndHyphenEdit::INSERT_ZWJ_AND_HYPHEN;
+        case HyphenationType::DONT_BREAK:  // Hyphen edit for non breaking case doesn't make sense.
         default:
-            return BREAK_AT_END;
+            return EndHyphenEdit::NO_EDIT;
     }
 }
 
-uint32_t HyphenEdit::editForNextLine(HyphenationType type) {
+StartHyphenEdit editForNextLine(HyphenationType type) {
     switch (type) {
-        case HyphenationType::DONT_BREAK:
-            return NO_EDIT;
         case HyphenationType::BREAK_AND_INSERT_HYPHEN_AT_NEXT_LINE:
-            return INSERT_HYPHEN_AT_START;
+            return StartHyphenEdit::INSERT_HYPHEN;
         case HyphenationType::BREAK_AND_INSERT_HYPHEN_AND_ZWJ:
-            return INSERT_ZWJ_AT_START;
+            return StartHyphenEdit::INSERT_ZWJ;
+        case HyphenationType::DONT_BREAK:  // Hyphen edit for non breaking case doesn't make sense.
         default:
-            return BREAK_AT_START;
+            return StartHyphenEdit::NO_EDIT;
     }
 }
 
