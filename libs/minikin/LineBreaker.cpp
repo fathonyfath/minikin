@@ -215,8 +215,9 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const uint16_t* str, size_t 
 //     word (and like postBreak it doesn't count any line-ending space after the word).
 // hyphenPenalty is the amount of penalty for hyphenation.
 void LineBreaker::addHyphenationCandidates(const MinikinPaint* paint,
-        size_t runStart, size_t afterWord, size_t lastBreak, ParaWidth lastBreakWidth,
-        ParaWidth postBreak, size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags) {
+        const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
+        size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth postBreak, size_t postSpaceCount,
+        float hyphenPenalty, Bidi bidiFlags) {
     const bool isRtlWord = isRtl(bidiFlags);
     const size_t wordStart = mWordBreaker->wordStart();
     const size_t wordEnd = mWordBreaker->wordEnd();
@@ -243,7 +244,8 @@ void LineBreaker::addHyphenationCandidates(const MinikinPaint* paint,
         overhangs.resize(firstPartLen);
         const float firstPartWidth = Layout::measureText(mTextBuf.data(), lastBreak, firstPartLen,
                 mTextBuf.size(), bidiFlags, *paint, StartHyphenEdit::NO_EDIT, editForThisLine(hyph),
-                advances.data(), nullptr /* extent */, overhangs.data());
+                typeface, advances.data(),
+                nullptr /* extent */, overhangs.data());
         const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
         LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtlWord);
         // TODO: This ignores potential overhang from a previous word, e.g. in "R table" if the
@@ -256,7 +258,7 @@ void LineBreaker::addHyphenationCandidates(const MinikinPaint* paint,
         overhangs.resize(secondPartLen);
         const float secondPartWidth = Layout::measureText(mTextBuf.data(), j, secondPartLen,
                 mTextBuf.size(), bidiFlags, *paint, editForNextLine(hyph), EndHyphenEdit::NO_EDIT,
-                advances.data(), nullptr /* extent */, overhangs.data());
+                typeface, advances.data(), nullptr /* extent */, overhangs.data());
         // hyphPreBreak is calculated like this so that when the line width for a future line break
         // is being calculated, the width of the whole word would be subtracted and the width of the
         // second part would be added.
@@ -275,14 +277,15 @@ void LineBreaker::addHyphenationCandidates(const MinikinPaint* paint,
 //
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addWordBreak.
-void LineBreaker::addStyleRunInternal(const MinikinPaint* paint, size_t start, size_t end,
-        bool isRtl, uint32_t localeListId) {
+void LineBreaker::addStyleRunInternal(const MinikinPaint* paint,
+        const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end, bool isRtl,
+        uint32_t localeListId) {
     const Bidi bidiFlags = isRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
 
     float hyphenPenalty = 0.0;
     if (paint != nullptr) {
         Layout::measureText(mTextBuf.data(), start, end - start, mTextBuf.size(), bidiFlags,
-                *paint, mCharWidths.data() + start, mCharExtents.data() + start,
+                *paint, typeface, mCharWidths.data() + start, mCharExtents.data() + start,
                 mCharOverhangs.data() + start);
 
         // a heuristic that seems to perform well
@@ -370,8 +373,9 @@ void LineBreaker::addStyleRunInternal(const MinikinPaint* paint, size_t start, s
                 adjustSecondOverhang(maxBackwardOverhang);
             }
             if (hyphenate) {
-                addHyphenationCandidates(paint, start, afterWord, lastBreak, lastBreakWidth,
-                        postBreak, postSpaceCount, hyphenPenalty, bidiFlags);
+                addHyphenationCandidates(paint, typeface, start, afterWord, lastBreak,
+                        lastBreakWidth, postBreak, postSpaceCount, hyphenPenalty,
+                        bidiFlags);
             }
             if (addBreak) {
                 const float penalty = hyphenPenalty * mWordBreaker->breakBadness();
@@ -543,7 +547,7 @@ void LineBreaker::addReplacement(size_t start, size_t end, float width, uint32_t
     std::fill(&mCharWidths[start + 1], &mCharWidths[end], 0.0f);
     // TODO: Get the extents information from the caller.
     std::fill(&mCharExtents[start], &mCharExtents[end], (MinikinExtent) {0.0f, 0.0f, 0.0f});
-    addStyleRunInternal(nullptr, start, end, false, localeListId);
+    addStyleRunInternal(nullptr, nullptr, start, end, false, localeListId);
 }
 
 // Get the width of a space. May return 0 if there are no spaces.

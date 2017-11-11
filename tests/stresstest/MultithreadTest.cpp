@@ -66,15 +66,17 @@ static void thread_main(int tid) {
     }
 
     std::mt19937 mt(tid);
+    MinikinPaint paint;
 
     for (int i = 0; i < COLLECTION_COUNT_PER_THREAD; ++i) {
-        MinikinPaint paint(getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
+        std::shared_ptr<FontCollection> collection(
+                getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
 
         for (int j = 0; j < LAYOUT_COUNT_PER_COLLECTION; ++j) {
             // Generates 10 of 3-letter words so that the word sometimes hit the cache.
             Layout layout;
             std::vector<uint16_t> text = generateTestText(&mt, 3, 10);
-            layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
+            layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, collection);
             std::vector<float> advances(text.size());
             layout.getAdvances(advances.data());
             for (size_t k = 0; k < advances.size(); ++k) {
