@@ -27,13 +27,42 @@
 
 namespace minikin {
 
+class FontCollection;
 class MinikinFont;
 
 // Possibly move into own .h file?
 // Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
 struct MinikinPaint {
-    MinikinPaint() : size(0), scaleX(0), skewX(0), letterSpacing(0), wordSpacing(0),
-            paintFlags(0), localeListId(0), hyphenEdit(), fontFeatureSettings() { }
+    MinikinPaint(
+            float size,
+            float scaleX,
+            float skewX,
+            float letterSpacing,
+            float wordSpacing,
+            uint32_t paintFlags,
+            uint32_t localeListId,
+            FontStyle fontStyle,
+            HyphenEdit hyphenEdit,
+            const std::string& fontFeatureSettings,
+            const std::shared_ptr<FontCollection>& collection)
+        : size(size), scaleX(scaleX), skewX(skewX), letterSpacing(letterSpacing),
+          wordSpacing(wordSpacing), paintFlags(paintFlags), localeListId(localeListId),
+          fontStyle(fontStyle), hyphenEdit(hyphenEdit), fontFeatureSettings(fontFeatureSettings),
+          collection(collection) {}
+
+    // For testing purposes only.
+    MinikinPaint(const std::shared_ptr<FontCollection>& collection) : MinikinPaint(
+          10.0f,  /* size */
+          1.0f,  /* scale */
+          0.0f,  /* skewX */
+          0.0f,  /* letterSpacing */
+          0.0f,  /* wordSpacing */
+          0,  /* paintFlags */
+          0,  /* localeListId */
+          FontStyle(), /* fontStyle */
+          packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT),  /* HyphenEdit */
+          "",  /* fontFeatureSettings */
+          collection) {}
 
     bool skipCache() const {
         return !fontFeatureSettings.empty();
@@ -49,18 +78,13 @@ struct MinikinPaint {
     FontStyle fontStyle;
     HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
+    std::shared_ptr<FontCollection> collection;
 
-    void copyFrom(const MinikinPaint& paint) {
-        *this = paint;
-    }
-
+    // Forbid copy and assign but allow move.
     MinikinPaint(MinikinPaint&&) = default;
     MinikinPaint& operator=(MinikinPaint&&) = default;
-
-private:
-    // Forbid implicit copy and assign. Use copyFrom instead.
-    MinikinPaint(const MinikinPaint&) = default;
-    MinikinPaint& operator=(const MinikinPaint&) = default;
+    MinikinPaint(const MinikinPaint&) = delete;
+    MinikinPaint& operator=(const MinikinPaint&) = delete;
 };
 
 // Only a few flags affect layout, but those that do should have values
