@@ -147,11 +147,13 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        inline void addStyleRun(MinikinPaint* paint, size_t start, size_t end, bool isRtl) {
-            addStyleRunInternal(paint, start, end, isRtl, paint->localeListId);
+        inline void addStyleRun(MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
+                bool isRtl) {
+            addStyleRunInternal(paint, typeface, start, end, isRtl, paint->localeListId);
         }
-        void addStyleRun(const MinikinPaint* paint, size_t start, size_t end, bool isRtl,
-            uint32_t localeListId);
+        void addStyleRun(const MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
+                size_t start, size_t end, bool isRtl, uint32_t localeListId);
 
         void addReplacement(size_t start, size_t end, float width, uint32_t localeListId);
 
@@ -216,13 +218,15 @@ class LineBreaker {
         uint32_t mCurrentLocaleListId;
         uint64_t mCurrentLocaleId = 0;
 
-        void addStyleRunInternal(const MinikinPaint* paint, size_t start, size_t end, bool isRtl,
-                uint32_t localeListId);
+        void addStyleRunInternal(const MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
+                bool isRtl, uint32_t localeListId);
 
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
 
-        void addHyphenationCandidates(const MinikinPaint* paint, size_t runStart, size_t afterWord,
+        void addHyphenationCandidates(const MinikinPaint* paint,
+                const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
                 size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
                 size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags);
 

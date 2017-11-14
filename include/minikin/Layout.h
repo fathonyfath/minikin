@@ -79,19 +79,21 @@ public:
     void dump() const;
 
     void doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-            Bidi bidiFlags, const MinikinPaint &paint);
+            Bidi bidiFlags, const MinikinPaint &paint,
+            const std::shared_ptr<FontCollection>& collection);
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
             Bidi bidiFlags, const MinikinPaint &paint, StartHyphenEdit startHyphen,
-            EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents,
-            LayoutOverhang* overhangs);
+            EndHyphenEdit endHyphen, const std::shared_ptr<FontCollection>& collection,
+            float* advances, MinikinExtent* extents, LayoutOverhang* overhangs);
 
     static inline float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-            Bidi bidiFlags, const MinikinPaint &paint, float* advances, MinikinExtent* extents,
-            LayoutOverhang* overhangs) {
+            Bidi bidiFlags, const MinikinPaint &paint,
+            const std::shared_ptr<FontCollection>& collection, float* advances,
+            MinikinExtent* extents, LayoutOverhang* overhangs) {
         return measureText(buf, start, count, bufSize, bidiFlags, paint,
-                startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit), advances,
-                extents, overhangs);
+                startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit), collection,
+                advances, extents, overhangs);
     }
 
     // public accessors
@@ -143,18 +145,21 @@ private:
     // When advances is not null, measurement results will be stored in the array.
     static float doLayoutRunCached(const uint16_t* buf, size_t runStart, size_t runLength,
         size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
-        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout, float* advances,
+        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
         bool isRtl, LayoutContext* ctx, size_t bufStart,
-        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout, float* advances,
+        StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+        const std::shared_ptr<FontCollection>& collection, Layout* layout, float* advances,
         MinikinExtent* extents, LayoutOverhang* overhangs);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-        bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
+        bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+        const std::shared_ptr<FontCollection>& collection);
 
     // Append another layout (for example, cached value) into this one
     void appendLayout(Layout* src, size_t start, float extraAdvance);
