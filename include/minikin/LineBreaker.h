@@ -48,6 +48,43 @@ enum HyphenationFrequency {
 class Hyphenator;
 class WordBreaker;
 
+class Run {
+    public:
+        Run(const Range& range) : mRange(range) {}
+        virtual ~Run() {}
+
+        // Returns true if this run is RTL. Otherwise returns false.
+        virtual bool isRtl() const = 0;
+
+        // Returns true if this run is a target of hyphenation. Otherwise return false.
+        virtual bool canHyphenate() const = 0;
+
+        // Returns the locale list ID for this run.
+        virtual uint32_t getLocaleListId() const = 0;
+
+        // Fills the each character's advances, extents and overhangs.
+        virtual void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
+                                LayoutOverhang* overhangs) const = 0;
+
+        // Following two methods are only called when the implementation returns true for
+        // canHyphenate method.
+
+        // Returns the paint pointer used for this run. Do not return null if you returns true for
+        // canHyphenate method.
+        virtual const MinikinPaint* getPaint() const { return nullptr; }
+
+        // Measure the hyphenation piece and fills the each character's advances and overhangs.
+        virtual float measureHyphenPiece(const U16StringPiece&, const Range&, StartHyphenEdit,
+                                         EndHyphenEdit, float*, LayoutOverhang*) const {
+            return 0.0;
+        }
+
+        inline const Range& getRange() const { return mRange; }
+
+    protected:
+        const Range mRange;
+};
+
 class TabStops {
     public:
         void set(const int* stops, size_t nStops, int tabWidth) {
@@ -135,13 +172,7 @@ class LineBreaker {
             mHyphenationFrequency = frequency;
         }
 
-        inline void addStyleRun(MinikinPaint* paint,
-                                const std::shared_ptr<FontCollection>& typeface,
-                                const Range& range, bool isRtl) {
-            addStyleRunInternal(paint, typeface, range, isRtl, paint->localeListId);
-        }
-
-        void addReplacement(const Range& range, float width, uint32_t localeListId);
+        void addRun(const Run& run);
 
         size_t computeBreaks();
 
@@ -203,21 +234,14 @@ class LineBreaker {
         uint32_t mCurrentLocaleListId;
         uint64_t mCurrentLocaleId = 0;
 
-        void addStyleRunInternal(const MinikinPaint* paint,
-                                 const std::shared_ptr<FontCollection>& typeface,
-                                 const Range& range,
-                                 bool isRtl,
-                                 uint32_t localeListId);
-
         // Hyphenates a string potentially containing non-breaking spaces.
         std::vector<HyphenationType> hyphenate(const U16StringPiece& string);
 
-        void addHyphenationCandidates(const MinikinPaint& paint,
-                                      const std::shared_ptr<FontCollection>& typeface,
+        void addHyphenationCandidates(const Run& run,
                                       const Range& contextRange,
                                       const Range& wordRange, ParaWidth lastBreakWidth,
                                       ParaWidth PostBreak, size_t postSpaceCount,
-                                      float hyphenPenalty, Bidi bidiFlags);
+                                      float hyphenPenalty);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 float firstOverhang, float secondOverhang,
