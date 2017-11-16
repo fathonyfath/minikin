@@ -21,6 +21,8 @@
 #include <vector>
 
 #include "minikin/FontCollection.h"
+#include "minikin/Range.h"
+#include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
@@ -79,8 +81,14 @@ public:
     void dump() const;
 
     void doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-            Bidi bidiFlags, const MinikinPaint &paint,
+            Bidi bidiFlags, const MinikinPaint& paint,
             const std::shared_ptr<FontCollection>& collection);
+
+    inline void doLayout(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
+            const MinikinPaint& paint, const std::shared_ptr<FontCollection>& collection) {
+        doLayout(str.data(), range.getStart(), range.getLength(), str.size(), bidiFlags, paint,
+                 collection);
+    }
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
             Bidi bidiFlags, const MinikinPaint &paint, StartHyphenEdit startHyphen,
@@ -94,6 +102,22 @@ public:
         return measureText(buf, start, count, bufSize, bidiFlags, paint,
                 startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit), collection,
                 advances, extents, overhangs);
+    }
+
+    static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
+            const MinikinPaint &paint, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+            const std::shared_ptr<FontCollection>& collection, float* advances,
+            MinikinExtent* extents, LayoutOverhang* overhangs) {
+        return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
+                paint, startHyphen, endHyphen, collection, advances, extents, overhangs);
+    }
+
+    static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
+            const MinikinPaint &paint, const std::shared_ptr<FontCollection>& collection,
+            float* advances, MinikinExtent* extents, LayoutOverhang* overhangs) {
+        return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
+                paint, startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
+                collection, advances, extents, overhangs);
     }
 
     // public accessors

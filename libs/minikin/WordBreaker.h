@@ -27,6 +27,7 @@
 
 #include <unicode/brkiter.h>
 
+#include "minikin/Range.h"
 #include "Locale.h"
 
 namespace minikin {
@@ -102,6 +103,14 @@ public:
     ssize_t wordStart() const;
 
     ssize_t wordEnd() const;
+
+    // Returns the range from wordStart() to wordEnd().
+    // If wordEnd() <= wordStart(), returns empty range.
+    inline Range wordRange() const {
+        const uint32_t start = wordStart();
+        const uint32_t end = wordEnd();
+        return start < end ? Range(start, end) : Range(end, end);
+    }
 
     int breakBadness() const;
 

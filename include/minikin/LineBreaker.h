@@ -28,6 +28,8 @@
 #include "minikin/FontCollection.h"
 #include "minikin/Layout.h"
 #include "minikin/MinikinFont.h"
+#include "minikin/Range.h"
+#include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
@@ -91,25 +93,14 @@ class LineBreaker {
                 virtual float getRightPadding(size_t lineNo) = 0;
         };
 
-        LineBreaker();
+        LineBreaker(const U16StringPiece& string);
 
         virtual ~LineBreaker();
 
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
-        void resize(size_t size) {
-            mTextBuf.resize(size);
-            mCharWidths.resize(size);
-            mCharExtents.resize(size);
-            mCharOverhangs.resize(size);
-        }
-
         size_t size() const {
             return mTextBuf.size();
-        }
-
-        uint16_t* buffer() {
-            return mTextBuf.data();
         }
 
         float* charWidths() {
@@ -128,9 +119,6 @@ class LineBreaker {
             mLineWidthDelegate = std::move(lineWidths);
         }
 
-        // set text to current contents of buffer
-        void setText();
-
         void setTabStops(const int* stops, size_t nStops, int tabWidth) {
             mTabStops.set(stops, nStops, tabWidth);
         }
@@ -148,14 +136,12 @@ class LineBreaker {
         }
 
         inline void addStyleRun(MinikinPaint* paint,
-                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
-                bool isRtl) {
-            addStyleRunInternal(paint, typeface, start, end, isRtl, paint->localeListId);
+                                const std::shared_ptr<FontCollection>& typeface,
+                                const Range& range, bool isRtl) {
+            addStyleRunInternal(paint, typeface, range, isRtl, paint->localeListId);
         }
-        void addStyleRun(const MinikinPaint* paint, const std::shared_ptr<FontCollection>& typeface,
-                size_t start, size_t end, bool isRtl, uint32_t localeListId);
 
-        void addReplacement(size_t start, size_t end, float width, uint32_t localeListId);
+        void addReplacement(const Range& range, float width, uint32_t localeListId);
 
         size_t computeBreaks();
 
@@ -179,10 +165,9 @@ class LineBreaker {
             return mFlags.data();
         }
 
-        void finish();
     protected:
-        // For testing purpose.
-        LineBreaker(std::unique_ptr<WordBreaker>&& breaker);
+        // For testing purposes.
+        LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16StringPiece& string);
 
     private:
         // ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for
@@ -219,16 +204,20 @@ class LineBreaker {
         uint64_t mCurrentLocaleId = 0;
 
         void addStyleRunInternal(const MinikinPaint* paint,
-                const std::shared_ptr<FontCollection>& typeface, size_t start, size_t end,
-                bool isRtl, uint32_t localeListId);
+                                 const std::shared_ptr<FontCollection>& typeface,
+                                 const Range& range,
+                                 bool isRtl,
+                                 uint32_t localeListId);
 
         // Hyphenates a string potentially containing non-breaking spaces.
-        std::vector<HyphenationType> hyphenate(const uint16_t* str, size_t len);
+        std::vector<HyphenationType> hyphenate(const U16StringPiece& string);
 
-        void addHyphenationCandidates(const MinikinPaint* paint,
-                const std::shared_ptr<FontCollection>& typeface, size_t runStart, size_t afterWord,
-                size_t lastBreak, ParaWidth lastBreakWidth, ParaWidth PostBreak,
-                size_t postSpaceCount, float hyphenPenalty, Bidi bidiFlags);
+        void addHyphenationCandidates(const MinikinPaint& paint,
+                                      const std::shared_ptr<FontCollection>& typeface,
+                                      const Range& contextRange,
+                                      const Range& wordRange, ParaWidth lastBreakWidth,
+                                      ParaWidth PostBreak, size_t postSpaceCount,
+                                      float hyphenPenalty, Bidi bidiFlags);
 
         void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
                 float firstOverhang, float secondOverhang,
@@ -238,7 +227,7 @@ class LineBreaker {
         void adjustSecondOverhang(float secondOverhang);
 
         std::unique_ptr<WordBreaker> mWordBreaker;
-        std::vector<uint16_t> mTextBuf;
+        U16StringPiece mTextBuf;
         std::vector<float> mCharWidths;
         std::vector<MinikinExtent> mCharExtents;
         std::vector<LayoutOverhang> mCharOverhangs;
