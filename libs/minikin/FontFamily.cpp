@@ -75,7 +75,6 @@ FontFamily::FontFamily(FontVariant variant, std::vector<Font>&& fonts)
 
 FontFamily::FontFamily(uint32_t localeListId, FontVariant variant, std::vector<Font>&& fonts)
     : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
-    MINIKIN_ASSERT(!mFonts.empty(), "FontFamily must contain at least one font");
     computeCoverage();
 }
 
@@ -108,17 +107,20 @@ static FontFakery computeFakery(FontStyle wanted, FontStyle actual) {
 }
 
 FakedFont FontFamily::getClosestMatch(FontStyle style) const {
-    const Font* bestFont = &mFonts[0];
-    int bestMatch = computeMatch(mFonts[0].style, style);
-    for (size_t i = 1; i < mFonts.size(); i++) {
-        const Font* font = &mFonts[i];
-        int match = computeMatch(font->style, style);
-        if (match < bestMatch) {
-            bestFont = font;
+    const Font* bestFont = nullptr;
+    int bestMatch = 0;
+    for (size_t i = 0; i < mFonts.size(); i++) {
+        const Font& font = mFonts[i];
+        int match = computeMatch(font.style, style);
+        if (i == 0 || match < bestMatch) {
+            bestFont = &font;
             bestMatch = match;
         }
     }
-    return {bestFont->typeface.get(), computeFakery(style, bestFont->style)};
+    if (bestFont != nullptr) {
+        return FakedFont{ bestFont->typeface.get(), computeFakery(style, bestFont->style) };
+    }
+    return FakedFont{ nullptr, FontFakery() };
 }
 
 bool FontFamily::isColorEmojiFamily() const {
