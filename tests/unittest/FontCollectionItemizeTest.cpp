@@ -65,8 +65,11 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
     result->clear();
     ParseUnicode(buf, BUF_SIZE, str, &len, NULL);
     const uint32_t localeListId = registerLocaleList(localeList);
+    MinikinPaint paint;
+    paint.fontStyle = style;
+    paint.localeListId = localeListId;
     android::AutoMutex _l(gMinikinLock);
-    collection->itemize(buf, len, style, localeListId, result);
+    collection->itemize(buf, len, paint, result);
 }
 
 // Overloaded version for default font style.
@@ -104,9 +107,9 @@ TEST_F(FontCollectionItemizeTest, itemize_latin) {
     std::vector<FontCollection::Run> runs;
 
     const FontStyle kRegularStyle = FontStyle();
-    const FontStyle kItalicStyle = FontStyle(FontSlant::ITALIC);
-    const FontStyle kBoldStyle = FontStyle(FontWeight::BOLD);
-    const FontStyle kBoldItalicStyle = FontStyle(FontWeight::BOLD, FontSlant::ITALIC);
+    const FontStyle kItalicStyle = FontStyle(FontStyle::Slant::ITALIC);
+    const FontStyle kBoldStyle = FontStyle(FontStyle::Weight::BOLD);
+    const FontStyle kBoldItalicStyle = FontStyle(FontStyle::Weight::BOLD, FontStyle::Slant::ITALIC);
 
     itemize(collection, "'a' 'b' 'c' 'd' 'e'", kRegularStyle, &runs);
     ASSERT_EQ(1U, runs.size());
@@ -702,9 +705,9 @@ TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
-    FontStyle kBoldStyle(FontWeight::BOLD);
-    FontStyle kItalicStyle(FontSlant::ITALIC);
-    FontStyle kBoldItalicStyle(FontWeight::BOLD, FontSlant::ITALIC);
+    FontStyle kBoldStyle(FontStyle::Weight::BOLD);
+    FontStyle kItalicStyle(FontStyle::Slant::ITALIC);
+    FontStyle kBoldItalicStyle(FontStyle::Weight::BOLD, FontStyle::Slant::ITALIC);
 
     // Currently there is no italic or bold font for Japanese. FontFakery has
     // the differences between desired and actual font style.
@@ -745,12 +748,12 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
 
     std::vector<std::shared_ptr<FontFamily>> families;
     std::shared_ptr<MinikinFont> font(new MinikinFontForTest(kLatinFont));
-    std::shared_ptr<FontFamily> family1(new FontFamily(FontVariant::DEFAULT,
+    std::shared_ptr<FontFamily> family1(new FontFamily(FontFamily::Variant::DEFAULT,
             std::vector<Font>{ Font(font, FontStyle()) }));
     families.push_back(family1);
 
     std::shared_ptr<MinikinFont> font2(new MinikinFontForTest(kVSTestFont));
-    std::shared_ptr<FontFamily> family2(new FontFamily(FontVariant::DEFAULT,
+    std::shared_ptr<FontFamily> family2(new FontFamily(FontFamily::Variant::DEFAULT,
             std::vector<Font>{ Font(font2, FontStyle()) }));
     families.push_back(family2);
 
@@ -952,7 +955,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::shared_ptr<MinikinFont> firstFamilyMinikinFont(
                 new MinikinFontForTest(kNoGlyphFont));
         std::shared_ptr<FontFamily> firstFamily(new FontFamily(
-                registerLocaleList("und"), FontVariant::DEFAULT,
+                registerLocaleList("und"), FontFamily::Variant::DEFAULT,
                 std::vector<Font>({ Font(firstFamilyMinikinFont, FontStyle()) })));
         families.push_back(firstFamily);
 
@@ -964,7 +967,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
             std::shared_ptr<MinikinFont> minikin_font(new MinikinFontForTest(kJAFont));
             std::shared_ptr<FontFamily> family(new FontFamily(
-                    registerLocaleList(testCase.fontLocales[i]), FontVariant::DEFAULT,
+                    registerLocaleList(testCase.fontLocales[i]), FontFamily::Variant::DEFAULT,
                     std::vector<Font>({ Font(minikin_font, FontStyle()) })));
             families.push_back(family);
             fontLocaleIdxMap.insert(std::make_pair(minikin_font.get(), i));

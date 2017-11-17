@@ -98,7 +98,8 @@ public:
             mSize(paint.size), mScaleX(paint.scaleX), mSkewX(paint.skewX),
             mLetterSpacing(paint.letterSpacing),
             mPaintFlags(paint.paintFlags), mLocaleListId(paint.localeListId),
-            mStartHyphen(startHyphen), mEndHyphen(endHyphen), mIsRtl(dir), mHash(computeHash()) {
+            mFamilyVariant(paint.familyVariant), mStartHyphen(startHyphen), mEndHyphen(endHyphen),
+            mIsRtl(dir), mHash(computeHash()) {
     }
     bool operator==(const LayoutCacheKey &other) const;
 
@@ -139,6 +140,7 @@ private:
     float mLetterSpacing;
     int32_t mPaintFlags;
     uint32_t mLocaleListId;
+    FontFamily::Variant mFamilyVariant;
     StartHyphenEdit mStartHyphen;
     EndHyphenEdit mEndHyphen;
     bool mIsRtl;
@@ -232,6 +234,7 @@ bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
             && mLetterSpacing == other.mLetterSpacing
             && mPaintFlags == other.mPaintFlags
             && mLocaleListId == other.mLocaleListId
+            && mFamilyVariant == other.mFamilyVariant
             && mStartHyphen == other.mStartHyphen
             && mEndHyphen == other.mEndHyphen
             && mIsRtl == other.mIsRtl
@@ -243,13 +246,14 @@ android::hash_t LayoutCacheKey::computeHash() const {
     uint32_t hash = android::JenkinsHashMix(0, mId);
     hash = android::JenkinsHashMix(hash, mStart);
     hash = android::JenkinsHashMix(hash, mCount);
-    hash = android::JenkinsHashMix(hash, mStyle.hash());
+    hash = android::JenkinsHashMix(hash, android::hash_type(mStyle.identifier()));
     hash = android::JenkinsHashMix(hash, android::hash_type(mSize));
     hash = android::JenkinsHashMix(hash, android::hash_type(mScaleX));
     hash = android::JenkinsHashMix(hash, android::hash_type(mSkewX));
     hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
     hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
     hash = android::JenkinsHashMix(hash, android::hash_type(mLocaleListId));
+    hash = android::JenkinsHashMix(hash, android::hash_type(static_cast<uint8_t>(mFamilyVariant)));
     hash = android::JenkinsHashMix(hash, android::hash_type(
             static_cast<uint8_t>(packHyphenEdit(mStartHyphen, mEndHyphen))));
     hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
@@ -893,7 +897,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
         const std::shared_ptr<FontCollection>& collection) {
     hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
     std::vector<FontCollection::Run> items;
-    collection->itemize(buf + start, count, ctx->paint.fontStyle, ctx->paint.localeListId, &items);
+    collection->itemize(buf + start, count, ctx->paint, &items);
 
     std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing

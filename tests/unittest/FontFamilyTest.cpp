@@ -690,47 +690,33 @@ TEST_F(FontFamilyTest, coverageTableSelectionTest) {
     EXPECT_TRUE(unicodeEnc4Font->hasGlyph(0x1F926, 0));
 }
 
-const char* slantToString(FontSlant slant) {
-    if (slant == FontSlant::ITALIC) {
+const char* slantToString(FontStyle::Slant slant) {
+    if (slant == FontStyle::Slant::ITALIC) {
         return "ITALIC";
     } else {
         return "UPRIGHT";
     }
 }
 
-const char* variantToString(FontVariant variant) {
-    switch (variant) {
-        case FontVariant::DEFAULT:
-            return "DEFAULT";
-        case FontVariant::COMPACT:
-            return "COMPACT";
-        case FontVariant::ELEGANT:
-            return "ELEGANT";
-        default:
-            MINIKIN_NOT_REACHED("Unknown variant");
-    }
-}
-
 std::string fontStyleToString(const FontStyle& style) {
     char buf[64] = {};
-    snprintf(buf, sizeof(buf), "FontStyle(weight=%d, slant=%s, variant=%s)",
-             style.weight, slantToString(style.slant),
-             variantToString(style.variant));
+    snprintf(buf, sizeof(buf), "FontStyle(weight=%d, slant=%s)",
+             style.weight(), slantToString(style.slant()));
     return buf;
 }
 
 TEST_F(FontFamilyTest, closestMatch) {
     constexpr char ROBOTO[] = "/system/fonts/Roboto-Regular.ttf";
 
-    constexpr FontWeight THIN = FontWeight::THIN;
-    constexpr FontWeight LIGHT = FontWeight::LIGHT;
-    constexpr FontWeight NORMAL = FontWeight::NORMAL;
-    constexpr FontWeight MEDIUM = FontWeight::MEDIUM;
-    constexpr FontWeight BOLD = FontWeight::BOLD;
-    constexpr FontWeight BLACK = FontWeight::BLACK;
+    constexpr FontStyle::Weight THIN = FontStyle::Weight::THIN;
+    constexpr FontStyle::Weight LIGHT = FontStyle::Weight::LIGHT;
+    constexpr FontStyle::Weight NORMAL = FontStyle::Weight::NORMAL;
+    constexpr FontStyle::Weight MEDIUM = FontStyle::Weight::MEDIUM;
+    constexpr FontStyle::Weight BOLD = FontStyle::Weight::BOLD;
+    constexpr FontStyle::Weight BLACK = FontStyle::Weight::BLACK;
 
-    constexpr FontSlant UPRIGHT = FontSlant::UPRIGHT;
-    constexpr FontSlant ITALIC = FontSlant::ITALIC;
+    constexpr FontStyle::Slant UPRIGHT = FontStyle::Slant::UPRIGHT;
+    constexpr FontStyle::Slant ITALIC = FontStyle::Slant::ITALIC;
 
     const std::vector<FontStyle> STANDARD_SET = {
           FontStyle(NORMAL, UPRIGHT),  // 0

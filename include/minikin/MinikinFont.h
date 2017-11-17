@@ -33,7 +33,8 @@ class MinikinFont;
 // Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
 struct MinikinPaint {
     MinikinPaint() : size(0), scaleX(0), skewX(0), letterSpacing(0), wordSpacing(0),
-            paintFlags(0), localeListId(0), hyphenEdit(), fontFeatureSettings() { }
+            paintFlags(0), localeListId(0), familyVariant(FontFamily::Variant::DEFAULT),
+            hyphenEdit(), fontFeatureSettings() { }
 
     bool skipCache() const {
         return !fontFeatureSettings.empty();
@@ -47,6 +48,7 @@ struct MinikinPaint {
     uint32_t paintFlags;
     uint32_t localeListId;
     FontStyle fontStyle;
+    FontFamily::Variant familyVariant;
     HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
 

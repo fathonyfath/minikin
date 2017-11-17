@@ -38,12 +38,12 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
         }
 
         xmlChar* variantXmlch = xmlGetProp(familyNode, (const xmlChar*)"variant");
-        FontVariant variant = FontVariant::DEFAULT;
+        FontFamily::Variant variant = FontFamily::Variant::DEFAULT;
         if (variantXmlch) {
             if (xmlStrcmp(variantXmlch, (const xmlChar*)"elegant") == 0) {
-                variant = FontVariant::ELEGANT;
+                variant = FontFamily::Variant::ELEGANT;
             } else if (xmlStrcmp(variantXmlch, (const xmlChar*)"compact") == 0) {
-                variant = FontVariant::COMPACT;
+                variant = FontFamily::Variant::COMPACT;
             }
         }
 
@@ -53,9 +53,8 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
                 continue;
             }
 
-            FontWeight weight = static_cast<FontWeight>(
-                    atoi((const char*)(xmlGetProp(fontNode, (const xmlChar*)"weight"))));
-            FontSlant italic = static_cast<FontSlant>(xmlStrcmp(
+            uint16_t weight = atoi((const char*)(xmlGetProp(fontNode, (const xmlChar*)"weight")));
+            FontStyle::Slant italic = static_cast<FontStyle::Slant>(xmlStrcmp(
                     xmlGetProp(fontNode, (const xmlChar*)"style"), (const xmlChar*)"italic") == 0);
             xmlChar* index = xmlGetProp(familyNode, (const xmlChar*)"index");
 

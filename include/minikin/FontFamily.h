@@ -22,67 +22,12 @@
 #include <unordered_set>
 #include <vector>
 
-#include <utils/TypeHelpers.h>
-
+#include "minikin/FontStyle.h"
 #include "minikin/SparseBitSet.h"
 
 namespace minikin {
 
 class MinikinFont;
-
-// Must be the same value as FontConfig.java
-enum class FontVariant : uint8_t {
-    DEFAULT = 0,  // Must be the same as FontConfig.VARIANT_DEFAULT
-    COMPACT = 1,  // Must be the same as FontConfig.VARIANT_COMPACT
-    ELEGANT = 2,  // Must be the same as FontConfig.VARIANT_ELEGANT
-};
-
-enum class FontWeight : uint16_t {
-    THIN        = 100,
-    EXTRA_LIGHT = 200,
-    LIGHT       = 300,
-    NORMAL      = 400,
-    MEDIUM      = 500,
-    SEMI_BOLD   = 600,
-    BOLD        = 700,
-    EXTRA_BOLD  = 800,
-    BLACK       = 900,
-    EXTRA_BLACK = 1000,
-};
-
-enum class FontSlant : bool {
-    ITALIC  = true,
-    UPRIGHT = false,
-};
-
-// FontStyle represents style information needed to select an actual font from a collection.
-struct FontStyle {
-    FontStyle() : FontStyle(FontVariant::DEFAULT, FontWeight::NORMAL, FontSlant::UPRIGHT) {}
-    explicit FontStyle(FontWeight weight)
-        : FontStyle(FontVariant::DEFAULT, weight, FontSlant::UPRIGHT) {}
-    explicit FontStyle(FontSlant slant)
-        : FontStyle(FontVariant::DEFAULT, FontWeight::NORMAL, slant) {}
-    FontStyle(FontWeight weight, FontSlant slant)
-        : FontStyle(FontVariant::DEFAULT, weight, slant) {}
-    FontStyle(uint16_t weight, FontSlant slant)
-        : FontStyle(FontVariant::DEFAULT, weight, slant) {}
-    FontStyle(FontVariant variant, FontWeight weight, FontSlant slant)
-        : FontStyle(variant, static_cast<uint16_t>(weight), slant) {}
-    FontStyle(FontVariant variant, uint16_t weight, FontSlant slant)
-        : weight(weight), slant(slant), variant(variant) {}
-
-    uint16_t weight;
-    FontSlant slant;
-    FontVariant variant;
-
-    inline bool operator==(const FontStyle& other) const {
-        return weight == other.weight && slant == other.slant && variant== other.variant;
-    }
-
-    inline android::hash_t hash() const {
-        return (weight << 16) | (static_cast<uint8_t>(variant) << 8) | static_cast<uint8_t>(slant);
-    }
-};
 
 // attributes representing transforms (fake bold, fake italic) to match styles
 class FontFakery {
@@ -125,9 +70,16 @@ struct FontVariation {
 
 class FontFamily {
 public:
+    // Must be the same value as FontConfig.java
+    enum class Variant : uint8_t {
+        DEFAULT = 0,  // Must be the same as FontConfig.VARIANT_DEFAULT
+        COMPACT = 1,  // Must be the same as FontConfig.VARIANT_COMPACT
+        ELEGANT = 2,  // Must be the same as FontConfig.VARIANT_ELEGANT
+    };
+
     explicit FontFamily(std::vector<Font>&& fonts);
-    FontFamily(FontVariant variant, std::vector<Font>&& fonts);
-    FontFamily(uint32_t localeListId, FontVariant variant, std::vector<Font>&& fonts);
+    FontFamily(Variant variant, std::vector<Font>&& fonts);
+    FontFamily(uint32_t localeListId, Variant variant, std::vector<Font>&& fonts);
 
     // TODO: Good to expose FontUtil.h.
     static bool analyzeStyle(const std::shared_ptr<MinikinFont>& typeface, int* weight,
@@ -135,7 +87,7 @@ public:
     FakedFont getClosestMatch(FontStyle style) const;
 
     uint32_t localeListId() const { return mLocaleListId; }
-    FontVariant variant() const { return mVariant; }
+    Variant variant() const { return mVariant; }
 
     // API's for enumerating the fonts in a family. These don't guarantee any particular order
     size_t getNumFonts() const { return mFonts.size(); }
@@ -165,7 +117,7 @@ private:
     void computeCoverage();
 
     uint32_t mLocaleListId;
-    FontVariant mVariant;
+    Variant mVariant;
     std::vector<Font> mFonts;
     std::unordered_set<AxisTag> mSupportedAxes;
 
