@@ -66,14 +66,14 @@ Font::Font(const Font& o) {
 
 // static
 FontFamily::FontFamily(std::vector<Font>&& fonts)
-      : FontFamily(FontVariant::DEFAULT, std::move(fonts)) {
+      : FontFamily(Variant::DEFAULT, std::move(fonts)) {
 }
 
-FontFamily::FontFamily(FontVariant variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(Variant variant, std::vector<Font>&& fonts)
     : FontFamily(LocaleListCache::kEmptyListId, variant, std::move(fonts)) {
 }
 
-FontFamily::FontFamily(uint32_t localeListId, FontVariant variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(uint32_t localeListId, Variant variant, std::vector<Font>&& fonts)
     : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
     computeCoverage();
 }
@@ -90,8 +90,8 @@ bool FontFamily::analyzeStyle(const std::shared_ptr<MinikinFont>& typeface, int*
 // Compute a matching metric between two styles - 0 is an exact match
 static int computeMatch(FontStyle style1, FontStyle style2) {
     if (style1 == style2) return 0;
-    int score = abs(style1.weight / 100 - style2.weight / 100);
-    if (style1.slant != style2.slant) {
+    int score = abs(style1.weight() / 100 - style2.weight() / 100);
+    if (style1.slant() != style2.slant()) {
         score += 2;
     }
     return score;
@@ -101,8 +101,9 @@ static FontFakery computeFakery(FontStyle wanted, FontStyle actual) {
     // If desired weight is semibold or darker, and 2 or more grades
     // higher than actual (for example, medium 500 -> bold 700), then
     // select fake bold.
-    bool isFakeBold = wanted.weight >= 600 && (wanted.weight - actual.weight) >= 200;
-    bool isFakeItalic = wanted.slant == FontSlant::ITALIC && actual.slant == FontSlant::UPRIGHT;
+    bool isFakeBold = wanted.weight() >= 600 && (wanted.weight() - actual.weight()) >= 200;
+    bool isFakeItalic = wanted.slant() == FontStyle::Slant::ITALIC &&
+            actual.slant() == FontStyle::Slant::UPRIGHT;
     return FontFakery(isFakeBold, isFakeItalic);
 }
 
