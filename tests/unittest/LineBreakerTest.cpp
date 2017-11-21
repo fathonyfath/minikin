@@ -284,36 +284,6 @@ static void expectLineBreaks(const std::string& expected, const std::vector<int>
         << "Actual  : " << buildDisplayText(text, actualBreaks);
 }
 
-class ConstantRun : public Run {
-public:
-    ConstantRun(const Range& range, uint32_t localeListId, float width)
-            : Run(range), mLocaleListId(localeListId), mWidth(width) {}
-
-    virtual bool isRtl() const override { return false; }
-    virtual bool canHyphenate() const override { return true; }
-    virtual uint32_t getLocaleListId() const { return mLocaleListId; }
-
-    virtual void getMetrics(const U16StringPiece&, float* advances, MinikinExtent*,
-                            LayoutOverhang*) const {
-        std::fill(advances, advances + mRange.getLength(), mWidth);
-    }
-
-    virtual const MinikinPaint* getPaint() const {
-        return &mPaint;
-    }
-
-    virtual float measureHyphenPiece(const U16StringPiece&, const Range& range, StartHyphenEdit,
-                                     EndHyphenEdit, float* advances, LayoutOverhang*) const {
-        std::fill(advances, advances + range.getLength(), mWidth);
-        return mWidth * range.getLength();
-    }
-
-private:
-    MinikinPaint mPaint;
-    uint32_t mLocaleListId;
-    float mWidth;
-};
-
 TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
     const uint32_t enUSLocaleListId = getLocaleListId("en-US");
     const Locale& enUSLocale = getLocaleList(enUSLocaleListId)[0];
@@ -339,7 +309,9 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
 
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
-        b.addRun(ConstantRun(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH));
+        MinikinPaint paint;
+        paint.localeListId = enUSLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(0, text.size()), false);
 
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(7U, breakNum);
@@ -384,8 +356,11 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
         TestableLineBreaker b(&impl, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
-        b.addRun(ConstantRun(Range(0, 2), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(2, text.size()), frFRLocaleListId, CHAR_WIDTH));
+        MinikinPaint paint;
+        paint.localeListId = enUSLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(0, 2), false);
+        paint.localeListId = frFRLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(2, text.size()), false);
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(3U, breakNum);
         expectLineBreaks("ab|cdef|gh",
@@ -419,8 +394,10 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
         TestableLineBreaker b(&impl, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
-        b.addRun(ConstantRun(Range(0, 2), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(2, text.size()), enUSLocaleListId, CHAR_WIDTH));
+        MinikinPaint paint;
+        paint.localeListId = enUSLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(0, 2), false);
+        b.addStyleRun(&paint, mCollection, Range(2, text.size()), false);
 
         const size_t breakNum = b.computeBreaks();
         ASSERT_EQ(2U, breakNum);
@@ -460,8 +437,11 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
         TestableLineBreaker b(&impl, text);
         b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(4 * CHAR_WIDTH));
 
-        b.addRun(ConstantRun(Range(0, 7), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(7, text.size()), frFRLocaleListId, CHAR_WIDTH));
+        MinikinPaint paint;
+        paint.localeListId = enUSLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(0, 7), false);
+        paint.localeListId = frFRLocaleListId;
+        b.addStyleRun(&paint, mCollection, Range(7, text.size()), false);
 
         const size_t breakNum = b.computeBreaks();
         expectLineBreaks("aaa |b@c|-d |eee",
@@ -488,7 +468,9 @@ TEST_F(LineBreakerTest, CrashFix_Space_Tab) {
     TestableLineBreaker b(&impl, text);
     b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
 
-    b.addRun(ConstantRun(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH));
+    MinikinPaint paint;
+    paint.localeListId = enUSLocaleListId;
+    b.addStyleRun(&paint, mCollection, Range(0, text.size()), false);
 
     b.computeBreaks();  // Make sure no crash happens.
 }
@@ -526,6 +508,7 @@ private:
 
 TEST_F(LineBreakerTest, setLocaleList) {
     constexpr size_t CHAR_COUNT = 14;
+    MinikinPaint paint;
     const std::vector<uint16_t> text(CHAR_COUNT, 'a');
     LocaleTraceICULineBreakerPoolImpl localeTracer;
     TestableLineBreaker lineBreaker(&localeTracer, text);
@@ -536,86 +519,86 @@ TEST_F(LineBreakerTest, setLocaleList) {
     const Locale& enUS = getLocaleList(getLocaleListId("en-US"))[0];
     const Locale& frFR = getLocaleList(getLocaleListId("fr-FR"))[0];
     {
-        const uint32_t localeListId = getLocaleListId("en-US");
-        lineBreaker.addRun(ConstantRun(Range(0, 1), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(0, 1), false);
         expectedCallCount++;  // The locale changes from initial state to en-US.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(1, 2), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(1, 2), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
     }
     {
-        const uint32_t localeListId = getLocaleListId("fr-FR,en-US");
-        lineBreaker.addRun(ConstantRun(Range(2, 3), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("fr-FR,en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(2, 3), false);
         expectedCallCount++;  // The locale changes from en-US to fr-FR.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(3, 4), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(3, 4), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
     }
     {
-        const uint32_t localeListId = getLocaleListId("fr-FR");
-        lineBreaker.addRun(ConstantRun(Range(4, 5), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("fr-FR");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(4, 5), false);
         // Expected not to be called since the first locale is not changed.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(5, 6), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(5, 6), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
     }
     {
-        const uint32_t localeListId = getLocaleListId("");
-        lineBreaker.addRun(ConstantRun(Range(6, 7), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(6, 7), false);
         expectedCallCount++;  // The locale changes from fr-FR to icu::Locale::Root.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(7, 8), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(7, 8), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
     {
-        const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE");
-        lineBreaker.addRun(ConstantRun(Range(8, 9), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("THISISABOGUSLANGUAGE");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(8, 9), false);
         // Expected not to be called. The bogus locale ends up with the empty locale.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(9, 10), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(9, 10), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
     {
-        const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE,en-US");
-        lineBreaker.addRun(ConstantRun(Range(10, 11), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("THISISABOGUSLANGUAGE,en-US");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(10, 11), false);
         expectedCallCount++;  // The locale changes from icu::Locale::Root to en-US.
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(11, 12), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(11, 12), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
     }
     {
-        const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE");
-        lineBreaker.addRun(ConstantRun(Range(12, 13), localeListId, CHAR_WIDTH));
+        paint.localeListId = getLocaleListId("THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE");
+        lineBreaker.addStyleRun(&paint, mCollection, Range(12, 13), false);
         expectedCallCount++;  // The locale changes from en-US to icu::Locale::Root
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
 
         // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(13, 14), localeListId, CHAR_WIDTH));
+        lineBreaker.addStyleRun(&paint, mCollection, Range(13, 14), false);
         EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
         EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
     }
