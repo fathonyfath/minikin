@@ -22,43 +22,43 @@
 namespace minikin {
 namespace android {
 
-class LineWidth : public LineBreaker::LineWidthDelegate {
+class AndroidLineWidth : public LineWidth {
     public:
-        LineWidth(float firstWidth, int32_t firstLineCount, float restWidth,
+        AndroidLineWidth(float firstWidth, int32_t firstLineCount, float restWidth,
                 const std::vector<float>& indents, const std::vector<float>& leftPaddings,
                 const std::vector<float>& rightPaddings, int32_t indentsAndPaddingsOffset)
             : mFirstWidth(firstWidth), mFirstLineCount(firstLineCount), mRestWidth(restWidth),
               mIndents(indents), mLeftPaddings(leftPaddings),
               mRightPaddings(rightPaddings), mOffset(indentsAndPaddingsOffset) {}
 
-        float getLineWidth(size_t lineNo) override {
+        float getAt(size_t lineNo) const override {
             const float width = ((ssize_t)lineNo < (ssize_t)mFirstLineCount)
                     ? mFirstWidth : mRestWidth;
             return width - get(mIndents, lineNo);
         }
 
-        float getMinLineWidth() override {
+        float getMin() const override {
             // A simpler algorithm would have been simply looping until the larger of
             // mFirstLineCount and mIndents.size()-mOffset, but that does unnecessary calculations
             // when mFirstLineCount is large. Instead, we measure the first line, all the lines that
             // have an indent, and the first line after firstWidth ends and restWidth starts.
-            float minWidth = std::min(getLineWidth(0), getLineWidth(mFirstLineCount));
+            float minWidth = std::min(getAt(0), getAt(mFirstLineCount));
             for (size_t lineNo = 1; lineNo + mOffset < mIndents.size(); lineNo++) {
-                minWidth = std::min(minWidth, getLineWidth(lineNo));
+                minWidth = std::min(minWidth, getAt(lineNo));
             }
             return minWidth;
         }
 
-        float getLeftPadding(size_t lineNo) override {
+        float getLeftPaddingAt(size_t lineNo) const override {
             return get(mLeftPaddings, lineNo);
         }
 
-        float getRightPadding(size_t lineNo) override {
+        float getRightPaddingAt(size_t lineNo) const override {
             return get(mRightPaddings, lineNo);
         }
 
     private:
-        float get(const std::vector<float>& vec, size_t lineNo) {
+        float get(const std::vector<float>& vec, size_t lineNo) const {
             if (vec.empty()) {
                 return 0;
             }
@@ -158,18 +158,22 @@ class StaticLayoutNative {
                     std::make_unique<Replacement>(Range(start, end), width, localeListId));
         }
 
-        // Only valid while this instance is alive.
-        inline std::unique_ptr<LineBreaker::LineWidthDelegate> buildLineWidthDelegate(
-                float firstWidth, int32_t firstLineCount, float restWidth,
-                int32_t indentsAndPaddingsOffset) {
-            return std::make_unique<LineWidth>(firstWidth, firstLineCount, restWidth, mIndents,
-                    mLeftPaddings, mRightPaddings, indentsAndPaddingsOffset);
+        MeasuredText measureText(const U16StringPiece& text) const {
+            return MeasuredText::generate(text, mRuns);
         }
 
-        void addRuns(LineBreaker* lineBreaker) {
-            for (const auto& run : mRuns) {
-                lineBreaker->addRun(*run);
-            }
+        LineBreakResult computeBreaks(
+                const U16StringPiece& text, const MeasuredText& measuredText,
+                // Line width arguments
+                float firstWidth, int32_t firstWidthLineCount, float restWidth,
+                int32_t indentsOffset,
+                // Tab stop arguments
+                const int32_t* tabStops, int32_t tabStopSize, int32_t defaultTabStopWidth) const {
+            AndroidLineWidth lineWidth(firstWidth, firstWidthLineCount, restWidth, mIndents,
+                                       mLeftPaddings, mRightPaddings, indentsOffset);
+            LineBreaker lineBreaker(text, measuredText, mStrategy, mFrequency, mIsJustified);
+            return lineBreaker.computeBreaks(mRuns, lineWidth,
+                                             TabStops(tabStops, tabStopSize, defaultTabStopWidth));
         }
 
         void clearRuns() {
