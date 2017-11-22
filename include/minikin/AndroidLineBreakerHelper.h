@@ -128,7 +128,7 @@ class Replacement : public Run {
 
         void getMetrics(const U16StringPiece& /* unused */, float* advances,
                         MinikinExtent* /* unused */, LayoutOverhang* /* unused */) const override {
-            advances[mRange.getStart()] = mWidth;
+            advances[0] = mWidth;
             // TODO: Get the extents information from the caller.
         }
 
