@@ -330,7 +330,8 @@ class LineBreaker {
         // The following are state for greedy breaker. They get updated during calculation of
         // greedy breaks (including when a partial greedy algorithm is run when adding style runs
         // containing tabs).
-        const Candidate* mLastGreedyBreak;  // The last greedy break
+        size_t mLastGreedyBreakIndex;  // The last greedy break index of mCandidates.
+        const Candidate& getLastBreakCandidate() const;
         size_t mLastConsideredGreedyCandidate;  // The index of the last candidate considered
         int mFirstTabIndex;  // The index of the first tab character seen in current line
 
