@@ -20,6 +20,7 @@
 #include <map>
 
 #include "minikin/Hyphenator.h"
+
 #include "Locale.h"
 
 namespace minikin {
@@ -52,7 +53,7 @@ public:
 
 protected:
     // The following five methods are protected for testing purposes.
-    HyphenatorMap(); // Use getInstance() instead.
+    HyphenatorMap();  // Use getInstance() instead.
     void addInternal(const std::string& localeStr, const Hyphenator* hyphenator);
     void addAliasInternal(const std::string& fromLocaleStr, const std::string& toLocaleStr);
     const Hyphenator* lookupInternal(const Locale& locale);
@@ -73,4 +74,4 @@ private:
 
 }  // namespace minikin
 
-#endif   // MINIKIN_HYPHENATOR_MAP_H
+#endif  // MINIKIN_HYPHENATOR_MAP_H

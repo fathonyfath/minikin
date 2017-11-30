@@ -80,11 +80,11 @@ void SparseBitSet::initFromRanges(const uint32_t* ranges, size_t nRanges) {
         }
 
         size_t index = ((currentPage - 1) << (kLogValuesPerPage - kLogBitsPerEl)) +
-            ((start & kPageMask) >> kLogBitsPerEl);
+                       ((start & kPageMask) >> kLogBitsPerEl);
         size_t nElements = (end - (start & ~kElMask) + kElMask) >> kLogBitsPerEl;
         if (nElements == 1) {
-            mBitmaps[index] |= (kElAllOnes >> (start & kElMask)) &
-                (kElAllOnes << ((~end + 1) & kElMask));
+            mBitmaps[index] |=
+                    (kElAllOnes >> (start & kElMask)) & (kElAllOnes << ((~end + 1) & kElMask));
         } else {
             mBitmaps[index] |= kElAllOnes >> (start & kElMask);
             for (size_t j = 1; j < nElements - 1; j++) {

@@ -21,8 +21,9 @@
 #include <hb.h>
 
 #include "minikin/LocaleList.h"
-#include "MinikinInternal.h"
+
 #include "LocaleListCache.h"
+#include "MinikinInternal.h"
 #include "StringPiece.h"
 
 namespace minikin {
@@ -42,8 +43,8 @@ static bool isEmojiSubtag(const char* buf, size_t bufLen, const char* subtag, si
     if (strncmp(buf, subtag, subtagLen) != 0) {
         return false;  // no match between two strings
     }
-    return (bufLen == subtagLen || buf[subtagLen] == '\0' ||
-            buf[subtagLen] == '-' || buf[subtagLen] == '_');
+    return (bufLen == subtagLen || buf[subtagLen] == '\0' || buf[subtagLen] == '-' ||
+            buf[subtagLen] == '_');
 }
 
 // Pack the three letter code into 15 bits and stored to 16 bit integer. The highest bit is 0.
@@ -54,20 +55,18 @@ static bool isEmojiSubtag(const char* buf, size_t bufLen, const char* subtag, si
 //
 // In case of two letter code, use fullbit(0x1f) for the first letter instead.
 static uint16_t packLanguageOrRegion(const StringPiece& in, uint8_t twoLetterBase,
-        uint8_t threeLetterBase) {
+                                     uint8_t threeLetterBase) {
     if (in.length() == 2) {
         return 0x7c00u |  // 0x1fu << 10
-                (uint16_t)(in[0] - twoLetterBase) << 5 |
-                (uint16_t)(in[1] - twoLetterBase);
+               (uint16_t)(in[0] - twoLetterBase) << 5 | (uint16_t)(in[1] - twoLetterBase);
     } else {
         return ((uint16_t)(in[0] - threeLetterBase) << 10) |
-                (uint16_t)(in[1] - threeLetterBase) << 5 |
-                (uint16_t)(in[2] - threeLetterBase);
+               (uint16_t)(in[1] - threeLetterBase) << 5 | (uint16_t)(in[2] - threeLetterBase);
     }
 }
 
 static size_t unpackLanguageOrRegion(uint16_t in, char* out, uint8_t twoLetterBase,
-        uint8_t threeLetterBase) {
+                                     uint8_t threeLetterBase) {
     uint8_t first = (in >> 10) & FIVE_BITS;
     uint8_t second = (in >> 5) & FIVE_BITS;
     uint8_t third = in & FIVE_BITS;
@@ -96,7 +95,7 @@ constexpr uint32_t packScript(char c1, char c2, char c3, char c4) {
     constexpr char FIRST_LETTER_BASE = 'A';
     constexpr char REST_LETTER_BASE = 'a';
     return ((uint32_t)(c1 - FIRST_LETTER_BASE) << 15) | (uint32_t)(c2 - REST_LETTER_BASE) << 10 |
-            ((uint32_t)(c3 - REST_LETTER_BASE) << 5) | (uint32_t)(c4 - REST_LETTER_BASE);
+           ((uint32_t)(c3 - REST_LETTER_BASE) << 5) | (uint32_t)(c4 - REST_LETTER_BASE);
 }
 
 constexpr uint32_t packScript(uint32_t script) {
@@ -146,13 +145,13 @@ static inline bool isValidLanguageCode(const StringPiece& buffer) {
 // Returns true if buffer is valid for script code. The length of buffer must be 4.
 static inline bool isValidScriptCode(const StringPiece& buffer) {
     return buffer.size() == 4 && isUppercase(buffer[0]) && isLowercase(buffer[1]) &&
-            isLowercase(buffer[2]) && isLowercase(buffer[3]);
+           isLowercase(buffer[2]) && isLowercase(buffer[3]);
 }
 
 // Returns true if the buffer is valid for region code.
 static inline bool isValidRegionCode(const StringPiece& buffer) {
     return (buffer.size() == 2 && isUppercase(buffer[0]) && isUppercase(buffer[1])) ||
-            (buffer.size() == 3 && isDigit(buffer[0]) && isDigit(buffer[1]) && isDigit(buffer[2]));
+           (buffer.size() == 3 && isDigit(buffer[0]) && isDigit(buffer[1]) && isDigit(buffer[2]));
 }
 
 // Parse BCP 47 language identifier into internal structure
@@ -224,15 +223,15 @@ Locale::EmojiStyle Locale::resolveEmojiStyle(const char* buf, size_t length) {
     const size_t kMinSubtagLength = 10;
     if (length >= kMinSubtagLength) {
         static const char kPrefix[] = "-u-em-";
-        const char *pos = std::search(buf, buf + length, kPrefix, kPrefix + strlen(kPrefix));
+        const char* pos = std::search(buf, buf + length, kPrefix, kPrefix + strlen(kPrefix));
         if (pos != buf + length) {  // found
             pos += strlen(kPrefix);
             const size_t remainingLength = length - (pos - buf);
-            if (isEmojiSubtag(pos, remainingLength, "emoji", 5)){
+            if (isEmojiSubtag(pos, remainingLength, "emoji", 5)) {
                 return EMSTYLE_EMOJI;
-            } else if (isEmojiSubtag(pos, remainingLength, "text", 4)){
+            } else if (isEmojiSubtag(pos, remainingLength, "text", 4)) {
                 return EMSTYLE_TEXT;
-            } else if (isEmojiSubtag(pos, remainingLength, "default", 7)){
+            } else if (isEmojiSubtag(pos, remainingLength, "default", 7)) {
                 return EMSTYLE_DEFAULT;
             }
         }
@@ -250,7 +249,7 @@ Locale::EmojiStyle Locale::scriptToEmojiStyle(uint32_t script) {
     return EMSTYLE_EMPTY;
 }
 
-//static
+// static
 uint8_t Locale::scriptToSubScriptBits(uint32_t script) {
     uint8_t subScriptBits = 0u;
     switch (script) {
@@ -381,15 +380,14 @@ int Locale::calcScoreFor(const LocaleList& supported) const {
     bool scriptMatch = false;
 
     for (size_t i = 0; i < supported.size(); ++i) {
-        if (mEmojiStyle != EMSTYLE_EMPTY &&
-               mEmojiStyle == supported[i].mEmojiStyle) {
+        if (mEmojiStyle != EMSTYLE_EMPTY && mEmojiStyle == supported[i].mEmojiStyle) {
             subtagMatch = true;
             if (mLanguage == supported[i].mLanguage) {
                 return 4;
             }
         }
         if (isEqualScript(supported[i]) ||
-                supportsScript(supported[i].mSubScriptBits, mSubScriptBits)) {
+            supportsScript(supported[i].mSubScriptBits, mSubScriptBits)) {
             scriptMatch = true;
             if (mLanguage == supported[i].mLanguage) {
                 languageScriptMatch = true;
@@ -415,12 +413,11 @@ int Locale::calcScoreFor(const LocaleList& supported) const {
 }
 
 static hb_language_t buildHbLanguage(const Locale& locale) {
-    return locale.isSupported() ?
-            hb_language_from_string(locale.getString().c_str(), -1) : HB_LANGUAGE_INVALID;
+    return locale.isSupported() ? hb_language_from_string(locale.getString().c_str(), -1)
+                                : HB_LANGUAGE_INVALID;
 }
 
-LocaleList::LocaleList(std::vector<Locale>&& locales)
-    : mLocales(std::move(locales)) {
+LocaleList::LocaleList(std::vector<Locale>&& locales) : mLocales(std::move(locales)) {
     if (mLocales.empty()) {
         return;
     }
@@ -439,8 +436,6 @@ LocaleList::LocaleList(std::vector<Locale>&& locales)
         }
         mHbLangs.push_back(buildHbLanguage(locale));
     }
-
-
 }
 
 }  // namespace minikin

@@ -23,6 +23,7 @@
 #include "minikin/FontCollection.h"
 #include "minikin/FontFamily.h"
 #include "minikin/LocaleList.h"
+
 #include "MinikinFontForTest.h"
 
 namespace minikin {
@@ -54,8 +55,9 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
             }
 
             uint16_t weight = atoi((const char*)(xmlGetProp(fontNode, (const xmlChar*)"weight")));
-            FontStyle::Slant italic = static_cast<FontStyle::Slant>(xmlStrcmp(
-                    xmlGetProp(fontNode, (const xmlChar*)"style"), (const xmlChar*)"italic") == 0);
+            FontStyle::Slant italic = static_cast<FontStyle::Slant>(
+                    xmlStrcmp(xmlGetProp(fontNode, (const xmlChar*)"style"),
+                              (const xmlChar*)"italic") == 0);
             xmlChar* index = xmlGetProp(familyNode, (const xmlChar*)"index");
 
             xmlChar* fontFileName = xmlNodeListGetString(doc, fontNode->xmlChildrenNode, 1);

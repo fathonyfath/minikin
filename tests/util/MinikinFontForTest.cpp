@@ -34,11 +34,11 @@ namespace minikin {
 static int uniqueId = 0;  // TODO: make thread safe if necessary.
 
 MinikinFontForTest::MinikinFontForTest(const std::string& font_path, int index,
-        const std::vector<FontVariation>& variations) :
-        MinikinFont(uniqueId++),
-        mFontPath(font_path),
-        mVariations(variations),
-        mFontIndex(index) {
+                                       const std::vector<FontVariation>& variations)
+        : MinikinFont(uniqueId++),
+          mFontPath(font_path),
+          mVariations(variations),
+          mFontIndex(index) {
     int fd = open(font_path.c_str(), O_RDONLY);
     LOG_ALWAYS_FATAL_IF(fd == -1);
     struct stat st = {};
@@ -60,8 +60,7 @@ float MinikinFontForTest::GetHorizontalAdvance(uint32_t /* glyph_id */,
     return 10.0f;
 }
 
-void MinikinFontForTest::GetBounds(MinikinRect* bounds,
-                                   uint32_t /* glyph_id */,
+void MinikinFontForTest::GetBounds(MinikinRect* bounds, uint32_t /* glyph_id */,
                                    const MinikinPaint& /* paint */,
                                    const FontFakery& /* fakery */) const {
     // TODO: Make mock values configurable if necessary.
@@ -71,8 +70,7 @@ void MinikinFontForTest::GetBounds(MinikinRect* bounds,
     bounds->mBottom = 10.0f;
 }
 
-void MinikinFontForTest::GetFontExtent(MinikinExtent* extent,
-                                       const MinikinPaint& /* paint */,
+void MinikinFontForTest::GetFontExtent(MinikinExtent* extent, const MinikinPaint& /* paint */,
                                        const FontFakery& /* fakery */) const {
     extent->ascent = -10.0f;
     extent->descent = 20.0f;

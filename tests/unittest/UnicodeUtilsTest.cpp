@@ -34,4 +34,4 @@ TEST(UnicodeUtils, parse) {
     EXPECT_EQ(buf[3], 'a');
 }
 
-} // namespace minikin
+}  // namespace minikin

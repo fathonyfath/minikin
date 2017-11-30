@@ -26,22 +26,18 @@ namespace minikin {
 class MinikinFontForTest : public MinikinFont {
 public:
     MinikinFontForTest(const std::string& font_path, int index,
-            const std::vector<FontVariation>& variations);
+                       const std::vector<FontVariation>& variations);
     MinikinFontForTest(const std::string& font_path, int index)
             : MinikinFontForTest(font_path, index, std::vector<FontVariation>()) {}
     MinikinFontForTest(const std::string& font_path) : MinikinFontForTest(font_path, 0) {}
     virtual ~MinikinFontForTest();
 
     // MinikinFont overrides.
-    float GetHorizontalAdvance(uint32_t glyph_id,
-                               const MinikinPaint& paint,
+    float GetHorizontalAdvance(uint32_t glyph_id, const MinikinPaint& paint,
                                const FontFakery& fakery) const override;
-    void GetBounds(MinikinRect* bounds,
-                   uint32_t glyph_id,
-                   const MinikinPaint& paint,
+    void GetBounds(MinikinRect* bounds, uint32_t glyph_id, const MinikinPaint& paint,
                    const FontFakery& fakery) const override;
-    void GetFontExtent(MinikinExtent* extent,
-                       const MinikinPaint& paint,
+    void GetFontExtent(MinikinExtent* extent, const MinikinPaint& paint,
                        const FontFakery& fakery) const override;
 
     const std::string& fontPath() const { return mFontPath; }
@@ -52,6 +48,7 @@ public:
     const std::vector<minikin::FontVariation>& GetAxes() const { return mVariations; }
     std::shared_ptr<MinikinFont> createFontWithVariation(
             const std::vector<FontVariation>& variations) const;
+
 private:
     MinikinFontForTest() = delete;
     MinikinFontForTest(const MinikinFontForTest&) = delete;

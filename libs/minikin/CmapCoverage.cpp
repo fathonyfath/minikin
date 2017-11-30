@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "minikin/SparseBitSet.h"
+
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -35,17 +36,17 @@ static uint32_t readU16(const uint8_t* data, size_t offset) {
 
 static uint32_t readU24(const uint8_t* data, size_t offset) {
     return ((uint32_t)data[offset]) << 16 | ((uint32_t)data[offset + 1]) << 8 |
-        ((uint32_t)data[offset + 2]);
+           ((uint32_t)data[offset + 2]);
 }
 
 static uint32_t readU32(const uint8_t* data, size_t offset) {
     return ((uint32_t)data[offset]) << 24 | ((uint32_t)data[offset + 1]) << 16 |
-        ((uint32_t)data[offset + 2]) << 8 | ((uint32_t)data[offset + 3]);
+           ((uint32_t)data[offset + 2]) << 8 | ((uint32_t)data[offset + 3]);
 }
 
 // The start must be larger than or equal to coverage.back() if coverage is not empty.
 // Returns true if the range is appended. Otherwise returns false as an error.
-static bool addRange(std::vector<uint32_t> &coverage, uint32_t start, uint32_t end) {
+static bool addRange(std::vector<uint32_t>& coverage, uint32_t start, uint32_t end) {
     if (coverage.empty() || coverage.back() < start) {
         coverage.push_back(start);
         coverage.push_back(end);
@@ -64,37 +65,33 @@ static bool addRange(std::vector<uint32_t> &coverage, uint32_t start, uint32_t e
 
 struct Range {
     uint32_t start;  // inclusive
-    uint32_t end;  // exclusive
+    uint32_t end;    // exclusive
 
-    static Range InvalidRange() {
-        return Range({ U32MAX, U32MAX });
-    }
+    static Range InvalidRange() { return Range({U32MAX, U32MAX}); }
 
-    inline bool isValid() const {
-        return start != U32MAX && end != U32MAX;
-    }
+    inline bool isValid() const { return start != U32MAX && end != U32MAX; }
 
     // Returns true if left and right intersect.
     inline static bool intersects(const Range& left, const Range& right) {
-        return left.isValid() && right.isValid() &&
-                left.start < right.end && right.start < left.end;
+        return left.isValid() && right.isValid() && left.start < right.end &&
+               right.start < left.end;
     }
 
     // Returns merged range. This method assumes left and right are not invalid ranges and they have
     // an intersection.
     static Range merge(const Range& left, const Range& right) {
-        return Range({ std::min(left.start, right.start), std::max(left.end, right.end) });
+        return Range({std::min(left.start, right.start), std::max(left.end, right.end)});
     }
 };
 
 // Returns Range from given ranges vector. Returns InvalidRange if i is out of range.
 static inline Range getRange(const std::vector<uint32_t>& r, size_t i) {
-    return i + 1 < r.size() ? Range({ r[i], r[i + 1] }) : Range::InvalidRange();
+    return i + 1 < r.size() ? Range({r[i], r[i + 1]}) : Range::InvalidRange();
 }
 
 // Merge two sorted lists of ranges into one sorted list.
-static std::vector<uint32_t> mergeRanges(
-        const std::vector<uint32_t>& lRanges, const std::vector<uint32_t>& rRanges) {
+static std::vector<uint32_t> mergeRanges(const std::vector<uint32_t>& lRanges,
+                                         const std::vector<uint32_t>& rRanges) {
     std::vector<uint32_t> out;
 
     const size_t lsize = lRanges.size();
@@ -194,8 +191,8 @@ static bool getCoverageFormat4(std::vector<uint32_t>& coverage, const uint8_t* d
             }
         } else {
             for (uint32_t j = start; j < end + 1; j++) {
-                uint32_t actualRangeOffset = kHeaderSize + 6 * segCount + rangeOffset +
-                    (i + j - start) * 2;
+                uint32_t actualRangeOffset =
+                        kHeaderSize + 6 * segCount + rangeOffset + (i + j - start) * 2;
                 if (actualRangeOffset + 2 > size) {
                     // invalid rangeOffset is considered a "warning" by OpenType Sanitizer
                     continue;
@@ -294,8 +291,8 @@ uint8_t getTablePriority(uint16_t platformId, uint16_t encodingId) {
 // function assumes code points in both default UVS Table and non-default UVS table are stored in
 // ascending order. This is required by the standard.
 static bool getVSCoverage(std::vector<uint32_t>* out_ranges, const uint8_t* data, size_t size,
-        uint32_t defaultUVSTableOffset, uint32_t nonDefaultUVSTableOffset,
-        const SparseBitSet& baseCoverage) {
+                          uint32_t defaultUVSTableOffset, uint32_t nonDefaultUVSTableOffset,
+                          const SparseBitSet& baseCoverage) {
     // Need to merge supported ranges from default UVS Table and non-default UVS Table.
     // First, collect all supported code points from non default UVS table.
     std::vector<uint32_t> rangesFromNonDefaultUVSTable;
@@ -367,7 +364,8 @@ static bool getVSCoverage(std::vector<uint32_t>* out_ranges, const uint8_t* data
 }
 
 static void getCoverageFormat14(std::vector<std::unique_ptr<SparseBitSet>>* out,
-        const uint8_t* data, size_t size, const SparseBitSet& baseCoverage) {
+                                const uint8_t* data, size_t size,
+                                const SparseBitSet& baseCoverage) {
     constexpr size_t kHeaderSize = 10;
     constexpr size_t kRecordSize = 11;
     constexpr size_t kLengthOffset = 2;
@@ -404,7 +402,7 @@ static void getCoverageFormat14(std::vector<std::unique_ptr<SparseBitSet>>* out,
         }
         std::vector<uint32_t> ranges;
         if (!getVSCoverage(&ranges, data, length, defaultUVSOffset, nonDefaultUVSOffset,
-                baseCoverage)) {
+                           baseCoverage)) {
             continue;
         }
         if (out->size() < vsIndex + 1) {
@@ -417,7 +415,7 @@ static void getCoverageFormat14(std::vector<std::unique_ptr<SparseBitSet>>* out,
 }
 
 SparseBitSet CmapCoverage::getCoverage(const uint8_t* cmap_data, size_t cmap_size,
-        std::vector<std::unique_ptr<SparseBitSet>>* out) {
+                                       std::vector<std::unique_ptr<SparseBitSet>>* out) {
     constexpr size_t kHeaderSize = 4;
     constexpr size_t kNumTablesOffset = 2;
     constexpr size_t kTableSize = 8;

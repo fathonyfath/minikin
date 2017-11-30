@@ -25,6 +25,7 @@
 #include <unicode/unorm2.h>
 
 #include "minikin/Emoji.h"
+
 #include "Locale.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -35,7 +36,7 @@ namespace minikin {
 
 template <typename T>
 static inline T max(T a, T b) {
-    return a>b ? a : b;
+    return a > b ? a : b;
 }
 
 const uint32_t EMOJI_STYLE_VS = 0xFE0F;
@@ -49,8 +50,7 @@ FontCollection::FontCollection(std::shared_ptr<FontFamily>&& typeface) : mMaxCha
     init(typefaces);
 }
 
-FontCollection::FontCollection(const vector<std::shared_ptr<FontFamily>>& typefaces) :
-    mMaxChar(0) {
+FontCollection::FontCollection(const vector<std::shared_ptr<FontFamily>>& typefaces) : mMaxChar(0) {
     init(typefaces);
 }
 
@@ -77,10 +77,8 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
         mSupportedAxes.insert(supportedAxes.begin(), supportedAxes.end());
     }
     nTypefaces = mFamilies.size();
-    MINIKIN_ASSERT(nTypefaces > 0,
-        "Font collection must have at least one valid typeface");
-    MINIKIN_ASSERT(nTypefaces <= 254,
-        "Font collection may only have up to 254 font families.");
+    MINIKIN_ASSERT(nTypefaces > 0, "Font collection must have at least one valid typeface");
+    MINIKIN_ASSERT(nTypefaces <= 254, "Font collection may only have up to 254 font families.");
     size_t nPages = (mMaxChar + kPageMask) >> kLogCharsPerPage;
     // TODO: Use variation selector map for mRanges construction.
     // A font can have a glyph for a base code point and variation selector pair but no glyph for
@@ -103,7 +101,7 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
     }
     // See the comment in Range for more details.
     LOG_ALWAYS_FATAL_IF(mFamilyVec.size() >= 0xFFFF,
-        "Exceeded the maximum indexable cmap coverage.");
+                        "Exceeded the maximum indexable cmap coverage.");
 }
 
 // Special scores for the font fallback.
@@ -127,8 +125,8 @@ const uint32_t kFirstFontScore = UINT32_MAX;
 //  - kFirstFontScore: When the font is the first font family in the collection and it supports the
 //    given character or variation sequence.
 uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, FontFamily::Variant variant,
-        uint32_t localeListId, const std::shared_ptr<FontFamily>& fontFamily) const {
-
+                                         uint32_t localeListId,
+                                         const std::shared_ptr<FontFamily>& fontFamily) const {
     const uint32_t coverageScore = calcCoverageScore(ch, vs, fontFamily);
     if (coverageScore == kFirstFontScore || coverageScore == kUnsupportedFontScore) {
         // No need to calculate other scores.
@@ -155,7 +153,7 @@ uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, FontFamily::V
 // - Returns 1 if the variation selector is not specified or if the font family only supports the
 //   variation sequence's base character.
 uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs,
-        const std::shared_ptr<FontFamily>& fontFamily) const {
+                                           const std::shared_ptr<FontFamily>& fontFamily) const {
     const bool hasVSGlyph = (vs != 0) && fontFamily->hasGlyph(ch, vs);
     if (!hasVSGlyph && !fontFamily->getCoverage().get(ch)) {
         // The font doesn't support either variation sequence or even the base character.
@@ -214,7 +212,7 @@ uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs,
 // Here, m is the maximum number of locales to be compared, and s(i) is the i-th locale's matching
 // score. The possible values of s(i) are 0, 1, 2, 3 and 4.
 uint32_t FontCollection::calcLocaleMatchingScore(uint32_t userLocaleListId,
-        const FontFamily& fontFamily) {
+                                                 const FontFamily& fontFamily) {
     const LocaleList& localeList = LocaleListCache::getById(userLocaleListId);
     const LocaleList& fontLocaleList = LocaleListCache::getById(fontFamily.localeListId());
 
@@ -250,8 +248,8 @@ uint32_t FontCollection::calcVariantMatchingScore(FontFamily::Variant variant,
 // 2. Calculate a score for the font family. See comments in calcFamilyScore for the detail.
 // 3. Highest score wins, with ties resolved to the first font.
 // This method never returns nullptr.
-const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t localeListId, FontFamily::Variant variant) const {
+const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(
+        uint32_t ch, uint32_t vs, uint32_t localeListId, FontFamily::Variant variant) const {
     if (ch >= mMaxChar) {
         return mFamilies[0];
     }
@@ -259,7 +257,7 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
     Range range = mRanges[ch >> kLogCharsPerPage];
 
     if (vs != 0) {
-        range = { 0, static_cast<uint16_t>(mFamilies.size()) };
+        range = {0, static_cast<uint16_t>(mFamilies.size())};
     }
 
     int bestFamilyIndex = -1;
@@ -300,35 +298,29 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch,
 // properly by Minikin or HarfBuzz even if the font does not explicitly support them and it's
 // usually meaningless to switch to a different font to display them.
 static bool doesNotNeedFontSupport(uint32_t c) {
-    return c == 0x000A // LINE FEED
-            || c == 0x000D // CARRIAGE RETURN
-            || c == 0x00AD // SOFT HYPHEN
-            || c == 0x034F // COMBINING GRAPHEME JOINER
-            || c == 0x061C // ARABIC LETTER MARK
-            || (0x200C <= c && c <= 0x200F) // ZERO WIDTH NON-JOINER..RIGHT-TO-LEFT MARK
-            || (0x202A <= c && c <= 0x202E) // LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
-            || (0x2066 <= c && c <= 0x2069) // LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
-            || c == 0xFEFF // BYTE ORDER MARK
-            || isVariationSelector(c);
+    return c == 0x000A                      // LINE FEED
+           || c == 0x000D                   // CARRIAGE RETURN
+           || c == 0x00AD                   // SOFT HYPHEN
+           || c == 0x034F                   // COMBINING GRAPHEME JOINER
+           || c == 0x061C                   // ARABIC LETTER MARK
+           || (0x200C <= c && c <= 0x200F)  // ZERO WIDTH NON-JOINER..RIGHT-TO-LEFT MARK
+           || (0x202A <= c && c <= 0x202E)  // LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
+           || (0x2066 <= c && c <= 0x2069)  // LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
+           || c == 0xFEFF                   // BYTE ORDER MARK
+           || isVariationSelector(c);
 }
 
 // Characters where we want to continue using existing font run instead of
 // recomputing the best match in the fallback list.
 static const uint32_t stickyWhitelist[] = {
-    '!',
-    ',',
-    '-',
-    '.',
-    ':',
-    ';',
-    '?',
-    0x00A0, // NBSP
-    0x2010, // HYPHEN
-    0x2011, // NB_HYPHEN
-    0x202F, // NNBSP
-    0x2640, // FEMALE_SIGN,
-    0x2642, // MALE_SIGN,
-    0x2695, // STAFF_OF_AESCULAPIUS
+        '!',    ',', '-', '.', ':', ';', '?',
+        0x00A0,  // NBSP
+        0x2010,  // HYPHEN
+        0x2011,  // NB_HYPHEN
+        0x202F,  // NNBSP
+        0x2640,  // FEMALE_SIGN,
+        0x2642,  // MALE_SIGN,
+        0x2695,  // STAFF_OF_AESCULAPIUS
 };
 
 static bool isStickyWhitelisted(uint32_t c) {
@@ -343,7 +335,7 @@ static inline bool isCombining(uint32_t c) {
 }
 
 bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
-        uint32_t variationSelector) const {
+                                          uint32_t variationSelector) const {
     if (!isVariationSelector(variationSelector)) {
         return false;
     }
@@ -379,8 +371,8 @@ bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
 
 constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
-void FontCollection::itemize(const uint16_t *string, size_t string_size, const MinikinPaint& paint,
-        vector<Run>* result) const {
+void FontCollection::itemize(const uint16_t* string, size_t string_size, const MinikinPaint& paint,
+                             vector<Run>* result) const {
     const FontFamily::Variant familyVariant = paint.familyVariant;
     const FontStyle style = paint.fontStyle;
     const uint32_t localeListId = paint.localeListId;
@@ -436,8 +428,8 @@ void FontCollection::itemize(const uint16_t *string, size_t string_size, const M
                 // character to the new run. U+20E3 COMBINING ENCLOSING KEYCAP, used in emoji, is
                 // handled properly by this since it's a combining mark too.
                 if (utf16Pos != 0 &&
-                        (isCombining(ch) || (isEmojiModifier(ch) && isEmojiBase(prevCh))) &&
-                        family != nullptr && family->getCoverage().get(prevCh)) {
+                    (isCombining(ch) || (isEmojiModifier(ch) && isEmojiBase(prevCh))) &&
+                    family != nullptr && family->getCoverage().get(prevCh)) {
                     const size_t prevChLength = U16_LENGTH(prevCh);
                     if (run != nullptr) {
                         run->end -= prevChLength;
@@ -494,7 +486,7 @@ std::shared_ptr<FontCollection> FontCollection::createCollectionWithVariation(
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<FontFamily> > families;
+    std::vector<std::shared_ptr<FontFamily>> families;
     for (const std::shared_ptr<FontFamily>& family : mFamilies) {
         std::shared_ptr<FontFamily> newFamily = family->createFamilyWithVariation(variations);
         if (newFamily) {

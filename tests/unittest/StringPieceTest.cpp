@@ -176,5 +176,4 @@ TEST(SplitIteratorTest, split) {
     }
 }
 
-} // namespace minikin
-
+}  // namespace minikin

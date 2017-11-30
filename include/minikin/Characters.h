@@ -20,16 +20,16 @@
 namespace minikin {
 
 // Code point order
-constexpr uint32_t CHAR_TAB             = 0x0009;
-constexpr uint32_t CHAR_HYPHEN_MINUS    = 0x002D;
-constexpr uint32_t CHAR_NBSP            = 0x00A0;
-constexpr uint32_t CHAR_SOFT_HYPHEN     = 0x00AD;
-constexpr uint32_t CHAR_MIDDLE_DOT      = 0x00B7;
+constexpr uint32_t CHAR_TAB = 0x0009;
+constexpr uint32_t CHAR_HYPHEN_MINUS = 0x002D;
+constexpr uint32_t CHAR_NBSP = 0x00A0;
+constexpr uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
+constexpr uint32_t CHAR_MIDDLE_DOT = 0x00B7;
 constexpr uint32_t CHAR_ARMENIAN_HYPHEN = 0x058A;
-constexpr uint32_t CHAR_MAQAF           = 0x05BE;
-constexpr uint32_t CHAR_UCAS_HYPHEN     = 0x1400;
-constexpr uint32_t CHAR_ZWJ             = 0x200D;
-constexpr uint32_t CHAR_HYPHEN          = 0x2010;
+constexpr uint32_t CHAR_MAQAF = 0x05BE;
+constexpr uint32_t CHAR_UCAS_HYPHEN = 0x1400;
+constexpr uint32_t CHAR_ZWJ = 0x200D;
+constexpr uint32_t CHAR_HYPHEN = 0x2010;
 
 }  // namespace minikin
 

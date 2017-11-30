@@ -25,8 +25,9 @@
 #include <gtest/gtest.h>
 
 #include "minikin/FontCollection.h"
-#include "MinikinInternal.h"
+
 #include "FontTestUtils.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 
@@ -41,8 +42,8 @@ std::mutex gMutex;
 std::condition_variable gCv;
 bool gReady = false;
 
-static std::vector<uint16_t> generateTestText(
-        std::mt19937* mt, int lettersInWord, int wordsInText) {
+static std::vector<uint16_t> generateTestText(std::mt19937* mt, int lettersInWord,
+                                              int wordsInText) {
     std::uniform_int_distribution<uint16_t> dist('A', 'Z');
 
     std::vector<uint16_t> text;

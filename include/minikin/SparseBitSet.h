@@ -48,15 +48,13 @@ public:
     // Determine whether the value is included in the set
     bool get(uint32_t ch) const {
         if (ch >= mMaxVal) return false;
-        const uint32_t *bitmap = &mBitmaps[mIndices[ch >> kLogValuesPerPage]];
+        const uint32_t* bitmap = &mBitmaps[mIndices[ch >> kLogValuesPerPage]];
         uint32_t index = ch & kPageMask;
         return (bitmap[index >> kLogBitsPerEl] & (kElFirst >> (index & kElMask))) != 0;
     }
 
     // One more than the maximum value in the set, or zero if empty
-    uint32_t length() const {
-        return mMaxVal;
-    }
+    uint32_t length() const { return mMaxVal; }
 
     // The next set bit starting at fromIndex, inclusive, or kNotFound
     // if none exists.
@@ -95,4 +93,4 @@ private:
 
 }  // namespace minikin
 
-#endif // MINIKIN_SPARSE_BIT_SET_H
+#endif  // MINIKIN_SPARSE_BIT_SET_H

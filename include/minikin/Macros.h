@@ -16,8 +16,8 @@
 #ifndef MINIKIN_MACROS_H
 #define MINIKIN_MACROS_H
 
-#define PREVENT_COPY_AND_ASSIGN(Type)      \
-    Type(const Type&) = delete;            \
+#define PREVENT_COPY_AND_ASSIGN(Type) \
+    Type(const Type&) = delete;       \
     Type& operator=(const Type&) = delete
 
 #endif  // MINIKIN_MACROS_H

@@ -28,6 +28,7 @@
 #include <unicode/brkiter.h>
 
 #include "minikin/Range.h"
+
 #include "Locale.h"
 
 namespace minikin {
@@ -71,7 +72,7 @@ public:
 protected:
     // protected for testing purposes.
     static constexpr size_t MAX_POOL_SIZE = 4;
-    ICULineBreakerPoolImpl() {};  // singleton.
+    ICULineBreakerPoolImpl(){};  // singleton.
     size_t getPoolSize() const { return mPool.size(); }
 
 private:
@@ -80,9 +81,7 @@ private:
 
 class WordBreaker {
 public:
-    virtual ~WordBreaker() {
-        finish();
-    }
+    virtual ~WordBreaker() { finish(); }
 
     WordBreaker();
 

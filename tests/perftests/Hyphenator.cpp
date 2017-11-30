@@ -27,8 +27,8 @@ const int enUsMinPrefix = 2;
 const int enUsMinSuffix = 3;
 
 static void BM_Hyphenator_short_word(benchmark::State& state) {
-    Hyphenator* hyphenator = Hyphenator::loadBinary(
-            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en");
+    Hyphenator* hyphenator = Hyphenator::loadBinary(readWholeFile(enUsHyph).data(), enUsMinPrefix,
+                                                    enUsMinSuffix, "en");
     std::vector<uint16_t> word = utf8ToUtf16("hyphen");
     std::vector<HyphenationType> result;
     while (state.KeepRunning()) {
@@ -40,10 +40,9 @@ static void BM_Hyphenator_short_word(benchmark::State& state) {
 BENCHMARK(BM_Hyphenator_short_word);
 
 static void BM_Hyphenator_long_word(benchmark::State& state) {
-    Hyphenator* hyphenator = Hyphenator::loadBinary(
-            readWholeFile(enUsHyph).data(), enUsMinPrefix, enUsMinSuffix, "en");
-    std::vector<uint16_t> word = utf8ToUtf16(
-            "Pneumonoultramicroscopicsilicovolcanoconiosis");
+    Hyphenator* hyphenator = Hyphenator::loadBinary(readWholeFile(enUsHyph).data(), enUsMinPrefix,
+                                                    enUsMinSuffix, "en");
+    std::vector<uint16_t> word = utf8ToUtf16("Pneumonoultramicroscopicsilicovolcanoconiosis");
     std::vector<HyphenationType> result;
     while (state.KeepRunning()) {
         hyphenator->hyphenate(&result, word.data(), word.size());

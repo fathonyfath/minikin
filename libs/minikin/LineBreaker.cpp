@@ -23,6 +23,7 @@
 #include "minikin/Layout.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
+
 #include "HyphenatorMap.h"
 #include "LayoutUtils.h"
 #include "Locale.h"
@@ -70,8 +71,8 @@ MeasuredText MeasuredText::generate(const U16StringPiece& text,
     MeasuredText result(text.size());
     for (const auto& run : runs) {
         const uint32_t runOffset = run->getRange().getStart();
-        run->getMetrics(text, result.widths.data() + runOffset,
-                        result.extents.data() + runOffset, result.overhangs.data() + runOffset);
+        run->getMetrics(text, result.widths.data() + runOffset, result.extents.data() + runOffset,
+                        result.overhangs.data() + runOffset);
     }
     return result;
 }
@@ -85,25 +86,22 @@ LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16String
                          const MeasuredText& measuredText, BreakStrategy strategy,
                          HyphenationFrequency frequency, bool justified)
         : mCurrentLocaleListId(LocaleListCache::kInvalidListId),
-        mWordBreaker(std::move(breaker)),
-        mTextBuf(textBuffer),
-        mMeasuredText(measuredText),
-        mStrategy(strategy),
-        mHyphenationFrequency(frequency),
-        mJustified(justified),
-        mLastConsideredGreedyCandidate(LAST_BREAK_OFFSET_NOWHERE),
-        mSpaceCount(0) {
-
+          mWordBreaker(std::move(breaker)),
+          mTextBuf(textBuffer),
+          mMeasuredText(measuredText),
+          mStrategy(strategy),
+          mHyphenationFrequency(frequency),
+          mJustified(justified),
+          mLastConsideredGreedyCandidate(LAST_BREAK_OFFSET_NOWHERE),
+          mSpaceCount(0) {
     mWordBreaker->setText(mTextBuf.data(), mTextBuf.size());
 
     // handle initial break here because addStyleRun may never be called
-    mCandidates.push_back({
-            0 /* offset */, 0.0 /* preBreak */, 0.0 /* postBreak */,
-            0.0 /* firstOverhang */, 0.0 /* secondOverhang */,
-            0.0 /* penalty */,
-            0 /* preSpaceCount */, 0 /* postSpaceCount */,
-            HyphenationType::DONT_BREAK /* hyphenType */,
-            false /* isRtl. TODO: may need to be based on input. */});
+    mCandidates.push_back({0 /* offset */, 0.0 /* preBreak */, 0.0 /* postBreak */,
+                           0.0 /* firstOverhang */, 0.0 /* secondOverhang */, 0.0 /* penalty */,
+                           0 /* preSpaceCount */, 0 /* postSpaceCount */,
+                           HyphenationType::DONT_BREAK /* hyphenType */,
+                           false /* isRtl. TODO: may need to be based on input. */});
 }
 
 LineBreaker::~LineBreaker() {}
@@ -112,7 +110,8 @@ const LineBreaker::Candidate& LineBreaker::getLastBreakCandidate() const {
     MINIKIN_ASSERT(mLastGreedyBreakIndex != LAST_BREAK_OFFSET_NOWHERE,
                    "Line break hasn't started.");
     return mLastGreedyBreakIndex == LAST_BREAK_OFFSET_DESPERATE
-            ?  mFakeDesperateCandidate : mCandidates[mLastGreedyBreakIndex];
+                   ? mFakeDesperateCandidate
+                   : mCandidates[mLastGreedyBreakIndex];
 }
 
 void LineBreaker::setLocaleList(uint32_t localeListId, size_t restartFrom) {
@@ -125,10 +124,10 @@ void LineBreaker::setLocaleList(uint32_t localeListId, size_t restartFrom) {
     const uint64_t newLocaleId = newLocale.getIdentifier();
 
     const bool needUpdate =
-        // The first time setLocale is called.
-        mCurrentLocaleListId == LocaleListCache::kInvalidListId ||
-        // The effective locale is changed.
-        newLocaleId != mCurrentLocaleId;
+            // The first time setLocale is called.
+            mCurrentLocaleListId == LocaleListCache::kInvalidListId ||
+            // The effective locale is changed.
+            newLocaleId != mCurrentLocaleId;
 
     // For now, we ignore all locales except the first valid one.
     // TODO: Support selecting the locale based on the script of the text.
@@ -145,15 +144,14 @@ void LineBreaker::setLocaleList(uint32_t localeListId, size_t restartFrom) {
 // plus '\n'.
 // Note: all such characters are in the BMP, so it's ok to use code units for this.
 static bool isLineEndSpace(uint16_t c) {
-    return c == '\n'
-            || c == ' '      // SPACE
-            || c == 0x1680   // OGHAM SPACE MARK
-            || (0x2000 <= c && c <= 0x200A && c != 0x2007) // EN QUAD, EM QUAD, EN SPACE, EM SPACE,
+    return c == '\n' || c == ' '                           // SPACE
+           || c == 0x1680                                  // OGHAM SPACE MARK
+           || (0x2000 <= c && c <= 0x200A && c != 0x2007)  // EN QUAD, EM QUAD, EN SPACE, EM SPACE,
                                                            // THREE-PER-EM SPACE, FOUR-PER-EM SPACE,
                                                            // SIX-PER-EM SPACE, PUNCTUATION SPACE,
                                                            // THIN SPACE, HAIR SPACE
-            || c == 0x205F   // MEDIUM MATHEMATICAL SPACE
-            || c == 0x3000;  // IDEOGRAPHIC SPACE
+           || c == 0x205F                                  // MEDIUM MATHEMATICAL SPACE
+           || c == 0x3000;                                 // IDEOGRAPHIC SPACE
 }
 
 // Hyphenates a string potentially containing non-breaking spaces.
@@ -164,7 +162,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
 
     // A word here is any consecutive string of non-NBSP characters.
     bool inWord = false;
-    size_t wordStart = 0; // The initial value will never be accessed, but just in case.
+    size_t wordStart = 0;  // The initial value will never be accessed, but just in case.
     for (size_t i = 0; i <= len; i++) {
         if (i == len || str[i] == CHAR_NBSP) {
             if (inWord) {
@@ -179,7 +177,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
                         mHyphenator->hyphenate(&wordVec, str.data() + wordStart, wordLen);
                         out.insert(out.end(), wordVec.cbegin(), wordVec.cend());
                     }
-                } else { // Word is too long. Inefficient to hyphenate.
+                } else {  // Word is too long. Inefficient to hyphenate.
                     out.insert(out.end(), wordLen, HyphenationType::DONT_BREAK);
                 }
                 inWord = false;
@@ -198,9 +196,9 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
 
 // Compute the total overhang of text based on per-cluster advances and overhangs.
 // The two input vectors are expected to be of the same size.
-/* static */ LayoutOverhang LineBreaker::computeOverhang(float totalAdvance,
-        const std::vector<float>& advances, const std::vector<LayoutOverhang>& overhangs,
-        bool isRtl) {
+/* static */ LayoutOverhang LineBreaker::computeOverhang(
+        float totalAdvance, const std::vector<float>& advances,
+        const std::vector<LayoutOverhang>& overhangs, bool isRtl) {
     ParaWidth left = 0.0;
     ParaWidth right = 0.0;
     ParaWidth seenAdvance = 0.0;
@@ -239,14 +237,10 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
 // postSpaceCount is the number of spaces that would be seen if we decide to break at the end of the
 //     word (and like postBreak it doesn't count any line-ending space after the word).
 // hyphenPenalty is the amount of penalty for hyphenation.
-void LineBreaker::addHyphenationCandidates(
-        const Run& run,
-        const Range& contextRange,
-        const Range& wordRange,
-        ParaWidth lastBreakWidth,
-        ParaWidth postBreak,
-        size_t postSpaceCount,
-        float hyphenPenalty) {
+void LineBreaker::addHyphenationCandidates(const Run& run, const Range& contextRange,
+                                           const Range& wordRange, ParaWidth lastBreakWidth,
+                                           ParaWidth postBreak, size_t postSpaceCount,
+                                           float hyphenPenalty) {
     MINIKIN_ASSERT(contextRange.contains(wordRange), "Context must contain word range");
 
     const bool isRtlWord = run.isRtl();
@@ -270,9 +264,9 @@ void LineBreaker::addHyphenationCandidates(
         const size_t firstPartLen = firstPart.getLength();
         advances.resize(firstPartLen);
         overhangs.resize(firstPartLen);
-        const float firstPartWidth = run.measureHyphenPiece(
-                mTextBuf, firstPart, StartHyphenEdit::NO_EDIT, editForThisLine(hyph),
-                advances.data(), overhangs.data());
+        const float firstPartWidth =
+                run.measureHyphenPiece(mTextBuf, firstPart, StartHyphenEdit::NO_EDIT,
+                                       editForThisLine(hyph), advances.data(), overhangs.data());
         const ParaWidth hyphPostBreak = lastBreakWidth + firstPartWidth;
         LayoutOverhang overhang = computeOverhang(firstPartWidth, advances, overhangs, isRtlWord);
         // TODO: This ignores potential overhang from a previous word, e.g. in "R table" if the
@@ -283,9 +277,9 @@ void LineBreaker::addHyphenationCandidates(
         const size_t secondPartLen = secondPart.getLength();
         advances.resize(secondPartLen);
         overhangs.resize(secondPartLen);
-        const float secondPartWidth = run.measureHyphenPiece(
-                mTextBuf, secondPart, editForNextLine(hyph), EndHyphenEdit::NO_EDIT,
-                advances.data(), overhangs.data());
+        const float secondPartWidth =
+                run.measureHyphenPiece(mTextBuf, secondPart, editForNextLine(hyph),
+                                       EndHyphenEdit::NO_EDIT, advances.data(), overhangs.data());
         // hyphPreBreak is calculated like this so that when the line width for a future line break
         // is being calculated, the width of the whole word would be subtracted and the width of the
         // second part would be added.
@@ -293,8 +287,8 @@ void LineBreaker::addHyphenationCandidates(
         overhang = computeOverhang(secondPartWidth, advances, overhangs, isRtlWord);
         const float secondOverhang = isRtlWord ? overhang.right : overhang.left;
 
-        addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang,
-                postSpaceCount, postSpaceCount, hyphenPenalty, hyph, isRtlWord);
+        addWordBreak(j, hyphPreBreak, hyphPostBreak, firstOverhang, secondOverhang, postSpaceCount,
+                     postSpaceCount, hyphenPenalty, hyph, isRtlWord);
     }
 }
 
@@ -311,7 +305,7 @@ void LineBreaker::addRun(const Run& run, const LineWidth& lineWidth, const TabSt
         // a heuristic that seems to perform well
         hyphenPenalty = 0.5 * paint->size * paint->scaleX * lineWidth.getAt(0);
         if (mHyphenationFrequency == HyphenationFrequency::Normal) {
-            hyphenPenalty *= 4.0; // TODO: Replace with a better value after some testing
+            hyphenPenalty *= 4.0;  // TODO: Replace with a better value after some testing
         }
 
         if (mJustified) {
@@ -325,13 +319,13 @@ void LineBreaker::addRun(const Run& run, const LineWidth& lineWidth, const TabSt
     }
 
     setLocaleList(run.getLocaleListId(), range.getStart());
-    size_t current = (size_t) mWordBreaker->current();
+    size_t current = (size_t)mWordBreaker->current();
     // This will keep the index of last code unit seen that's not a line-ending space, plus one.
     // In other words, the index of the first code unit after a word.
 
     Range hyphenationContextRange(range.getStart(), range.getStart());
-    ParaWidth lastBreakWidth = mWidth; // The width of the text as of the previous break point.
-    ParaWidth postBreak = mWidth; // The width of text seen if we decide to break here
+    ParaWidth lastBreakWidth = mWidth;  // The width of the text as of the previous break point.
+    ParaWidth postBreak = mWidth;       // The width of text seen if we decide to break here
     // postBreak plus potential forward overhang. Guaranteed to be >= postBreak.
     ParaWidth postBreakWithOverhang = mWidth;
     // The maximum amount of backward overhang seen since last word.
@@ -375,8 +369,8 @@ void LineBreaker::addRun(const Run& run, const LineWidth& lineWidth, const TabSt
                 // so we ignore it for now.
                 const float forwardOverhang =
                         isRtl ? mMeasuredText.overhangs[i].left : mMeasuredText.overhangs[i].right;
-                postBreakWithOverhang = std::max(postBreakWithOverhang,
-                                                 postBreak + forwardOverhang);
+                postBreakWithOverhang =
+                        std::max(postBreakWithOverhang, postBreak + forwardOverhang);
 
                 float backwardOverhang =
                         isRtl ? mMeasuredText.overhangs[i].right : mMeasuredText.overhangs[i].left;
@@ -385,10 +379,10 @@ void LineBreaker::addRun(const Run& run, const LineWidth& lineWidth, const TabSt
                 maxBackwardOverhang = std::max(maxBackwardOverhang, backwardOverhang);
             }
         }
-        if (i + 1 == current) { // We are at the end of a word.
+        if (i + 1 == current) {  // We are at the end of a word.
             // We skip breaks for zero-width characters inside replacement spans.
-            const bool addBreak = canHyphenate || current == range.getEnd() ||
-                    mMeasuredText.widths[current] > 0;
+            const bool addBreak =
+                    canHyphenate || current == range.getEnd() || mMeasuredText.widths[current] > 0;
 
             if (addBreak) {
                 // adjust second overhang for previous breaks
@@ -398,17 +392,17 @@ void LineBreaker::addRun(const Run& run, const LineWidth& lineWidth, const TabSt
                 const Range wordRange = mWordBreaker->wordRange();
                 if (!wordRange.isEmpty() && range.contains(wordRange)) {
                     addHyphenationCandidates(run, hyphenationContextRange, wordRange,
-                            lastBreakWidth, postBreak, postSpaceCount, hyphenPenalty);
+                                             lastBreakWidth, postBreak, postSpaceCount,
+                                             hyphenPenalty);
                 }
             }
             if (addBreak) {
                 const float penalty = hyphenPenalty * mWordBreaker->breakBadness();
                 // TODO: overhangs may need adjustment at bidi boundaries.
                 addWordBreak(current, mWidth /* preBreak */, postBreak,
-                        postBreakWithOverhang - postBreak /* firstOverhang */,
-                        0.0 /* secondOverhang, to be adjusted later */,
-                        mSpaceCount, postSpaceCount,
-                        penalty, HyphenationType::DONT_BREAK, isRtl);
+                             postBreakWithOverhang - postBreak /* firstOverhang */,
+                             0.0 /* secondOverhang, to be adjusted later */, mSpaceCount,
+                             postSpaceCount, penalty, HyphenationType::DONT_BREAK, isRtl);
             }
             hyphenationContextRange = Range(current, current);
             lastBreakWidth = mWidth;
@@ -426,7 +420,7 @@ void LineBreaker::addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t st
     ParaWidth width = mMeasuredText.widths[start];
     for (size_t i = start + 1; i < end; i++) {
         const float w = mMeasuredText.widths[i];
-        if (w > 0) { // Add desperate breaks only before grapheme clusters.
+        if (w > 0) {  // Add desperate breaks only before grapheme clusters.
             const ParaWidth newWidth = width + w;
             if (!fitsOnCurrentLine(newWidth, 0.0, 0.0, lineWidth)) {
                 const Candidate& lastGreedyBreak = getLastBreakCandidate();
@@ -453,10 +447,11 @@ void LineBreaker::addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t st
 
 // Add a word break (possibly for a hyphenated fragment).
 inline void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
-        float firstOverhang, float secondOverhang, size_t preSpaceCount, size_t postSpaceCount,
-        float penalty, HyphenationType hyph, bool isRtl) {
+                                      float firstOverhang, float secondOverhang,
+                                      size_t preSpaceCount, size_t postSpaceCount, float penalty,
+                                      HyphenationType hyph, bool isRtl) {
     mCandidates.push_back({offset, preBreak, postBreak, firstOverhang, secondOverhang, penalty,
-            preSpaceCount, postSpaceCount, hyph, isRtl});
+                           preSpaceCount, postSpaceCount, hyph, isRtl});
 }
 
 // Go back and adjust earlier line breaks if needed.
@@ -472,8 +467,7 @@ void LineBreaker::adjustSecondOverhang(float secondOverhang) {
             // No more remaining overhang. We don't need to adjust anything anymore.
             return;
         }
-        mCandidates[i].secondOverhang = std::max(mCandidates[i].secondOverhang,
-                remainingOverhang);
+        mCandidates[i].secondOverhang = std::max(mCandidates[i].secondOverhang, remainingOverhang);
     }
 }
 
@@ -490,11 +484,10 @@ MinikinExtent LineBreaker::computeMaxExtent(size_t start, size_t end) const {
 void LineBreaker::addGreedyBreak(size_t breakIndex) {
     const Candidate& candidate = mCandidates[breakIndex];
     const Candidate& lastGreedyBreak = getLastBreakCandidate();
-    pushBreak(candidate.offset,
-            candidate.postBreak - lastGreedyBreak.preBreak,
-            computeMaxExtent(lastGreedyBreak.offset, candidate.offset),
-            packHyphenEdit(editForNextLine(lastGreedyBreak.hyphenType),
-                    editForThisLine(candidate.hyphenType)));
+    pushBreak(candidate.offset, candidate.postBreak - lastGreedyBreak.preBreak,
+              computeMaxExtent(lastGreedyBreak.offset, candidate.offset),
+              packHyphenEdit(editForNextLine(lastGreedyBreak.hyphenType),
+                             editForThisLine(candidate.hyphenType)));
     mLastGreedyBreakIndex = breakIndex;
 }
 
@@ -511,8 +504,8 @@ void LineBreaker::considerGreedyBreakCandidate(size_t candIndex, const LineWidth
         leftOverhang = lastGreedyBreak->secondOverhang;
         rightOverhang = cand->firstOverhang;
     }
-    while (!fitsOnCurrentLine(cand->postBreak - lastGreedyBreak->preBreak,
-            leftOverhang, rightOverhang, lineWidth)) {
+    while (!fitsOnCurrentLine(cand->postBreak - lastGreedyBreak->preBreak, leftOverhang,
+                              rightOverhang, lineWidth)) {
         // This break would create an overfull line, pick the best break and break there (greedy).
         // We do this in a loop, since there's no guarantee that after a break the remaining text
         // would fit on the next line.
@@ -524,7 +517,7 @@ void LineBreaker::considerGreedyBreakCandidate(size_t candIndex, const LineWidth
 
             // Add desperate breaks starting immediately after the last break.
             addDesperateBreaksGreedy(lastGreedyBreak->preBreak, lastGreedyBreak->offset,
-                    cand->offset, lineWidth);
+                                     cand->offset, lineWidth);
             break;
         } else {
             // Break at the best known break.
@@ -602,11 +595,10 @@ void LineBreaker::computeBreaksGreedy(const LineWidth& lineWidth) {
     const Candidate* lastCandidate = &mCandidates.back();
     if (mCandidates.size() == 1 || mLastGreedyBreakIndex != (mCandidates.size() - 1)) {
         const Candidate& lastGreedyBreak = getLastBreakCandidate();
-        pushBreak(lastCandidate->offset,
-                lastCandidate->postBreak - lastGreedyBreak.preBreak,
-                computeMaxExtent(lastGreedyBreak.offset, lastCandidate->offset),
-                packHyphenEdit(editForNextLine(lastGreedyBreak.hyphenType),
-                        EndHyphenEdit::NO_EDIT));
+        pushBreak(lastCandidate->offset, lastCandidate->postBreak - lastGreedyBreak.preBreak,
+                  computeMaxExtent(lastGreedyBreak.offset, lastCandidate->offset),
+                  packHyphenEdit(editForNextLine(lastGreedyBreak.hyphenType),
+                                 EndHyphenEdit::NO_EDIT));
         // No need to update mLastGreedyBreakIndex because we're done.
     }
 }
@@ -615,18 +607,19 @@ void LineBreaker::computeBreaksGreedy(const LineWidth& lineWidth) {
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
 // are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
 void LineBreaker::addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
-        size_t postSpaceCount, bool isRtl, size_t start, size_t end) {
+                                            size_t postSpaceCount, bool isRtl, size_t start,
+                                            size_t end) {
     ParaWidth width = existingPreBreak + mMeasuredText.widths[start];
     for (size_t i = start + 1; i < end; i++) {
         const float w = mMeasuredText.widths[i];
-        if (w > 0) { // Add desperate breaks only before grapheme clusters.
+        if (w > 0) {  // Add desperate breaks only before grapheme clusters.
             out->push_back({i /* offset */, width /* preBreak */, width /* postBreak */,
-                    0.0 /* firstOverhang */, 0.0 /* secondOverhang */,
-                    SCORE_DESPERATE /* penalty */,
-                    // postSpaceCount doesn't include trailing spaces.
-                    postSpaceCount /* preSpaceCount */, postSpaceCount /* postSpaceCount */,
-                    HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN /* hyphenType */,
-                    isRtl /* isRtl */});
+                            0.0 /* firstOverhang */, 0.0 /* secondOverhang */,
+                            SCORE_DESPERATE /* penalty */,
+                            // postSpaceCount doesn't include trailing spaces.
+                            postSpaceCount /* preSpaceCount */, postSpaceCount /* postSpaceCount */,
+                            HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN /* hyphenType */,
+                            isRtl /* isRtl */});
             width += w;
         }
     }
@@ -644,7 +637,7 @@ void LineBreaker::addAllDesperateBreaksOptimal(const LineWidth& lineWidth) {
             break;
         }
     }
-    if (firstDesperateIndex == 0) { // No desperate breaks needed.
+    if (firstDesperateIndex == 0) {  // No desperate breaks needed.
         return;
     }
 
@@ -652,15 +645,15 @@ void LineBreaker::addAllDesperateBreaksOptimal(const LineWidth& lineWidth) {
     // mCandidates. The beginning of mCandidates, where there are no desparate breaks, is skipped.
     std::vector<Candidate> expandedCandidates;
     const size_t nRemainingCandidates = nCand - firstDesperateIndex;
-    expandedCandidates.reserve(nRemainingCandidates + 1); // At least one more is needed.
+    expandedCandidates.reserve(nRemainingCandidates + 1);  // At least one more is needed.
     for (size_t i = firstDesperateIndex; i < nCand; i++) {
         const Candidate& previousCand = mCandidates[i - 1];
         const Candidate& thisCand = mCandidates[i];
         const ParaWidth requiredWidth = thisCand.postBreak - previousCand.preBreak;
         if (requiredWidth > minLineWidth) {
             addDesperateBreaksOptimal(&expandedCandidates, previousCand.preBreak,
-                    thisCand.postSpaceCount, thisCand.isRtl, previousCand.offset /* start */,
-                    thisCand.offset /* end */);
+                                      thisCand.postSpaceCount, thisCand.isRtl,
+                                      previousCand.offset /* start */, thisCand.offset /* end */);
         }
         expandedCandidates.push_back(thisCand);
     }
@@ -690,9 +683,10 @@ void LineBreaker::finishBreaksOptimal(const std::vector<OptimalBreaksData>& brea
         mAscents.push_back(extent.ascent);
         mDescents.push_back(extent.descent);
 
-        const HyphenEdit edit = packHyphenEdit(
-                prev == 0 ? StartHyphenEdit::NO_EDIT : editForNextLine(mCandidates[prev].hyphenType),
-                editForThisLine(mCandidates[i].hyphenType));
+        const HyphenEdit edit =
+                packHyphenEdit(prev == 0 ? StartHyphenEdit::NO_EDIT
+                                         : editForNextLine(mCandidates[prev].hyphenType),
+                               editForThisLine(mCandidates[i].hyphenType));
         mFlags.push_back(static_cast<int>(edit));
     }
     std::reverse(mBreaks.begin(), mBreaks.end());
@@ -707,7 +701,7 @@ void LineBreaker::computeBreaksOptimal(const LineWidth& lineWidth) {
 
     std::vector<OptimalBreaksData> breaksData;
     breaksData.reserve(nCand);
-    breaksData.push_back({0.0, 0, 0}); // The first candidate is always at the first line.
+    breaksData.push_back({0.0, 0, 0});  // The first candidate is always at the first line.
 
     // "i" iterates through candidates for the end of the line.
     for (size_t i = 1; i < nCand; i++) {
@@ -752,8 +746,8 @@ void LineBreaker::computeBreaksOptimal(const LineWidth& lineWidth) {
             } else {
                 widthScore = delta * delta;
                 if (delta < 0) {
-                    if (-delta < maxShrink *
-                            (mCandidates[i].postSpaceCount - mCandidates[j].preSpaceCount)) {
+                    if (-delta < maxShrink * (mCandidates[i].postSpaceCount -
+                                              mCandidates[j].preSpaceCount)) {
                         widthScore *= SHRINK_PENALTY_MULTIPLIER;
                     } else {
                         widthScore = SCORE_OVERFULL;
@@ -773,17 +767,15 @@ void LineBreaker::computeBreaksOptimal(const LineWidth& lineWidth) {
                 bestPrev = j;
             }
         }
-        breaksData.push_back({
-            best + mCandidates[i].penalty + mLinePenalty,  // score
-            bestPrev,  // prev
-            breaksData[bestPrev].lineNumber + 1});  // lineNumber
+        breaksData.push_back({best + mCandidates[i].penalty + mLinePenalty,  // score
+                              bestPrev,                                      // prev
+                              breaksData[bestPrev].lineNumber + 1});         // lineNumber
     }
     finishBreaksOptimal(breaksData);
 }
 
 LineBreakResult LineBreaker::computeBreaks(const std::vector<std::unique_ptr<Run>>& runs,
-                                           const LineWidth& lineWidth,
-                                           const TabStops& tabStops) {
+                                           const LineWidth& lineWidth, const TabStops& tabStops) {
     for (const auto& run : runs) {
         addRun(*run, lineWidth, tabStops);
     }
@@ -814,10 +806,10 @@ void LineBreaker::insertGreedyBreakCandidate(size_t index, float penalty) {
     if (!mBestGreedyBreaks.empty()) {
         // Find the location in the queue where the penalty is <= the current penalty, and drop the
         // elements from there to the end of the queue.
-        auto where = std::lower_bound(
-                mBestGreedyBreaks.begin(), mBestGreedyBreaks.end(), gBreak,
-                [](GreedyBreak first, GreedyBreak second) -> bool
-                        { return first.penalty < second.penalty; });
+        auto where = std::lower_bound(mBestGreedyBreaks.begin(), mBestGreedyBreaks.end(), gBreak,
+                                      [](GreedyBreak first, GreedyBreak second) -> bool {
+                                          return first.penalty < second.penalty;
+                                      });
         if (where != mBestGreedyBreaks.end()) {
             mBestGreedyBreaks.erase(where, mBestGreedyBreaks.end());
         }

@@ -26,14 +26,9 @@ bool isNewEmoji(uint32_t c) {
         // Optimization for characters outside the new emoji range.
         return false;
     }
-    return (0x1F6F7 <= c && c <= 0x1F6F8)
-            || c == 0x1F91F
-            || (0x1F928 <= c && c <= 0x1F92F)
-            || (0x1F931 <= c && c <= 0x1F932)
-            || c == 0x1F94C
-            || (0x1F95F <= c && c <= 0x1F96B)
-            || (0x1F992 <= c && c <= 0x1F997)
-            || (0x1F9D0 <= c && c <= 0x1F9E6);
+    return (0x1F6F7 <= c && c <= 0x1F6F8) || c == 0x1F91F || (0x1F928 <= c && c <= 0x1F92F) ||
+           (0x1F931 <= c && c <= 0x1F932) || c == 0x1F94C || (0x1F95F <= c && c <= 0x1F96B) ||
+           (0x1F992 <= c && c <= 0x1F997) || (0x1F9D0 <= c && c <= 0x1F9E6);
 }
 
 bool isEmoji(uint32_t c) {
@@ -56,9 +51,7 @@ bool isEmojiBase(uint32_t c) {
     // Emoji Modifier Base characters new in Unicode emoji 5.0.
     // From http://www.unicode.org/Public/emoji/5.0/emoji-data.txt
     // TODO: Remove once emoji-data.text 5.0 is in ICU or update to 6.0.
-    if (c == 0x1F91F
-            || (0x1F931 <= c && c <= 0x1F932)
-            || (0x1F9D1 <= c && c <= 0x1F9DD)) {
+    if (c == 0x1F91F || (0x1F931 <= c && c <= 0x1F932) || (0x1F9D1 <= c && c <= 0x1F9DD)) {
         return true;
     }
     return u_hasBinaryProperty(c, UCHAR_EMOJI_MODIFIER_BASE);
@@ -74,4 +67,3 @@ UCharDirection emojiBidiOverride(const void* /* context */, UChar32 c) {
 }
 
 }  // namespace minikin
-

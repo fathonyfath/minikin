@@ -22,8 +22,9 @@
 #include <hb.h>
 
 #include "minikin/MinikinFont.h"
-#include "MinikinInternal.h"
+
 #include "MinikinFontForTest.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
 
@@ -36,11 +37,9 @@ public:
 };
 
 TEST_F(HbFontCacheTest, getHbFontLockedTest) {
-    std::shared_ptr<MinikinFontForTest> fontA(
-            new MinikinFontForTest(kTestFontDir "Regular.ttf"));
+    std::shared_ptr<MinikinFontForTest> fontA(new MinikinFontForTest(kTestFontDir "Regular.ttf"));
 
-    std::shared_ptr<MinikinFontForTest> fontB(
-            new MinikinFontForTest(kTestFontDir "Bold.ttf"));
+    std::shared_ptr<MinikinFontForTest> fontB(new MinikinFontForTest(kTestFontDir "Bold.ttf"));
 
     std::shared_ptr<MinikinFontForTest> fontC(
             new MinikinFontForTest(kTestFontDir "BoldItalic.ttf"));
