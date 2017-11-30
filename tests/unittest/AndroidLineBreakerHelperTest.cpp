@@ -40,8 +40,8 @@ TEST_F(AndroidLineBreakerHelperTest, RunTests) {
             getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
 
     StaticLayoutNative layoutNative(
-            kBreakStrategy_Greedy,  // break strategy
-            kHyphenationFrequency_None,  // hyphenation frequency
+            BreakStrategy::Greedy,  // break strategy
+            HyphenationFrequency::None,  // hyphenation frequency
             false,  // not justified
             std::vector<float>(),  // indents
             std::vector<float>(),  // left padding
@@ -53,26 +53,18 @@ TEST_F(AndroidLineBreakerHelperTest, RunTests) {
 
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
-    LineBreaker lineBreaker(text);
-    lineBreaker.setStrategy(layoutNative.getStrategy());
-    lineBreaker.setHyphenationFrequency(layoutNative.getFrequency());
-    lineBreaker.setJustified(layoutNative.isJustified());
-    lineBreaker.setLineWidthDelegate(
-        layoutNative.buildLineWidthDelegate(LINE_WIDTH, 1, LINE_WIDTH, 0 /* starting line no */));
-
-    layoutNative.addRuns(&lineBreaker);
-
-    lineBreaker.computeBreaks();
+    MeasuredText measuredText = layoutNative.measureText(text);
+    LineBreakResult result = layoutNative.computeBreaks(
+            text, measuredText,
+            LINE_WIDTH, 1, LINE_WIDTH, 0,  // line width arguments,
+            nullptr, 0, 0);  // tab stop arguments.
 
     // ReplacementRun assigns all width to the first character and leave zeros others.
     std::vector<float> expectedWidths = {
         CHAR_WIDTH, CHAR_WIDTH, REPLACEMENT_WIDTH, 0, CHAR_WIDTH, CHAR_WIDTH
     };
 
-    std::vector<float> actualWidths(lineBreaker.charWidths(),
-                                    lineBreaker.charWidths() + lineBreaker.size());
-
-    EXPECT_EQ(expectedWidths, actualWidths);
+    EXPECT_EQ(expectedWidths, measuredText.widths);
 }
 
 }  // namespace android

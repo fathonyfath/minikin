@@ -17,6 +17,9 @@
 #include "minikin/LineBreaker.h"
 
 #include <algorithm>
+#include <array>
+#include <memory>
+#include <utility>
 
 #include <cutils/log.h>
 #include <unicode/locid.h>
@@ -49,6 +52,14 @@ struct LocaleComparator {
         return l.getIdentifier() > r.getIdentifier();
     }
 };
+
+// Helper function for creating vector of move-only elements.
+template<class Base, class T, class... Tail>
+constexpr std::vector<Base> makeVector(T&& head, Tail&&... tail) {
+    std::array<T, 1 + sizeof...(Tail)> ar = {{std::forward<T>(head), std::forward<Tail>(tail)... }};
+    return std::vector<Base>({std::make_move_iterator(std::begin(ar)),
+        std::make_move_iterator(std::end(ar))});
+}
 
 typedef std::map<Locale, std::string, LocaleComparator> LocaleIteratorMap;
 
@@ -207,25 +218,28 @@ public:
 
 class TestableLineBreaker : public LineBreaker {
 public:
-    TestableLineBreaker(ICULineBreakerPool* pool, const U16StringPiece& string)
-            : LineBreaker(std::make_unique<TestableWordBreaker>(pool), string) {}
+    TestableLineBreaker(ICULineBreakerPool* pool, const U16StringPiece& string,
+                        const MeasuredText& measuredText)
+            : LineBreaker(std::make_unique<TestableWordBreaker>(pool), string, measuredText,
+                          BreakStrategy::Greedy, HyphenationFrequency::None, false /* justified */)
+            {}
 };
 
-class RectangleLineWidthDelegate : public LineBreaker::LineWidthDelegate {
+class RectangleLineWidthDelegate : public LineWidth {
 public:
     RectangleLineWidthDelegate(float width) : mWidth(width) {}
     virtual ~RectangleLineWidthDelegate() {}
 
-    float getLineWidth(size_t) override {
+    float getAt(size_t) const override {
         return mWidth;
     }
-    float getMinLineWidth() override {
+    float getMin() const override {
         return mWidth;
     }
-    float getLeftPadding(size_t) override {
+    float getLeftPaddingAt(size_t) const override {
         return 0;
     }
-    float getRightPadding(size_t) override {
+    float getRightPaddingAt(size_t) const override {
         return 0;
     }
 
@@ -235,7 +249,8 @@ private:
 
 class LineBreakerTest : public ICUTestBase {
 public:
-    LineBreakerTest() : ICUTestBase() {}
+    LineBreakerTest()
+            : ICUTestBase(), mTabStops(nullptr, 0, 0) {}
 
     virtual ~LineBreakerTest() {}
 
@@ -250,7 +265,18 @@ protected:
         ICUTestBase::TearDown();
     }
 
+    LineBreakResult doLineBreak(ICULineBreakerPool* pool,
+                                const U16StringPiece& text,
+                                const std::vector<std::unique_ptr<minikin::Run>>& runs,
+                                float lineWidth) {
+        RectangleLineWidthDelegate rectangleLineWidth(lineWidth);
+        MeasuredText measuredText = MeasuredText::generate(text, runs);
+        TestableLineBreaker b(pool, text, measuredText);
+        return b.computeBreaks(runs, rectangleLineWidth, mTabStops);
+    }
+
     std::shared_ptr<FontCollection> mCollection;
+    TabStops mTabStops;
 
 private:
     static constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
@@ -335,16 +361,12 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
         map[enUSLocale] = "ab|cde|fgh|ijk|lmn|o|pqr|st|u|vwxyz";
 
         MockICULineBreakerPoolImpl impl(std::move(map));
-        TestableLineBreaker b(&impl, text);
+        LineBreakResult result = doLineBreak(&impl, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH)
+        ), 5 * CHAR_WIDTH);
 
-        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-
-        b.addRun(ConstantRun(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH));
-
-        const size_t breakNum = b.computeBreaks();
-        ASSERT_EQ(7U, breakNum);
-        expectLineBreaks("abcde|fgh|ijk|lmno|pqrst|u|vwxyz",
-                  std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        ASSERT_EQ(7U, result.breakPoints.size());
+        expectLineBreaks("abcde|fgh|ijk|lmno|pqrst|u|vwxyz", result.breakPoints);
 
         EXPECT_EQ(std::vector<float>({
                 5 * CHAR_WIDTH,
@@ -354,7 +376,7 @@ TEST_F(LineBreakerTest, greedyLineBreakAtWordBreakingPoint) {
                 5 * CHAR_WIDTH,
                 1 * CHAR_WIDTH,
                 5 * CHAR_WIDTH,
-            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+            }), result.widths);
     }
     // TODO: Add more test cases, non rectangle, hyphenation, addReplacementSpan etc.
 }
@@ -381,21 +403,19 @@ TEST_F(LineBreakerTest, greedyLocaleSwitchTest) {
         map[frFRLocale] = "ab|cdef|gh";
 
         MockICULineBreakerPoolImpl impl(std::move(map));
-        TestableLineBreaker b(&impl, text);
-        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        LineBreakResult result = doLineBreak(&impl, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 2), enUSLocaleListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, text.size()), frFRLocaleListId, CHAR_WIDTH)
+        ), 5 * CHAR_WIDTH);
 
-        b.addRun(ConstantRun(Range(0, 2), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(2, text.size()), frFRLocaleListId, CHAR_WIDTH));
-        const size_t breakNum = b.computeBreaks();
-        ASSERT_EQ(3U, breakNum);
-        expectLineBreaks("ab|cdef|gh",
-                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        ASSERT_EQ(3U, result.breakPoints.size());
+        expectLineBreaks("ab|cdef|gh", result.breakPoints);
 
         EXPECT_EQ(std::vector<float>({
                 2 * CHAR_WIDTH,
                 4 * CHAR_WIDTH,
                 2 * CHAR_WIDTH,
-            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+            }), result.widths);
     }
     // TODO: Add more test cases, hyphenataion etc.
 }
@@ -416,20 +436,17 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_KeepSameLocaleTest) {
         map[enUSLocale] = "ab|cde|fgh";
 
         MockICULineBreakerPoolImpl impl(std::move(map));
-        TestableLineBreaker b(&impl, text);
-        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
+        LineBreakResult result = doLineBreak(&impl, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 2), enUSLocaleListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, text.size()), enUSLocaleListId, CHAR_WIDTH)
+        ), 5 * CHAR_WIDTH);
 
-        b.addRun(ConstantRun(Range(0, 2), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(2, text.size()), enUSLocaleListId, CHAR_WIDTH));
-
-        const size_t breakNum = b.computeBreaks();
-        ASSERT_EQ(2U, breakNum);
-        expectLineBreaks("abcde|fgh",
-                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        ASSERT_EQ(2U, result.breakPoints.size());
+        expectLineBreaks("abcde|fgh", result.breakPoints);
         EXPECT_EQ(std::vector<float>({
                 5 * CHAR_WIDTH,
                 3 * CHAR_WIDTH,
-            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+            }), result.widths);
     }
 }
 
@@ -457,21 +474,19 @@ TEST_F(LineBreakerTest, greedyLocaleSwich_insideEmail) {
         map[frFRLocale] = "aaa |b@c-d |eee";
 
         MockICULineBreakerPoolImpl impl(std::move(map));
-        TestableLineBreaker b(&impl, text);
-        b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(4 * CHAR_WIDTH));
+        LineBreakResult result = doLineBreak(&impl, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 7), enUSLocaleListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(7, text.size()), frFRLocaleListId, CHAR_WIDTH)
+        ), 4 * CHAR_WIDTH);
 
-        b.addRun(ConstantRun(Range(0, 7), enUSLocaleListId, CHAR_WIDTH));
-        b.addRun(ConstantRun(Range(7, text.size()), frFRLocaleListId, CHAR_WIDTH));
-
-        const size_t breakNum = b.computeBreaks();
-        expectLineBreaks("aaa |b@c|-d |eee",
-                 std::vector<int>(b.getBreaks(), b.getBreaks() + breakNum));
+        ASSERT_EQ(4U, result.breakPoints.size());
+        expectLineBreaks("aaa |b@c|-d |eee", result.breakPoints);
         EXPECT_EQ(std::vector<float>({
                 3 * CHAR_WIDTH,  // Doesn't count the trailing spaces.
                 3 * CHAR_WIDTH,  // Doesn't count the trailing spaces.
                 2 * CHAR_WIDTH,
                 3 * CHAR_WIDTH,
-            }), std::vector<float>(b.getWidths(), b.getWidths() + breakNum));
+            }), result.widths);
     }
 }
 
@@ -485,21 +500,18 @@ TEST_F(LineBreakerTest, CrashFix_Space_Tab) {
     map[enUSLocale] = "a |\t|b";
 
     MockICULineBreakerPoolImpl impl(std::move(map));
-    TestableLineBreaker b(&impl, text);
-    b.setLineWidthDelegate(std::make_unique<RectangleLineWidthDelegate>(5 * CHAR_WIDTH));
-
-    b.addRun(ConstantRun(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH));
-
-    b.computeBreaks();  // Make sure no crash happens.
+    std::vector<std::unique_ptr<minikin::Run>> runs = makeVector<std::unique_ptr<minikin::Run>>(
+        std::make_unique<ConstantRun>(Range(0, text.size()), enUSLocaleListId, CHAR_WIDTH)
+    );
+    doLineBreak(&impl, text, runs, 5 * CHAR_WIDTH);  // Make sure no crash happens.
 }
 
 class LocaleTraceICULineBreakerPoolImpl : public ICULineBreakerPool {
 public:
-    LocaleTraceICULineBreakerPoolImpl() : mAcquireCallCount(0) {}
+    LocaleTraceICULineBreakerPoolImpl() {}
 
     Slot acquire(const Locale& locale) override {
-        mAcquireCallCount++;
-        mLastRequestedLanguage = locale;
+        mRequestedLocaleLog.push_back(locale);
         UErrorCode status = U_ZERO_ERROR;
         return {locale.getIdentifier(), std::unique_ptr<icu::BreakIterator>(
                 icu::BreakIterator::createLineInstance(icu::Locale::getRoot(), status))};
@@ -510,114 +522,180 @@ public:
         Slot localSlot = std::move(slot);
     }
 
-    int getLocaleChangeCount() const {
-        return mAcquireCallCount;
+    const std::vector<Locale>& getPassedLocaleLog() const {
+        return mRequestedLocaleLog;
     }
 
-    const Locale& getLastPassedLocale() const {
-        return mLastRequestedLanguage;
+    void reset() {
+        mRequestedLocaleLog.clear();
     }
 
 private:
-    int mAcquireCallCount;
-    Locale mLastRequestedLanguage;
+    std::vector<Locale> mRequestedLocaleLog;
 
 };
 
 TEST_F(LineBreakerTest, setLocaleList) {
     constexpr size_t CHAR_COUNT = 14;
+    constexpr float LINE_WIDTH = CHAR_COUNT * CHAR_WIDTH;
     const std::vector<uint16_t> text(CHAR_COUNT, 'a');
     LocaleTraceICULineBreakerPoolImpl localeTracer;
-    TestableLineBreaker lineBreaker(&localeTracer, text);
-    lineBreaker.setLineWidthDelegate(
-            std::make_unique<RectangleLineWidthDelegate>(CHAR_COUNT * CHAR_WIDTH));
-    int expectedCallCount = 0;
 
     const Locale& enUS = getLocaleList(getLocaleListId("en-US"))[0];
     const Locale& frFR = getLocaleList(getLocaleListId("fr-FR"))[0];
+    const uint32_t enUSId = getLocaleListId("en-US");
     {
-        const uint32_t localeListId = getLocaleListId("en-US");
-        lineBreaker.addRun(ConstantRun(Range(0, 1), localeListId, CHAR_WIDTH));
-        expectedCallCount++;  // The locale changes from initial state to en-US.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS}), localeTracer.getPassedLocaleLog());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(1, 2), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), enUSId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS}), localeTracer.getPassedLocaleLog());
     }
     {
         const uint32_t localeListId = getLocaleListId("fr-FR,en-US");
-        lineBreaker.addRun(ConstantRun(Range(2, 3), localeListId, CHAR_WIDTH));
-        expectedCallCount++;  // The locale changes from en-US to fr-FR.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(3, 4), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
     }
     {
         const uint32_t localeListId = getLocaleListId("fr-FR");
-        lineBreaker.addRun(ConstantRun(Range(4, 5), localeListId, CHAR_WIDTH));
-        // Expected not to be called since the first locale is not changed.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(5, 6), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(frFR, localeTracer.getLastPassedLocale());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
     }
     {
         const uint32_t localeListId = getLocaleListId("");
-        lineBreaker.addRun(ConstantRun(Range(6, 7), localeListId, CHAR_WIDTH));
-        expectedCallCount++;  // The locale changes from fr-FR to icu::Locale::Root.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(7, 8), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
     }
     {
         const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE");
-        lineBreaker.addRun(ConstantRun(Range(8, 9), localeListId, CHAR_WIDTH));
-        // Expected not to be called. The bogus locale ends up with the empty locale.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(9, 10), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
+    }
+    {
+        const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE,fr-FR");
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
+
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS, frFR}), localeTracer.getPassedLocaleLog());
     }
     {
         const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE,en-US");
-        lineBreaker.addRun(ConstantRun(Range(10, 11), localeListId, CHAR_WIDTH));
-        expectedCallCount++;  // The locale changes from icu::Locale::Root to en-US.
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS}), localeTracer.getPassedLocaleLog());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(11, 12), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_EQ(enUS, localeTracer.getLastPassedLocale());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        EXPECT_EQ(std::vector<Locale>({enUS}), localeTracer.getPassedLocaleLog());
     }
     {
         const uint32_t localeListId = getLocaleListId("THISISABOGUSLANGUAGE,ANOTHERBOGUSLANGUAGE");
-        lineBreaker.addRun(ConstantRun(Range(12, 13), localeListId, CHAR_WIDTH));
-        expectedCallCount++;  // The locale changes from en-US to icu::Locale::Root
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
 
-        // Calling the same locale must not update locale.
-        lineBreaker.addRun(ConstantRun(Range(13, 14), localeListId, CHAR_WIDTH));
-        EXPECT_EQ(expectedCallCount, localeTracer.getLocaleChangeCount());
-        EXPECT_FALSE(localeTracer.getLastPassedLocale().isSupported());
+        // Changing to the same locale must not update locale.
+        localeTracer.reset();
+        doLineBreak(&localeTracer, text, makeVector<std::unique_ptr<minikin::Run>>(
+            std::make_unique<ConstantRun>(Range(0, 1), enUSId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(1, 2), localeListId, CHAR_WIDTH),
+            std::make_unique<ConstantRun>(Range(2, 3), localeListId, CHAR_WIDTH)
+        ), LINE_WIDTH);
+        ASSERT_EQ(2u, localeTracer.getPassedLocaleLog().size());
+        EXPECT_EQ(enUS, localeTracer.getPassedLocaleLog()[0]);
+        EXPECT_FALSE(localeTracer.getPassedLocaleLog()[1].isSupported());
     }
 }
 

@@ -27,22 +27,23 @@
 
 #include "minikin/FontCollection.h"
 #include "minikin/Layout.h"
+#include "minikin/Macros.h"
 #include "minikin/MinikinFont.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
-enum BreakStrategy {
-    kBreakStrategy_Greedy = 0,
-    kBreakStrategy_HighQuality = 1,
-    kBreakStrategy_Balanced = 2
+enum class BreakStrategy : uint8_t {
+    Greedy = 0,
+    HighQuality = 1,
+    Balanced = 2,
 };
 
-enum HyphenationFrequency {
-    kHyphenationFrequency_None = 0,
-    kHyphenationFrequency_Normal = 1,
-    kHyphenationFrequency_Full = 2
+enum class HyphenationFrequency : uint8_t {
+    None = 0,
+    Normal = 1,
+    Full = 2,
 };
 
 class Hyphenator;
@@ -87,16 +88,12 @@ class Run {
 
 class TabStops {
     public:
-        void set(const int* stops, size_t nStops, int tabWidth) {
-            if (stops != nullptr) {
-                mStops.assign(stops, stops + nStops);
-            } else {
-                mStops.clear();
-            }
-            mTabWidth = tabWidth;
-        }
+        // Caller must free stops. stops can be nullprt.
+        TabStops(const int32_t* stops, size_t nStops, int32_t tabWidth)
+            : mStops(stops), mStopsSize(nStops), mTabWidth(tabWidth) { }
+
         float nextTab(float widthSoFar) const {
-            for (size_t i = 0; i < mStops.size(); i++) {
+            for (size_t i = 0; i < mStopsSize; i++) {
                 if (mStops[i] > widthSoFar) {
                     return mStops[i];
                 }
@@ -104,101 +101,86 @@ class TabStops {
             return floor(widthSoFar / mTabWidth + 1) * mTabWidth;
         }
     private:
-        std::vector<int> mStops;
-        int mTabWidth;
+        const int32_t* mStops;
+        size_t mStopsSize;
+        int32_t mTabWidth;
+};
+
+// Implement this for the additional information during line breaking.
+// The functions in this class's interface may be called several times. The implementation
+// must return the same value for the same input.
+class LineWidth {
+    public:
+        virtual ~LineWidth() {}
+
+        // Called to find out the width for the line.
+        virtual float getAt(size_t lineNo) const = 0;
+
+        // Called to find out the minimum line width.
+        virtual float getMin() const = 0;
+
+        // Called to find out the available left-side padding for the line.
+        virtual float getLeftPaddingAt(size_t lineNo) const = 0;
+
+        // Called to find out the available right-side padding for the line.
+        virtual float getRightPaddingAt(size_t lineNo) const = 0;
+};
+
+class MeasuredText {
+public:
+    static MeasuredText generate(const U16StringPiece& text,
+                                 const std::vector<std::unique_ptr<Run>>& runs);
+
+    // Following three vectors have the same length.
+    // TODO: Introduce individual character info struct if copy cost in JNI is negligible.
+    std::vector<float> widths;
+    std::vector<MinikinExtent> extents;
+    std::vector<LayoutOverhang> overhangs;
+
+    MeasuredText(MeasuredText&&) = default;
+    MeasuredText& operator=(MeasuredText&&) = default;
+
+    PREVENT_COPY_AND_ASSIGN(MeasuredText);
+private:
+    // Use generate method instead.
+    MeasuredText(uint32_t size) : widths(size), extents(size), overhangs(size) {}
+};
+
+struct LineBreakResult {
+public:
+    LineBreakResult() = default;
+
+    // Following five vectors have the same length.
+    // TODO: Introduce individual line info struct if copy cost in JNI is negligible.
+    std::vector<int> breakPoints;
+    std::vector<float> widths;
+    std::vector<float> ascents;
+    std::vector<float> descents;
+    std::vector<int> flags;
+
+    LineBreakResult(LineBreakResult&&) = default;
+    LineBreakResult& operator=(LineBreakResult&&) = default;
+
+    PREVENT_COPY_AND_ASSIGN(LineBreakResult);
 };
 
 class LineBreaker {
     public:
-        // Implement this for the additional information during line breaking.
-        // The functions in this class's interface may be called several times. The implementation
-        // must return the same value for the same input.
-        class LineWidthDelegate {
-            public:
-                virtual ~LineWidthDelegate() {}
-
-                // Called to find out the width for the line.
-                virtual float getLineWidth(size_t lineNo) = 0;
-
-                // Called to find out the minimum line width.
-                virtual float getMinLineWidth() = 0;
-
-                // Called to find out the available left-side padding for the line.
-                virtual float getLeftPadding(size_t lineNo) = 0;
-
-                // Called to find out the available right-side padding for the line.
-                virtual float getRightPadding(size_t lineNo) = 0;
-        };
-
-        LineBreaker(const U16StringPiece& string);
+        LineBreaker(const U16StringPiece& textBuffer, const MeasuredText& measuredText,
+                    BreakStrategy strategy, HyphenationFrequency frequency, bool justified);
 
         virtual ~LineBreaker();
 
         const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
-        size_t size() const {
-            return mTextBuf.size();
-        }
-
-        float* charWidths() {
-            return mCharWidths.data();
-        }
-
-        MinikinExtent* charExtents() {
-            return mCharExtents.data();
-        }
-
-        LayoutOverhang* charOverhangs() {
-            return mCharOverhangs.data();
-        }
-
-        void setLineWidthDelegate(std::unique_ptr<LineWidthDelegate>&& lineWidths) {
-            mLineWidthDelegate = std::move(lineWidths);
-        }
-
-        void setTabStops(const int* stops, size_t nStops, int tabWidth) {
-            mTabStops.set(stops, nStops, tabWidth);
-        }
-
-        BreakStrategy getStrategy() const { return mStrategy; }
-
-        void setStrategy(BreakStrategy strategy) { mStrategy = strategy; }
-
-        void setJustified(bool justified) { mJustified = justified; }
-
-        HyphenationFrequency getHyphenationFrequency() const { return mHyphenationFrequency; }
-
-        void setHyphenationFrequency(HyphenationFrequency frequency) {
-            mHyphenationFrequency = frequency;
-        }
-
-        void addRun(const Run& run);
-
-        size_t computeBreaks();
-
-        const int* getBreaks() const {
-            return mBreaks.data();
-        }
-
-        const float* getWidths() const {
-            return mWidths.data();
-        }
-
-        const float* getAscents() const {
-            return mAscents.data();
-        }
-
-        const float* getDescents() const {
-            return mDescents.data();
-        }
-
-        const int* getFlags() const {
-            return mFlags.data();
-        }
+        LineBreakResult computeBreaks(const std::vector<std::unique_ptr<Run>>& runs,
+                                      const LineWidth& lineWidth, const TabStops& tabStops);
 
     protected:
         // For testing purposes.
-        LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16StringPiece& string);
+        LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16StringPiece& textBuffer,
+                    const MeasuredText& measuredText, BreakStrategy strategy,
+                    HyphenationFrequency frequency, bool justified);
 
     private:
         // ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for
@@ -229,6 +211,8 @@ class LineBreaker {
             bool isRtl; // The direction of the bidi run containing or ending in this candidate
         };
 
+        void addRun(const Run& run, const LineWidth& lineWidth, const TabStops& tabStops);
+
         void setLocaleList(uint32_t localeListId, size_t restartFrom);
         // A locale list ID and locale ID currently used for word iterator and hyphenator.
         uint32_t mCurrentLocaleListId;
@@ -252,18 +236,14 @@ class LineBreaker {
 
         std::unique_ptr<WordBreaker> mWordBreaker;
         U16StringPiece mTextBuf;
-        std::vector<float> mCharWidths;
-        std::vector<MinikinExtent> mCharExtents;
-        std::vector<LayoutOverhang> mCharOverhangs;
+        const MeasuredText& mMeasuredText;
 
         const Hyphenator* mHyphenator;
 
         // layout parameters
-        BreakStrategy mStrategy = kBreakStrategy_Greedy;
-        HyphenationFrequency mHyphenationFrequency = kHyphenationFrequency_Normal;
+        BreakStrategy mStrategy;
+        HyphenationFrequency mHyphenationFrequency;
         bool mJustified;
-        TabStops mTabStops;
-        std::unique_ptr<LineWidthDelegate> mLineWidthDelegate;
 
         // result of line breaking
         std::vector<int> mBreaks;
@@ -293,17 +273,17 @@ class LineBreaker {
         // Types, methods, and fields related to the greedy algorithm
         //
 
-        void computeBreaksGreedy();
+        void computeBreaksGreedy(const LineWidth& lineWidth);
 
         // This method is called as a helper to computeBreaksGreedy(), but also when we encounter a
         // tab character, which forces the line breaking algorithm to greedy mode. It computes all
         // the greedy line breaks based on available candidates and returns the preBreak of the last
         // break which would then be used to calculate the width of the tab.
-        ParaWidth computeBreaksGreedyPartial();
+        ParaWidth computeBreaksGreedyPartial(const LineWidth& lineWidth);
 
         // Called by computerBreaksGreedyPartial() on all candidates to determine if the line should
         // be broken at the candidate
-        void considerGreedyBreakCandidate(size_t candIndex);
+        void considerGreedyBreakCandidate(size_t candIndex, const LineWidth& lineWidth);
 
         // Adds a greedy break to list of line breaks.
         void addGreedyBreak(size_t breakIndex);
@@ -311,9 +291,11 @@ class LineBreaker {
         // Push an actual break to the output. Takes care of setting flags for tab, etc.
         void pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit);
 
-        void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end);
+        void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end,
+                                      const LineWidth& lineWidth);
 
-        bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang) const;
+        bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang,
+                               const LineWidth& lineWidth) const;
 
         struct GreedyBreak {
             size_t index;
@@ -330,7 +312,8 @@ class LineBreaker {
         // The following are state for greedy breaker. They get updated during calculation of
         // greedy breaks (including when a partial greedy algorithm is run when adding style runs
         // containing tabs).
-        const Candidate* mLastGreedyBreak;  // The last greedy break
+        size_t mLastGreedyBreakIndex;  // The last greedy break index of mCandidates.
+        const Candidate& getLastBreakCandidate() const;
         size_t mLastConsideredGreedyCandidate;  // The index of the last candidate considered
         int mFirstTabIndex;  // The index of the first tab character seen in current line
 
@@ -341,12 +324,12 @@ class LineBreaker {
         // Types, methods, and fields related to the optimal algorithm
         //
 
-        void computeBreaksOptimal();
+        void computeBreaksOptimal(const LineWidth& lineWidth);
 
         void addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
                 size_t postSpaceCount, bool isRtl, size_t start, size_t end);
 
-        void addAllDesperateBreaksOptimal();
+        void addAllDesperateBreaksOptimal(const LineWidth& lineWidth);
 
         // Data used to compute optimal line breaks
         struct OptimalBreaksData {
