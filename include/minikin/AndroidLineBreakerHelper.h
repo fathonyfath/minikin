@@ -78,62 +78,6 @@ private:
     const int32_t mOffset;
 };
 
-class StyleRun : public Run {
-public:
-    StyleRun(const Range& range, MinikinPaint&& paint, std::shared_ptr<FontCollection>&& collection,
-             bool isRtl)
-            : Run(range),
-              mPaint(std::move(paint)),
-              mCollection(std::move(collection)),
-              mIsRtl(isRtl) {}
-
-    bool canHyphenate() const override { return true; }
-    uint32_t getLocaleListId() const override { return mPaint.localeListId; }
-    bool isRtl() const override { return mIsRtl; }
-
-    void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
-                    LayoutOverhang* overhangs) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::measureText(text, mRange, bidiFlag, mPaint, mCollection, advances, extents,
-                            overhangs);
-    }
-
-    const MinikinPaint* getPaint() const override { return &mPaint; }
-
-    float measureHyphenPiece(const U16StringPiece& text, const Range& range,
-                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, float* advances,
-                             LayoutOverhang* overhangs) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen,
-                                   mCollection, advances, nullptr /* extent */, overhangs);
-    }
-
-private:
-    MinikinPaint mPaint;
-    std::shared_ptr<FontCollection> mCollection;
-    const bool mIsRtl;
-};
-
-class Replacement : public Run {
-public:
-    Replacement(const Range& range, float width, uint32_t localeListId)
-            : Run(range), mWidth(width), mLocaleListId(localeListId) {}
-
-    bool isRtl() const { return false; }
-    bool canHyphenate() const { return false; }
-    uint32_t getLocaleListId() const { return mLocaleListId; }
-
-    void getMetrics(const U16StringPiece& /* unused */, float* advances,
-                    MinikinExtent* /* unused */, LayoutOverhang* /* unused */) const override {
-        advances[0] = mWidth;
-        // TODO: Get the extents information from the caller.
-    }
-
-private:
-    const float mWidth;
-    const uint32_t mLocaleListId;
-};
-
 class StaticLayoutNative {
 public:
     StaticLayoutNative(BreakStrategy strategy, HyphenationFrequency frequency, bool isJustified,
@@ -146,20 +90,6 @@ public:
               mLeftPaddings(std::move(leftPaddings)),
               mRightPaddings(std::move(rightPaddings)) {}
 
-    void addStyleRun(int32_t start, int32_t end, MinikinPaint&& paint,
-                     std::shared_ptr<FontCollection> collection, bool isRtl) {
-        mRuns.emplace_back(std::make_unique<StyleRun>(Range(start, end), std::move(paint),
-                                                      std::move(collection), isRtl));
-    }
-
-    void addReplacementRun(int32_t start, int32_t end, float width, uint32_t localeListId) {
-        mRuns.emplace_back(std::make_unique<Replacement>(Range(start, end), width, localeListId));
-    }
-
-    MeasuredText measureText(const U16StringPiece& text) const {
-        return MeasuredText::generate(text, mRuns);
-    }
-
     LineBreakResult computeBreaks(const U16StringPiece& text, const MeasuredText& measuredText,
                                   // Line width arguments
                                   float firstWidth, int32_t firstWidthLineCount, float restWidth,
@@ -169,12 +99,10 @@ public:
                                   int32_t defaultTabStopWidth) const {
         AndroidLineWidth lineWidth(firstWidth, firstWidthLineCount, restWidth, mIndents,
                                    mLeftPaddings, mRightPaddings, indentsOffset);
-        LineBreaker lineBreaker(text, measuredText, mStrategy, mFrequency, mIsJustified);
-        return lineBreaker.computeBreaks(mRuns, lineWidth,
+        LineBreaker lineBreaker(text, mStrategy, mFrequency, mIsJustified);
+        return lineBreaker.computeBreaks(measuredText, lineWidth,
                                          TabStops(tabStops, tabStopSize, defaultTabStopWidth));
     }
-
-    void clearRuns() { mRuns.clear(); }
 
     inline BreakStrategy getStrategy() const { return mStrategy; }
     inline HyphenationFrequency getFrequency() const { return mFrequency; }
@@ -187,8 +115,6 @@ private:
     const std::vector<float> mIndents;
     const std::vector<float> mLeftPaddings;
     const std::vector<float> mRightPaddings;
-
-    std::vector<std::unique_ptr<Run>> mRuns;
 };
 
 }  // namespace android
