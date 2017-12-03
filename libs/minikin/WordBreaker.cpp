@@ -24,6 +24,7 @@
 
 #include "minikin/Emoji.h"
 #include "minikin/Hyphenator.h"
+
 #include "Locale.h"
 #include "MinikinInternal.h"
 
@@ -33,8 +34,9 @@ namespace {
 static icu::BreakIterator* createNewIterator(const Locale& locale) {
     // TODO: handle failure status
     UErrorCode status = U_ZERO_ERROR;
-    return icu::BreakIterator::createLineInstance(locale.isUnsupported()  ?
-            icu::Locale::getRoot() : icu::Locale::createFromName(locale.getString().c_str()),
+    return icu::BreakIterator::createLineInstance(
+            locale.isUnsupported() ? icu::Locale::getRoot()
+                                   : icu::Locale::createFromName(locale.getString().c_str()),
             status);
 }
 }  // namespace
@@ -51,7 +53,7 @@ ICULineBreakerPool::Slot ICULineBreakerPoolImpl::acquire(const Locale& locale) {
     }
 
     // Not found in pool. Create new one.
-    return { id, std::unique_ptr<icu::BreakIterator>(createNewIterator(locale)) };
+    return {id, std::unique_ptr<icu::BreakIterator>(createNewIterator(locale))};
 }
 
 void ICULineBreakerPoolImpl::release(ICULineBreakerPool::Slot&& slot) {
@@ -68,11 +70,9 @@ void ICULineBreakerPoolImpl::release(ICULineBreakerPool::Slot&& slot) {
     mPool.push_front(std::move(slot));
 }
 
-WordBreaker::WordBreaker() : mPool(&ICULineBreakerPoolImpl::getInstance()) {
-}
+WordBreaker::WordBreaker() : mPool(&ICULineBreakerPoolImpl::getInstance()) {}
 
-WordBreaker::WordBreaker(ICULineBreakerPool* pool) : mPool(pool) {
-}
+WordBreaker::WordBreaker(ICULineBreakerPool* pool) : mPool(pool) {}
 
 ssize_t WordBreaker::followingWithLocale(const Locale& locale, size_t from) {
     mIcuBreaker = mPool->acquire(locale);
@@ -175,8 +175,8 @@ static bool breakAfter(uint16_t c) {
 
 // Chicago Manual of Style recommends breaking before these characters in URLs and email addresses
 static bool breakBefore(uint16_t c) {
-    return c == '~' || c == '.' || c == ',' || c == '-' || c == '_' || c == '?' || c == '#'
-            || c == '%' || c == '=' || c == '&';
+    return c == '~' || c == '.' || c == ',' || c == '-' || c == '_' || c == '?' || c == '#' ||
+           c == '%' || c == '=' || c == '&';
 }
 
 enum ScanState {
@@ -245,7 +245,7 @@ ssize_t WordBreaker::findNextBreakInEmailOrUrl() {
             }
             // break before single slash
             if (thisChar == '/' && lastChar != '/' &&
-                        !(i + 1 < mScanOffset && mText[i + 1] == '/')) {
+                !(i + 1 < mScanOffset && mText[i + 1] == '/')) {
                 break;
             }
         }
@@ -261,7 +261,7 @@ ssize_t WordBreaker::next() {
     if (mInEmailOrUrl) {
         mCurrent = findNextBreakInEmailOrUrl();
     } else {  // Business as usual
-        mCurrent = (ssize_t) iteratorNext();
+        mCurrent = (ssize_t)iteratorNext();
     }
     return mCurrent;
 }

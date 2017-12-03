@@ -67,8 +67,8 @@ class TestableHyphenatorMap : public HyphenatorMap {
 public:
     TestableHyphenatorMap() : HyphenatorMap() {}
 
-    using HyphenatorMap::addInternal;
     using HyphenatorMap::addAliasInternal;
+    using HyphenatorMap::addInternal;
     using HyphenatorMap::lookupInternal;
 };
 
@@ -131,7 +131,6 @@ protected:
         mMap.addAliasInternal("gez", "und-Ethi");
         mMap.addAliasInternal("ti", "und-Ethi");
         mMap.addAliasInternal("wal", "und-Ethi");
-
     }
 
     const Locale& getLocale(const std::string& localeStr) {

@@ -32,11 +32,12 @@ class MinikinFont;
 // attributes representing transforms (fake bold, fake italic) to match styles
 class FontFakery {
 public:
-    FontFakery() : mFakeBold(false), mFakeItalic(false) { }
-    FontFakery(bool fakeBold, bool fakeItalic) : mFakeBold(fakeBold), mFakeItalic(fakeItalic) { }
+    FontFakery() : mFakeBold(false), mFakeItalic(false) {}
+    FontFakery(bool fakeBold, bool fakeItalic) : mFakeBold(fakeBold), mFakeItalic(fakeItalic) {}
     // TODO: want to support graded fake bolding
     bool isFakeBold() { return mFakeBold; }
     bool isFakeItalic() { return mFakeItalic; }
+
 private:
     bool mFakeBold;
     bool mFakeItalic;
@@ -83,7 +84,7 @@ public:
 
     // TODO: Good to expose FontUtil.h.
     static bool analyzeStyle(const std::shared_ptr<MinikinFont>& typeface, int* weight,
-            bool* italic);
+                             bool* italic);
     FakedFont getClosestMatch(FontStyle style) const;
 
     uint32_t localeListId() const { return mLocaleListId; }

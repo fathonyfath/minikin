@@ -15,7 +15,8 @@ The C++ style in Minikin follows Android Framework C++ Code Style Guide except f
    6. Other libraries' files
    7. A blank line
    8. Minikin public files
-   9. Minikin private files
+   9. A blank line
+   10. Minikin private files
 
  For example,
  ```

@@ -26,7 +26,7 @@ static uint16_t readU16(const uint8_t* data, size_t offset) {
 
 static uint32_t readU32(const uint8_t* data, size_t offset) {
     return ((uint32_t)data[offset]) << 24 | ((uint32_t)data[offset + 1]) << 16 |
-            ((uint32_t)data[offset + 2]) << 8 | ((uint32_t)data[offset + 3]);
+           ((uint32_t)data[offset + 2]) << 8 | ((uint32_t)data[offset + 3]);
 }
 
 bool analyzeStyle(const uint8_t* os2_data, size_t os2_size, int* weight, bool* italic) {

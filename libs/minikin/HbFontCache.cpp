@@ -21,36 +21,25 @@
 #include <utils/LruCache.h>
 
 #include "minikin/MinikinFont.h"
+
 #include "MinikinInternal.h"
 
 namespace minikin {
 
 class HbFontCache : private android::OnEntryRemoved<int32_t, hb_font_t*> {
 public:
-    HbFontCache() : mCache(kMaxEntries) {
-        mCache.setOnEntryRemovedListener(this);
-    }
+    HbFontCache() : mCache(kMaxEntries) { mCache.setOnEntryRemovedListener(this); }
 
     // callback for OnEntryRemoved
-    void operator()(int32_t& /* key */, hb_font_t*& value) {
-        hb_font_destroy(value);
-    }
+    void operator()(int32_t& /* key */, hb_font_t*& value) { hb_font_destroy(value); }
 
-    hb_font_t* get(int32_t fontId) {
-        return mCache.get(fontId);
-    }
+    hb_font_t* get(int32_t fontId) { return mCache.get(fontId); }
 
-    void put(int32_t fontId, hb_font_t* font) {
-        mCache.put(fontId, font);
-    }
+    void put(int32_t fontId, hb_font_t* font) { mCache.put(fontId, font); }
 
-    void clear() {
-        mCache.clear();
-    }
+    void clear() { mCache.clear(); }
 
-    void remove(int32_t fontId) {
-        mCache.remove(fontId);
-    }
+    void remove(int32_t fontId) { mCache.remove(fontId); }
 
 private:
     static const size_t kMaxEntries = 100;
@@ -102,7 +91,7 @@ hb_font_t* getHbFontLocked(const MinikinFont* minikinFont) {
     const void* buf = minikinFont->GetFontData();
     size_t size = minikinFont->GetFontSize();
     hb_blob_t* blob = hb_blob_create(reinterpret_cast<const char*>(buf), size,
-        HB_MEMORY_MODE_READONLY, nullptr, nullptr);
+                                     HB_MEMORY_MODE_READONLY, nullptr, nullptr);
     face = hb_face_create(blob, minikinFont->GetFontIndex());
     hb_blob_destroy(blob);
 

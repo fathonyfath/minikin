@@ -28,10 +28,10 @@ public:
     Range(const Range&) = default;
     Range& operator=(const Range&) = default;
 
-    inline uint32_t getStart() const { return mStart; }  // inclusive
+    inline uint32_t getStart() const { return mStart; }       // inclusive
     inline void setStart(uint32_t start) { mStart = start; }  // inclusive
 
-    inline uint32_t getEnd() const { return mEnd; }  // exclusive
+    inline uint32_t getEnd() const { return mEnd; }   // exclusive
     inline void setEnd(uint32_t end) { mEnd = end; }  // exclusive
 
     inline uint32_t getLength() const { return mEnd - mStart; }
@@ -56,9 +56,7 @@ public:
     //   range.contains(0);  // false
     //   range.contains(1);  // true
     //   range.contains(2);  // false
-    inline bool contains(uint32_t pos) const {
-        return mStart <= pos && pos < mEnd;
-    }
+    inline bool contains(uint32_t pos) const { return mStart <= pos && pos < mEnd; }
 
 private:
     // Helper class for "for (uint32_t i : range)" style for-loop.
@@ -68,7 +66,10 @@ private:
 
         inline bool operator!=(const RangeIterator& o) const { return o.mPos != mPos; }
         inline uint32_t operator*() const { return mPos; }
-        inline RangeIterator& operator++() { mPos++; return *this; }
+        inline RangeIterator& operator++() {
+            mPos++;
+            return *this;
+        }
 
     private:
         uint32_t mPos;

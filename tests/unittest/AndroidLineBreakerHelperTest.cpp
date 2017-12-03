@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/LineBreaker.h"
+
 #include "FontTestUtils.h"
 #include "ICUTestBase.h"
 #include "UnicodeUtils.h"
@@ -39,13 +40,12 @@ TEST_F(AndroidLineBreakerHelperTest, RunTests) {
     std::shared_ptr<FontCollection> collection =
             getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
 
-    StaticLayoutNative layoutNative(
-            BreakStrategy::Greedy,  // break strategy
-            HyphenationFrequency::None,  // hyphenation frequency
-            false,  // not justified
-            std::vector<float>(),  // indents
-            std::vector<float>(),  // left padding
-            std::vector<float>());  // right padding
+    StaticLayoutNative layoutNative(BreakStrategy::Greedy,       // break strategy
+                                    HyphenationFrequency::None,  // hyphenation frequency
+                                    false,                       // not justified
+                                    std::vector<float>(),        // indents
+                                    std::vector<float>(),        // left padding
+                                    std::vector<float>());       // right padding
 
     layoutNative.addStyleRun(0, 2, MinikinPaint(), collection, false /* is RTL */);
     layoutNative.addReplacementRun(2, 4, REPLACEMENT_WIDTH, 0 /* locale list id */);
@@ -54,15 +54,13 @@ TEST_F(AndroidLineBreakerHelperTest, RunTests) {
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
     MeasuredText measuredText = layoutNative.measureText(text);
-    LineBreakResult result = layoutNative.computeBreaks(
-            text, measuredText,
-            LINE_WIDTH, 1, LINE_WIDTH, 0,  // line width arguments,
-            nullptr, 0, 0);  // tab stop arguments.
+    LineBreakResult result = layoutNative.computeBreaks(text, measuredText, LINE_WIDTH, 1,
+                                                        LINE_WIDTH, 0,   // line width arguments,
+                                                        nullptr, 0, 0);  // tab stop arguments.
 
     // ReplacementRun assigns all width to the first character and leave zeros others.
-    std::vector<float> expectedWidths = {
-        CHAR_WIDTH, CHAR_WIDTH, REPLACEMENT_WIDTH, 0, CHAR_WIDTH, CHAR_WIDTH
-    };
+    std::vector<float> expectedWidths = {CHAR_WIDTH, CHAR_WIDTH, REPLACEMENT_WIDTH,
+                                         0,          CHAR_WIDTH, CHAR_WIDTH};
 
     EXPECT_EQ(expectedWidths, measuredText.widths);
 }

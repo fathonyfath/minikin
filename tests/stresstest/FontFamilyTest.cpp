@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/FontCollection.h"
+
 #include "FontTestUtils.h"
 #include "HbFontCache.h"
 #include "MinikinFontForTest.h"
@@ -44,8 +45,8 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
     for (uint32_t codePoint = 0; codePoint < MAX_UNICODE_CODE_POINT; ++codePoint) {
         uint32_t unusedGlyph;
         EXPECT_EQ(family->hasGlyph(codePoint, 0 /* variation selector */),
-                static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, 0 /* variation selector */,
-                        &unusedGlyph)));
+                  static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, 0 /* variation selector */,
+                                                      &unusedGlyph)));
     }
 
     for (uint32_t vs = VS1; vs < VS256; ++vs) {
@@ -56,21 +57,17 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
         for (uint32_t codePoint = 0; codePoint < MAX_UNICODE_CODE_POINT; ++codePoint) {
             uint32_t unusedGlyph;
             ASSERT_EQ(family->hasGlyph(codePoint, vs),
-                    static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, vs, &unusedGlyph)))
-                << "Inconsistent Result: " << fontPath << "#" << ttcIndex
-                << ": U+" << std::hex << codePoint << " U+" << std::hex << vs
-                << " Minikin: " << family->hasGlyph(codePoint, vs)
-                << " HarfBuzz: "
-                << static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, vs, &unusedGlyph));
-
+                      static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, vs, &unusedGlyph)))
+                    << "Inconsistent Result: " << fontPath << "#" << ttcIndex << ": U+" << std::hex
+                    << codePoint << " U+" << std::hex << vs
+                    << " Minikin: " << family->hasGlyph(codePoint, vs) << " HarfBuzz: "
+                    << static_cast<bool>(hb_font_get_glyph(hbFont, codePoint, vs, &unusedGlyph));
         }
     }
     hb_font_destroy(hbFont);
 }
 
-INSTANTIATE_TEST_CASE_P(FontFamilyTest,
-        FontFamilyHarfBuzzCompatibilityTest,
-        ::testing::Values(
-                TestParam("/system/fonts/NotoSansCJK-Regular.ttc", 0),
-                TestParam("/system/fonts/NotoColorEmoji.ttf", 0)));
+INSTANTIATE_TEST_CASE_P(FontFamilyTest, FontFamilyHarfBuzzCompatibilityTest,
+                        ::testing::Values(TestParam("/system/fonts/NotoSansCJK-Regular.ttc", 0),
+                                          TestParam("/system/fonts/NotoColorEmoji.ttf", 0)));
 }  // namespace minikin

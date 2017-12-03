@@ -35,7 +35,7 @@ public:
     inline size_t size() const { return mLength; }
     inline bool empty() const { return mLength == 0; }
 
-    inline char operator[] (size_t i) const { return mData[i]; }
+    inline char operator[](size_t i) const { return mData[i]; }
 
     inline StringPiece substr(size_t from, size_t length) const {
         return StringPiece(mData + from, length);
@@ -49,16 +49,14 @@ public:
         return p == nullptr ? mLength : p - mData;
     }
 
-    std::string toString() const {
-        return std::string(mData, mData + mLength);
-    }
+    std::string toString() const { return std::string(mData, mData + mLength); }
 
 private:
     const char* mData;
     size_t mLength;
 };
 
-inline bool operator== (const StringPiece& l, const StringPiece& r) {
+inline bool operator==(const StringPiece& l, const StringPiece& r) {
     const size_t len = l.size();
     if (len != r.size()) {
         return false;
@@ -71,7 +69,7 @@ inline bool operator== (const StringPiece& l, const StringPiece& r) {
     return memcmp(lData, rData, len) == 0;
 }
 
-inline bool operator== (const StringPiece& l, const char* s) {
+inline bool operator==(const StringPiece& l, const char* s) {
     const size_t len = l.size();
     if (len != strlen(s)) {
         return false;
@@ -79,18 +77,18 @@ inline bool operator== (const StringPiece& l, const char* s) {
     return memcmp(l.data(), s, len) == 0;
 }
 
-inline bool operator!= (const StringPiece& l, const StringPiece& r) {
+inline bool operator!=(const StringPiece& l, const StringPiece& r) {
     return !(l == r);
 }
 
-inline bool operator!= (const StringPiece& l, const char* s) {
+inline bool operator!=(const StringPiece& l, const char* s) {
     return !(l == s);
 }
 
 class SplitIterator {
 public:
-    SplitIterator(const StringPiece& string, char delimiter) :
-        mStarted(false), mCurrent(0), mString(string), mDelimiter(delimiter) {}
+    SplitIterator(const StringPiece& string, char delimiter)
+            : mStarted(false), mCurrent(0), mString(string), mDelimiter(delimiter) {}
 
     inline StringPiece next() {
         if (!hasNext()) {
@@ -102,6 +100,7 @@ public:
         return mString.substr(searchFrom, mCurrent - searchFrom);
     }
     inline bool hasNext() const { return mCurrent < mString.size(); }
+
 private:
     bool mStarted;
     size_t mCurrent;

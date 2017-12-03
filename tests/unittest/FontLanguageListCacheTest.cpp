@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/LocaleList.h"
+
 #include "ICUTestBase.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"

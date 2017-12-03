@@ -72,28 +72,28 @@ enum class HyphenationType : uint8_t {
 enum class EndHyphenEdit : uint8_t {
     // Note that everything inserting characters must have a value greater than or equal to
     // INSERT_HYPHEN.
-    NO_EDIT                = 0b000,
-    REPLACE_WITH_HYPHEN    = 0b001,
+    NO_EDIT = 0b000,
+    REPLACE_WITH_HYPHEN = 0b001,
 
-    INSERT_HYPHEN          = 0b010,
+    INSERT_HYPHEN = 0b010,
     INSERT_ARMENIAN_HYPHEN = 0b011,
-    INSERT_MAQAF           = 0b100,
-    INSERT_UCAS_HYPHEN     = 0b101,
-    INSERT_ZWJ_AND_HYPHEN  = 0b110,
+    INSERT_MAQAF = 0b100,
+    INSERT_UCAS_HYPHEN = 0b101,
+    INSERT_ZWJ_AND_HYPHEN = 0b110,
 };
 
 enum class StartHyphenEdit : uint8_t {
-    NO_EDIT       = 0b00,
+    NO_EDIT = 0b00,
 
     INSERT_HYPHEN = 0b01,
-    INSERT_ZWJ    = 0b10,
+    INSERT_ZWJ = 0b10,
 };
 
 typedef uint8_t HyphenEdit;
 constexpr uint8_t START_BITS_SHIFT = 3;
 // The following two masks must keep in sync with the definitions in the Java code at:
 // frameworks/base/graphics/java/android/graphics/Paint.java
-constexpr uint8_t MASK_END_OF_LINE   = 0b00111;
+constexpr uint8_t MASK_END_OF_LINE = 0b00111;
 constexpr uint8_t MASK_START_OF_LINE = 0b11000;
 
 inline HyphenEdit packHyphenEdit(StartHyphenEdit start, EndHyphenEdit end) {
@@ -120,7 +120,10 @@ inline bool isInsertion(EndHyphenEdit hyph) {
     return static_cast<uint8_t>(hyph) >= static_cast<uint8_t>(EndHyphenEdit::INSERT_HYPHEN);
 }
 
-template<typename T, size_t size> constexpr size_t ARRAYSIZE(T const (&)[size]) { return size; }
+template <typename T, size_t size>
+constexpr size_t ARRAYSIZE(T const (&)[size]) {
+    return size;
+}
 constexpr uint32_t HYPHEN_STR_ZWJ[] = {CHAR_ZWJ};
 constexpr uint32_t HYPHEN_STR_HYPHEN[] = {CHAR_HYPHEN};
 constexpr uint32_t HYPHEN_STR_ARMENIAN_HYPHEN[] = {CHAR_ARMENIAN_HYPHEN};
@@ -189,7 +192,8 @@ public:
     // until this instance is deleted.
     // Note: nullptr is valid input, in which case the hyphenator only processes soft hyphens.
     static Hyphenator* loadBinary(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
-            const std::string& locale);
+                                  const std::string& locale);
+
 private:
     enum class HyphenationLocale : uint8_t {
         OTHER = 0,
@@ -200,7 +204,7 @@ private:
 
     // Use Hyphenator::loadBinary instead.
     Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minSuffix,
-        HyphenationLocale hyphenLocale);
+               HyphenationLocale hyphenLocale);
 
     // apply various hyphenation rules including hard and soft hyphens, ignoring patterns
     void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len) const;
@@ -213,7 +217,7 @@ private:
 
     // calculate hyphenation from patterns, assuming alphabet lookup has already been done
     void hyphenateFromCodes(HyphenationType* result, const uint16_t* codes, size_t len,
-            HyphenationType hyphenValue) const;
+                            HyphenationType hyphenValue) const;
 
     // See also LONGEST_HYPHENATED_WORD in LineBreaker.cpp. Here the constant is used so
     // that temporary buffers can be stack-allocated without waste, which is a slightly
@@ -225,12 +229,9 @@ private:
     const HyphenationLocale mHyphenationLocale;
 
     // accessors for binary data
-    const Header* getHeader() const {
-        return reinterpret_cast<const Header*>(mPatternData);
-    }
-
+    const Header* getHeader() const { return reinterpret_cast<const Header*>(mPatternData); }
 };
 
 }  // namespace minikin
 
-#endif   // MINIKIN_HYPHENATOR_H
+#endif  // MINIKIN_HYPHENATOR_H

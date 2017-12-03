@@ -51,7 +51,7 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
 
     // Preserve "und" and "und-****" since uloc_addLikelySubtags changes "und" to "en-Latn-US".
     if (strncmp(output, "und", 3) == 0 &&
-        (outLength == 3 || (outLength == 8 && output[3]  == '_'))) {
+        (outLength == 3 || (outLength == 8 && output[3] == '_'))) {
         output[3] = '-';  // to be language tag.
         return outLength;
     }

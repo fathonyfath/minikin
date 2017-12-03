@@ -31,7 +31,6 @@ constexpr int DEFAULT_MIN_PREFIX = 2;
 constexpr int DEFAULT_MAX_PREFIX = 2;
 }  // namespace
 
-
 // Following two function's implementations are here since Hyphenator.cpp can't include
 // HyphenatorMap.h due to harfbuzz dependency on the host binary.
 void addHyphenator(const std::string& localeStr, const Hyphenator* hyphenator) {
@@ -43,9 +42,8 @@ void addHyphenatorAlias(const std::string& fromLocaleStr, const std::string& toL
 }
 
 HyphenatorMap::HyphenatorMap()
-      : mSoftHyphenOnlyHyphenator(Hyphenator::loadBinary(
-              nullptr, DEFAULT_MIN_PREFIX, DEFAULT_MAX_PREFIX, "")) {
-}
+        : mSoftHyphenOnlyHyphenator(
+                  Hyphenator::loadBinary(nullptr, DEFAULT_MIN_PREFIX, DEFAULT_MAX_PREFIX, "")) {}
 
 void HyphenatorMap::addInternal(const std::string& localeStr, const Hyphenator* hyphenator) {
     const Locale locale(localeStr);
@@ -59,8 +57,8 @@ void HyphenatorMap::addInternalLocked(const Locale& locale, const Hyphenator* hy
     mMap[locale.getIdentifier()] = hyphenator;
 }
 
-void HyphenatorMap::addAliasInternal(
-        const std::string& fromLocaleStr, const std::string& toLocaleStr) {
+void HyphenatorMap::addAliasInternal(const std::string& fromLocaleStr,
+                                     const std::string& toLocaleStr) {
     const Locale fromLocale(fromLocaleStr);
     const Locale toLocale(toLocaleStr);
     android::AutoMutex _l(gMinikinLock);
@@ -119,8 +117,7 @@ const Hyphenator* HyphenatorMap::lookupByIdentifierLocked(uint64_t id) const {
     return it == mMap.end() ? nullptr : it->second;
 }
 
-const Hyphenator* HyphenatorMap::lookupBySubtagLocked(const Locale& locale,
-        SubtagBits bits) const {
+const Hyphenator* HyphenatorMap::lookupBySubtagLocked(const Locale& locale, SubtagBits bits) const {
     const Locale partialLocale = locale.getPartialLocale(bits);
     if (!partialLocale.isSupported() || partialLocale == locale) {
         return nullptr;  // Skip the partial locale result in the same locale or not supported.

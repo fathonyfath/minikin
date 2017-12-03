@@ -22,6 +22,7 @@
 
 #include "minikin/FontFamily.h"
 #include "minikin/LocaleList.h"
+
 #include "FontTestUtils.h"
 #include "ICUTestBase.h"
 #include "Locale.h"
@@ -45,13 +46,13 @@ const char kZH_HansFont[] = kTestFontDir "ZhHans.ttf";
 const char kZH_HantFont[] = kTestFontDir "ZhHant.ttf";
 
 const char kEmojiXmlFile[] = kTestFontDir "emoji.xml";
-const char kNoGlyphFont[] =  kTestFontDir "NoGlyphFont.ttf";
+const char kNoGlyphFont[] = kTestFontDir "NoGlyphFont.ttf";
 const char kColorEmojiFont[] = kTestFontDir "ColorEmojiFont.ttf";
 const char kTextEmojiFont[] = kTestFontDir "TextEmojiFont.ttf";
 const char kMixedEmojiFont[] = kTestFontDir "ColorTextMixedEmojiFont.ttf";
 
-const char kHasCmapFormat14Font[] =  kTestFontDir "NoCmapFormat14.ttf";
-const char kNoCmapFormat14Font[] =  kTestFontDir "VariationSelectorTest-Regular.ttf";
+const char kHasCmapFormat14Font[] = kTestFontDir "NoCmapFormat14.ttf";
+const char kNoCmapFormat14Font[] = kTestFontDir "VariationSelectorTest-Regular.ttf";
 
 typedef ICUTestBase FontCollectionItemizeTest;
 
@@ -79,8 +80,8 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
 }
 
 // Overloaded version for empty locale list id.
-void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
-             FontStyle style, std::vector<FontCollection::Run>* result) {
+void itemize(const std::shared_ptr<FontCollection>& collection, const char* str, FontStyle style,
+             std::vector<FontCollection::Run>* result) {
     itemize(collection, str, style, "", result);
 }
 
@@ -749,12 +750,12 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
     std::vector<std::shared_ptr<FontFamily>> families;
     std::shared_ptr<MinikinFont> font(new MinikinFontForTest(kLatinFont));
     std::shared_ptr<FontFamily> family1(new FontFamily(FontFamily::Variant::DEFAULT,
-            std::vector<Font>{ Font(font, FontStyle()) }));
+                                                       std::vector<Font>{Font(font, FontStyle())}));
     families.push_back(family1);
 
     std::shared_ptr<MinikinFont> font2(new MinikinFontForTest(kVSTestFont));
-    std::shared_ptr<FontFamily> family2(new FontFamily(FontFamily::Variant::DEFAULT,
-            std::vector<Font>{ Font(font2, FontStyle()) }));
+    std::shared_ptr<FontFamily> family2(new FontFamily(
+            FontFamily::Variant::DEFAULT, std::vector<Font>{Font(font2, FontStyle())}));
     families.push_back(family2);
 
     std::shared_ptr<FontCollection> collection(new FontCollection(families));
@@ -839,102 +840,102 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::vector<std::string> fontLocales;
         int selectedFontIndex;
     } testCases[] = {
-        // Font can specify empty locale.
-        { "und", { "", "" }, 0 },
-        { "und", { "", "en-Latn" }, 0 },
-        { "en-Latn", { "", "" }, 0 },
-        { "en-Latn", { "", "en-Latn" }, 1 },
+            // Font can specify empty locale.
+            {"und", {"", ""}, 0},
+            {"und", {"", "en-Latn"}, 0},
+            {"en-Latn", {"", ""}, 0},
+            {"en-Latn", {"", "en-Latn"}, 1},
 
-        // Single user preferred locale.
-        // Exact match case
-        { "en-Latn", { "en-Latn", "ja-Jpan" }, 0 },
-        { "ja-Jpan", { "en-Latn", "ja-Jpan" }, 1 },
-        { "en-Latn", { "en-Latn", "nl-Latn", "es-Latn" }, 0 },
-        { "nl-Latn", { "en-Latn", "nl-Latn", "es-Latn" }, 1 },
-        { "es-Latn", { "en-Latn", "nl-Latn", "es-Latn" }, 2 },
-        { "es-Latn", { "en-Latn", "en-Latn", "nl-Latn" }, 0 },
+            // Single user preferred locale.
+            // Exact match case
+            {"en-Latn", {"en-Latn", "ja-Jpan"}, 0},
+            {"ja-Jpan", {"en-Latn", "ja-Jpan"}, 1},
+            {"en-Latn", {"en-Latn", "nl-Latn", "es-Latn"}, 0},
+            {"nl-Latn", {"en-Latn", "nl-Latn", "es-Latn"}, 1},
+            {"es-Latn", {"en-Latn", "nl-Latn", "es-Latn"}, 2},
+            {"es-Latn", {"en-Latn", "en-Latn", "nl-Latn"}, 0},
 
-        // Exact script match case
-        { "en-Latn", { "nl-Latn", "e-Latn" }, 0 },
-        { "en-Arab", { "nl-Latn", "ar-Arab" }, 1 },
-        { "en-Latn", { "be-Latn", "ar-Arab", "d-Beng" }, 0 },
-        { "en-Arab", { "be-Latn", "ar-Arab", "d-Beng" }, 1 },
-        { "en-Beng", { "be-Latn", "ar-Arab", "d-Beng" }, 2 },
-        { "en-Beng", { "be-Latn", "ar-Beng", "d-Beng" }, 1 },
-        { "zh-Hant", { "zh-Hant", "zh-Hans" }, 0 },
-        { "zh-Hans", { "zh-Hant", "zh-Hans" }, 1 },
+            // Exact script match case
+            {"en-Latn", {"nl-Latn", "e-Latn"}, 0},
+            {"en-Arab", {"nl-Latn", "ar-Arab"}, 1},
+            {"en-Latn", {"be-Latn", "ar-Arab", "d-Beng"}, 0},
+            {"en-Arab", {"be-Latn", "ar-Arab", "d-Beng"}, 1},
+            {"en-Beng", {"be-Latn", "ar-Arab", "d-Beng"}, 2},
+            {"en-Beng", {"be-Latn", "ar-Beng", "d-Beng"}, 1},
+            {"zh-Hant", {"zh-Hant", "zh-Hans"}, 0},
+            {"zh-Hans", {"zh-Hant", "zh-Hans"}, 1},
 
-        // Subscript match case, e.g. Jpan supports Hira.
-        { "en-Hira", { "ja-Jpan" }, 0 },
-        { "zh-Hani", { "zh-Hans", "zh-Hant" }, 0 },
-        { "zh-Hani", { "zh-Hant", "zh-Hans" }, 0 },
-        { "en-Hira", { "zh-Hant", "ja-Jpan", "ja-Jpan" }, 1 },
+            // Subscript match case, e.g. Jpan supports Hira.
+            {"en-Hira", {"ja-Jpan"}, 0},
+            {"zh-Hani", {"zh-Hans", "zh-Hant"}, 0},
+            {"zh-Hani", {"zh-Hant", "zh-Hans"}, 0},
+            {"en-Hira", {"zh-Hant", "ja-Jpan", "ja-Jpan"}, 1},
 
-        // Language match case
-        { "ja-Latn", { "zh-Latn", "ja-Latn" }, 1 },
-        { "zh-Latn", { "zh-Latn", "ja-Latn" }, 0 },
-        { "ja-Latn", { "zh-Latn", "ja-Latn" }, 1 },
-        { "ja-Latn", { "zh-Latn", "ja-Latn", "ja-Latn" }, 1 },
+            // Language match case
+            {"ja-Latn", {"zh-Latn", "ja-Latn"}, 1},
+            {"zh-Latn", {"zh-Latn", "ja-Latn"}, 0},
+            {"ja-Latn", {"zh-Latn", "ja-Latn"}, 1},
+            {"ja-Latn", {"zh-Latn", "ja-Latn", "ja-Latn"}, 1},
 
-        // Mixed case
-        // Script/subscript match is strongest.
-        { "ja-Jpan", { "en-Latn", "ja-Latn", "en-Jpan" }, 2 },
-        { "ja-Hira", { "en-Latn", "ja-Latn", "en-Jpan" }, 2 },
-        { "ja-Hira", { "en-Latn", "ja-Latn", "en-Jpan", "en-Jpan" }, 2 },
+            // Mixed case
+            // Script/subscript match is strongest.
+            {"ja-Jpan", {"en-Latn", "ja-Latn", "en-Jpan"}, 2},
+            {"ja-Hira", {"en-Latn", "ja-Latn", "en-Jpan"}, 2},
+            {"ja-Hira", {"en-Latn", "ja-Latn", "en-Jpan", "en-Jpan"}, 2},
 
-        // Language match only happens if the script matches.
-        { "ja-Hira", { "en-Latn", "ja-Latn" }, 0 },
-        { "ja-Hira", { "en-Jpan", "ja-Jpan" }, 1 },
+            // Language match only happens if the script matches.
+            {"ja-Hira", {"en-Latn", "ja-Latn"}, 0},
+            {"ja-Hira", {"en-Jpan", "ja-Jpan"}, 1},
 
-        // Multiple locales.
-        // Even if all fonts have the same score, use the 2nd locale for better selection.
-        { "en-Latn,ja-Jpan", { "zh-Hant", "zh-Hans", "ja-Jpan" }, 2 },
-        { "en-Latn,nl-Latn", { "es-Latn", "be-Latn", "nl-Latn" }, 2 },
-        { "en-Latn,br-Latn,nl-Latn", { "es-Latn", "be-Latn", "nl-Latn" }, 2 },
-        { "en-Latn,br-Latn,nl-Latn", { "es-Latn", "be-Latn", "nl-Latn", "nl-Latn" }, 2 },
+            // Multiple locales.
+            // Even if all fonts have the same score, use the 2nd locale for better selection.
+            {"en-Latn,ja-Jpan", {"zh-Hant", "zh-Hans", "ja-Jpan"}, 2},
+            {"en-Latn,nl-Latn", {"es-Latn", "be-Latn", "nl-Latn"}, 2},
+            {"en-Latn,br-Latn,nl-Latn", {"es-Latn", "be-Latn", "nl-Latn"}, 2},
+            {"en-Latn,br-Latn,nl-Latn", {"es-Latn", "be-Latn", "nl-Latn", "nl-Latn"}, 2},
 
-        // Script score.
-        { "en-Latn,ja-Jpan", { "en-Arab", "en-Jpan" }, 1 },
-        { "en-Latn,ja-Jpan", { "en-Arab", "en-Jpan", "en-Jpan" }, 1 },
+            // Script score.
+            {"en-Latn,ja-Jpan", {"en-Arab", "en-Jpan"}, 1},
+            {"en-Latn,ja-Jpan", {"en-Arab", "en-Jpan", "en-Jpan"}, 1},
 
-        // Language match case
-        { "en-Latn,ja-Latn", { "bd-Latn", "ja-Latn" }, 1 },
-        { "en-Latn,ja-Latn", { "bd-Latn", "ja-Latn", "ja-Latn" }, 1 },
+            // Language match case
+            {"en-Latn,ja-Latn", {"bd-Latn", "ja-Latn"}, 1},
+            {"en-Latn,ja-Latn", {"bd-Latn", "ja-Latn", "ja-Latn"}, 1},
 
-        // Language match only happens if the script matches.
-        { "en-Latn,ar-Arab", { "en-Beng", "ar-Arab" }, 1 },
+            // Language match only happens if the script matches.
+            {"en-Latn,ar-Arab", {"en-Beng", "ar-Arab"}, 1},
 
-        // Multiple locales in the font settings.
-        { "ko-Jamo", { "ja-Jpan", "ko-Kore", "ko-Kore,ko-Jamo"}, 2 },
-        { "en-Latn", { "ja-Jpan", "en-Latn,ja-Jpan"}, 1 },
-        { "en-Latn", { "ja-Jpan", "ja-Jpan,en-Latn"}, 1 },
-        { "en-Latn", { "ja-Jpan,zh-Hant", "en-Latn,ja-Jpan", "en-Latn"}, 1 },
-        { "en-Latn", { "zh-Hant,ja-Jpan", "ja-Jpan,en-Latn", "en-Latn"}, 1 },
+            // Multiple locales in the font settings.
+            {"ko-Jamo", {"ja-Jpan", "ko-Kore", "ko-Kore,ko-Jamo"}, 2},
+            {"en-Latn", {"ja-Jpan", "en-Latn,ja-Jpan"}, 1},
+            {"en-Latn", {"ja-Jpan", "ja-Jpan,en-Latn"}, 1},
+            {"en-Latn", {"ja-Jpan,zh-Hant", "en-Latn,ja-Jpan", "en-Latn"}, 1},
+            {"en-Latn", {"zh-Hant,ja-Jpan", "ja-Jpan,en-Latn", "en-Latn"}, 1},
 
-        // Kore = Hang + Hani, etc.
-        { "ko-Kore", { "ko-Hang", "ko-Jamo,ko-Hani", "ko-Hang,ko-Hani"}, 2 },
-        { "ja-Hrkt", { "ja-Hira", "ja-Kana", "ja-Hira,ja-Kana"}, 2 },
-        { "ja-Jpan", { "ja-Hira", "ja-Kana", "ja-Hani", "ja-Hira,ja-Kana,ja-Hani"}, 3 },
-        { "zh-Hanb", { "zh-Hant", "zh-Bopo", "zh-Hant,zh-Bopo"}, 2 },
-        { "zh-Hanb", { "ja-Hanb", "zh-Hant,zh-Bopo"}, 1 },
+            // Kore = Hang + Hani, etc.
+            {"ko-Kore", {"ko-Hang", "ko-Jamo,ko-Hani", "ko-Hang,ko-Hani"}, 2},
+            {"ja-Hrkt", {"ja-Hira", "ja-Kana", "ja-Hira,ja-Kana"}, 2},
+            {"ja-Jpan", {"ja-Hira", "ja-Kana", "ja-Hani", "ja-Hira,ja-Kana,ja-Hani"}, 3},
+            {"zh-Hanb", {"zh-Hant", "zh-Bopo", "zh-Hant,zh-Bopo"}, 2},
+            {"zh-Hanb", {"ja-Hanb", "zh-Hant,zh-Bopo"}, 1},
 
-        // Language match with unified subscript bits.
-        { "zh-Hanb", { "zh-Hant", "zh-Bopo", "ja-Hant,ja-Bopo", "zh-Hant,zh-Bopo"}, 3 },
-        { "zh-Hanb", { "zh-Hant", "zh-Bopo", "ja-Hant,zh-Bopo", "zh-Hant,zh-Bopo"}, 3 },
+            // Language match with unified subscript bits.
+            {"zh-Hanb", {"zh-Hant", "zh-Bopo", "ja-Hant,ja-Bopo", "zh-Hant,zh-Bopo"}, 3},
+            {"zh-Hanb", {"zh-Hant", "zh-Bopo", "ja-Hant,zh-Bopo", "zh-Hant,zh-Bopo"}, 3},
 
-        // Two elements subtag matching: language and subtag or language or script.
-        { "ja-Kana-u-em-emoji", { "zh-Hant", "ja-Kana"}, 1 },
-        { "ja-Kana-u-em-emoji", { "zh-Hant", "ja-Kana", "ja-Zsye"}, 2 },
-        { "ja-Zsym-u-em-emoji", { "ja-Kana", "ja-Zsym", "ja-Zsye"}, 2 },
+            // Two elements subtag matching: language and subtag or language or script.
+            {"ja-Kana-u-em-emoji", {"zh-Hant", "ja-Kana"}, 1},
+            {"ja-Kana-u-em-emoji", {"zh-Hant", "ja-Kana", "ja-Zsye"}, 2},
+            {"ja-Zsym-u-em-emoji", {"ja-Kana", "ja-Zsym", "ja-Zsye"}, 2},
 
-        // One element subtag matching: subtag only or script only.
-        { "en-Latn-u-em-emoji", { "ja-Latn", "ja-Zsye"}, 1 },
-        { "en-Zsym-u-em-emoji", { "ja-Zsym", "ja-Zsye"}, 1 },
-        { "en-Zsye-u-em-text", { "ja-Zsym", "ja-Zsye"}, 0 },
+            // One element subtag matching: subtag only or script only.
+            {"en-Latn-u-em-emoji", {"ja-Latn", "ja-Zsye"}, 1},
+            {"en-Zsym-u-em-emoji", {"ja-Zsym", "ja-Zsye"}, 1},
+            {"en-Zsye-u-em-text", {"ja-Zsym", "ja-Zsye"}, 0},
 
-        // Multiple locale list with subtags.
-        { "en-Latn,ja-Jpan-u-em-text", { "en-Latn", "en-Zsye", "en-Zsym"}, 0 },
-        { "en-Latn,en-Zsye,ja-Jpan-u-em-text", { "zh", "en-Zsye", "en-Zsym"}, 1 },
+            // Multiple locale list with subtags.
+            {"en-Latn,ja-Jpan-u-em-text", {"en-Latn", "en-Zsye", "en-Zsym"}, 0},
+            {"en-Latn,en-Zsye,ja-Jpan-u-em-text", {"zh", "en-Zsye", "en-Zsym"}, 1},
     };
 
     for (auto testCase : testCases) {
@@ -952,11 +953,10 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::vector<std::shared_ptr<FontFamily>> families;
 
         // Prepare first font which doesn't supports U+9AA8
-        std::shared_ptr<MinikinFont> firstFamilyMinikinFont(
-                new MinikinFontForTest(kNoGlyphFont));
-        std::shared_ptr<FontFamily> firstFamily(new FontFamily(
-                registerLocaleList("und"), FontFamily::Variant::DEFAULT,
-                std::vector<Font>({ Font(firstFamilyMinikinFont, FontStyle()) })));
+        std::shared_ptr<MinikinFont> firstFamilyMinikinFont(new MinikinFontForTest(kNoGlyphFont));
+        std::shared_ptr<FontFamily> firstFamily(
+                new FontFamily(registerLocaleList("und"), FontFamily::Variant::DEFAULT,
+                               std::vector<Font>({Font(firstFamilyMinikinFont, FontStyle())})));
         families.push_back(firstFamily);
 
         // Prepare font families
@@ -968,7 +968,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
             std::shared_ptr<MinikinFont> minikin_font(new MinikinFontForTest(kJAFont));
             std::shared_ptr<FontFamily> family(new FontFamily(
                     registerLocaleList(testCase.fontLocales[i]), FontFamily::Variant::DEFAULT,
-                    std::vector<Font>({ Font(minikin_font, FontStyle()) })));
+                    std::vector<Font>({Font(minikin_font, FontStyle())})));
             families.push_back(family);
             fontLocaleIdxMap.insert(std::make_pair(minikin_font.get(), i));
         }
@@ -995,290 +995,294 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
         std::string requestedLocales;
         std::string expectedFont;
     } testCases[] = {
-        // Following test cases verify that following rules in font fallback chain.
-        // - If the first font in the collection supports the given character or variation sequence,
-        //   it should be selected.
-        // - If the font doesn't support the given character, variation sequence or its base
-        //   character, it should not be selected.
-        // - If two or more fonts match the requested locales, the font matches with the highest
-        //   priority locale should be selected.
-        // - If two or more fonts get the same score, the font listed earlier in the XML file
-        //   (here, kItemizeFontXml) should be selected.
+            // Following test cases verify that following rules in font fallback chain.
+            // - If the first font in the collection supports the given character or variation
+            // sequence,
+            //   it should be selected.
+            // - If the font doesn't support the given character, variation sequence or its base
+            //   character, it should not be selected.
+            // - If two or more fonts match the requested locales, the font matches with the highest
+            //   priority locale should be selected.
+            // - If two or more fonts get the same score, the font listed earlier in the XML file
+            //   (here, kItemizeFontXml) should be selected.
 
-        // Regardless of locale, the first font is always selected if it covers the code point.
-        { "'a'", "", kLatinFont},
-        { "'a'", "en-Latn", kLatinFont},
-        { "'a'", "ja-Jpan", kLatinFont},
-        { "'a'", "ja-Jpan,en-Latn", kLatinFont},
-        { "'a'", "zh-Hans,zh-Hant,en-Latn,ja-Jpan,fr-Latn", kLatinFont},
+            // Regardless of locale, the first font is always selected if it covers the code point.
+            {"'a'", "", kLatinFont},
+            {"'a'", "en-Latn", kLatinFont},
+            {"'a'", "ja-Jpan", kLatinFont},
+            {"'a'", "ja-Jpan,en-Latn", kLatinFont},
+            {"'a'", "zh-Hans,zh-Hant,en-Latn,ja-Jpan,fr-Latn", kLatinFont},
 
-        // U+81ED is supported by both the ja font and zh-Hans font.
-        { "U+81ED", "", kZH_HansFont },  // zh-Hans font is listed before ja font.
-        { "U+81ED", "en-Latn", kZH_HansFont },  // zh-Hans font is listed before ja font.
-        { "U+81ED", "ja-Jpan", kJAFont },
-        { "U+81ED", "zh-Hans", kZH_HansFont },
+            // U+81ED is supported by both the ja font and zh-Hans font.
+            {"U+81ED", "", kZH_HansFont},         // zh-Hans font is listed before ja font.
+            {"U+81ED", "en-Latn", kZH_HansFont},  // zh-Hans font is listed before ja font.
+            {"U+81ED", "ja-Jpan", kJAFont},
+            {"U+81ED", "zh-Hans", kZH_HansFont},
 
-        { "U+81ED", "ja-Jpan,en-Latn", kJAFont },
-        { "U+81ED", "en-Latn,ja-Jpan", kJAFont },
-        { "U+81ED", "en-Latn,zh-Hans", kZH_HansFont },
-        { "U+81ED", "zh-Hans,en-Latn", kZH_HansFont },
-        { "U+81ED", "ja-Jpan,zh-Hans", kJAFont },
-        { "U+81ED", "zh-Hans,ja-Jpan", kZH_HansFont },
+            {"U+81ED", "ja-Jpan,en-Latn", kJAFont},
+            {"U+81ED", "en-Latn,ja-Jpan", kJAFont},
+            {"U+81ED", "en-Latn,zh-Hans", kZH_HansFont},
+            {"U+81ED", "zh-Hans,en-Latn", kZH_HansFont},
+            {"U+81ED", "ja-Jpan,zh-Hans", kJAFont},
+            {"U+81ED", "zh-Hans,ja-Jpan", kZH_HansFont},
 
-        { "U+81ED", "en-Latn,zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+81ED", "en-Latn,ja-Jpan,zh-Hans", kJAFont },
-        { "U+81ED", "en-Latn,zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+81ED", "ja-Jpan,en-Latn,zh-Hans", kJAFont },
-        { "U+81ED", "ja-Jpan,zh-Hans,en-Latn", kJAFont },
-        { "U+81ED", "zh-Hans,en-Latn,ja-Jpan", kZH_HansFont },
-        { "U+81ED", "zh-Hans,ja-Jpan,en-Latn", kZH_HansFont },
+            {"U+81ED", "en-Latn,zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+81ED", "en-Latn,ja-Jpan,zh-Hans", kJAFont},
+            {"U+81ED", "en-Latn,zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+81ED", "ja-Jpan,en-Latn,zh-Hans", kJAFont},
+            {"U+81ED", "ja-Jpan,zh-Hans,en-Latn", kJAFont},
+            {"U+81ED", "zh-Hans,en-Latn,ja-Jpan", kZH_HansFont},
+            {"U+81ED", "zh-Hans,ja-Jpan,en-Latn", kZH_HansFont},
 
-        // U+304A is only supported by ja font.
-        { "U+304A", "", kJAFont },
-        { "U+304A", "ja-Jpan", kJAFont },
-        { "U+304A", "zh-Hant", kJAFont },
-        { "U+304A", "zh-Hans", kJAFont },
+            // U+304A is only supported by ja font.
+            {"U+304A", "", kJAFont},
+            {"U+304A", "ja-Jpan", kJAFont},
+            {"U+304A", "zh-Hant", kJAFont},
+            {"U+304A", "zh-Hans", kJAFont},
 
-        { "U+304A", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+304A", "zh-Hant,ja-Jpan", kJAFont },
-        { "U+304A", "zh-Hans,zh-Hant", kJAFont },
-        { "U+304A", "zh-Hant,zh-Hans", kJAFont },
-        { "U+304A", "zh-Hans,ja-Jpan", kJAFont },
-        { "U+304A", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+304A", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+304A", "zh-Hant,ja-Jpan", kJAFont},
+            {"U+304A", "zh-Hans,zh-Hant", kJAFont},
+            {"U+304A", "zh-Hant,zh-Hans", kJAFont},
+            {"U+304A", "zh-Hans,ja-Jpan", kJAFont},
+            {"U+304A", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+304A", "zh-Hans,ja-Jpan,zh-Hant", kJAFont },
-        { "U+304A", "zh-Hans,zh-Hant,ja-Jpan", kJAFont },
-        { "U+304A", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+304A", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+304A", "zh-Hant,zh-Hans,ja-Jpan", kJAFont },
-        { "U+304A", "zh-Hant,ja-Jpan,zh-Hans", kJAFont },
+            {"U+304A", "zh-Hans,ja-Jpan,zh-Hant", kJAFont},
+            {"U+304A", "zh-Hans,zh-Hant,ja-Jpan", kJAFont},
+            {"U+304A", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+304A", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+304A", "zh-Hant,zh-Hans,ja-Jpan", kJAFont},
+            {"U+304A", "zh-Hant,ja-Jpan,zh-Hans", kJAFont},
 
-        // U+242EE is supported by both ja font and zh-Hant fonts but not by zh-Hans font.
-        { "U+242EE", "", kJAFont },  // ja font is listed before zh-Hant font.
-        { "U+242EE", "ja-Jpan", kJAFont },
-        { "U+242EE", "zh-Hans", kJAFont },
-        { "U+242EE", "zh-Hant", kZH_HantFont },
+            // U+242EE is supported by both ja font and zh-Hant fonts but not by zh-Hans font.
+            {"U+242EE", "", kJAFont},  // ja font is listed before zh-Hant font.
+            {"U+242EE", "ja-Jpan", kJAFont},
+            {"U+242EE", "zh-Hans", kJAFont},
+            {"U+242EE", "zh-Hant", kZH_HantFont},
 
-        { "U+242EE", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+242EE", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+242EE", "zh-Hans,zh-Hant", kZH_HantFont },
-        { "U+242EE", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+242EE", "zh-Hans,ja-Jpan", kJAFont },
-        { "U+242EE", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+242EE", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+242EE", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+242EE", "zh-Hans,zh-Hant", kZH_HantFont},
+            {"U+242EE", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+242EE", "zh-Hans,ja-Jpan", kJAFont},
+            {"U+242EE", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+242EE", "zh-Hans,ja-Jpan,zh-Hant", kJAFont },
-        { "U+242EE", "zh-Hans,zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+242EE", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+242EE", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+242EE", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+242EE", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+242EE", "zh-Hans,ja-Jpan,zh-Hant", kJAFont},
+            {"U+242EE", "zh-Hans,zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+242EE", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+242EE", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+242EE", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+242EE", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // U+9AA8 is supported by all ja-Jpan, zh-Hans, zh-Hant fonts.
-        { "U+9AA8", "", kZH_HansFont },  // zh-Hans font is listed before ja and zh-Hant fonts.
-        { "U+9AA8", "ja-Jpan", kJAFont },
-        { "U+9AA8", "zh-Hans", kZH_HansFont },
-        { "U+9AA8", "zh-Hant", kZH_HantFont },
+            // U+9AA8 is supported by all ja-Jpan, zh-Hans, zh-Hant fonts.
+            {"U+9AA8", "", kZH_HansFont},  // zh-Hans font is listed before ja and zh-Hant fonts.
+            {"U+9AA8", "ja-Jpan", kJAFont},
+            {"U+9AA8", "zh-Hans", kZH_HansFont},
+            {"U+9AA8", "zh-Hant", kZH_HantFont},
 
-        { "U+9AA8", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+9AA8", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+9AA8", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+9AA8", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+9AA8", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+9AA8", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+9AA8", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+9AA8", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+9AA8", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+9AA8", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+9AA8", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+9AA8", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+9AA8", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+9AA8", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+9AA8", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+9AA8", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+9AA8", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+9AA8", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+9AA8", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+9AA8", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+9AA8", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+9AA8", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+9AA8", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+9AA8", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // U+242EE U+FE00 is supported by ja font but not by zh-Hans or zh-Hant fonts.
-        { "U+242EE U+FE00", "", kJAFont },
-        { "U+242EE U+FE00", "ja-Jpan", kJAFont },
-        { "U+242EE U+FE00", "zh-Hant", kJAFont },
-        { "U+242EE U+FE00", "zh-Hans", kJAFont },
+            // U+242EE U+FE00 is supported by ja font but not by zh-Hans or zh-Hant fonts.
+            {"U+242EE U+FE00", "", kJAFont},
+            {"U+242EE U+FE00", "ja-Jpan", kJAFont},
+            {"U+242EE U+FE00", "zh-Hant", kJAFont},
+            {"U+242EE U+FE00", "zh-Hans", kJAFont},
 
-        { "U+242EE U+FE00", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+242EE U+FE00", "zh-Hant,ja-Jpan", kJAFont },
-        { "U+242EE U+FE00", "zh-Hans,zh-Hant", kJAFont },
-        { "U+242EE U+FE00", "zh-Hant,zh-Hans", kJAFont },
-        { "U+242EE U+FE00", "zh-Hans,ja-Jpan", kJAFont },
-        { "U+242EE U+FE00", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+242EE U+FE00", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+242EE U+FE00", "zh-Hant,ja-Jpan", kJAFont},
+            {"U+242EE U+FE00", "zh-Hans,zh-Hant", kJAFont},
+            {"U+242EE U+FE00", "zh-Hant,zh-Hans", kJAFont},
+            {"U+242EE U+FE00", "zh-Hans,ja-Jpan", kJAFont},
+            {"U+242EE U+FE00", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+242EE U+FE00", "zh-Hans,ja-Jpan,zh-Hant", kJAFont },
-        { "U+242EE U+FE00", "zh-Hans,zh-Hant,ja-Jpan", kJAFont },
-        { "U+242EE U+FE00", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+242EE U+FE00", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+242EE U+FE00", "zh-Hant,zh-Hans,ja-Jpan", kJAFont },
-        { "U+242EE U+FE00", "zh-Hant,ja-Jpan,zh-Hans", kJAFont },
+            {"U+242EE U+FE00", "zh-Hans,ja-Jpan,zh-Hant", kJAFont},
+            {"U+242EE U+FE00", "zh-Hans,zh-Hant,ja-Jpan", kJAFont},
+            {"U+242EE U+FE00", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+242EE U+FE00", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+242EE U+FE00", "zh-Hant,zh-Hans,ja-Jpan", kJAFont},
+            {"U+242EE U+FE00", "zh-Hant,ja-Jpan,zh-Hans", kJAFont},
 
-        // U+3402 U+E0100 is supported by both zh-Hans and zh-Hant but not by ja font.
-        { "U+3402 U+E0100", "", kZH_HansFont },  // zh-Hans font is listed before zh-Hant font.
-        { "U+3402 U+E0100", "ja-Jpan", kZH_HansFont },  // zh-Hans font is listed before zh-Hant font.
-        { "U+3402 U+E0100", "zh-Hant", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hans", kZH_HansFont },
+            // U+3402 U+E0100 is supported by both zh-Hans and zh-Hant but not by ja font.
+            {"U+3402 U+E0100", "", kZH_HansFont},  // zh-Hans font is listed before zh-Hant font.
+            {"U+3402 U+E0100", "ja-Jpan",
+             kZH_HansFont},  // zh-Hans font is listed before zh-Hant font.
+            {"U+3402 U+E0100", "zh-Hant", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hans", kZH_HansFont},
 
-        { "U+3402 U+E0100", "ja-Jpan,zh-Hant", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+3402 U+E0100", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+3402 U+E0100", "ja-Jpan,zh-Hans", kZH_HansFont },
+            {"U+3402 U+E0100", "ja-Jpan,zh-Hant", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+3402 U+E0100", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+3402 U+E0100", "ja-Jpan,zh-Hans", kZH_HansFont},
 
-        { "U+3402 U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+3402 U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+3402 U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+3402 U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+3402 U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+3402 U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+3402 U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+3402 U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+3402 U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+3402 U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // No font supports U+4444 U+FE00 but only zh-Hans supports its base character U+4444.
-        { "U+4444 U+FE00", "", kZH_HansFont },
-        { "U+4444 U+FE00", "ja-Jpan", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hant", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hans", kZH_HansFont },
+            // No font supports U+4444 U+FE00 but only zh-Hans supports its base character U+4444.
+            {"U+4444 U+FE00", "", kZH_HansFont},
+            {"U+4444 U+FE00", "ja-Jpan", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hant", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hans", kZH_HansFont},
 
-        { "U+4444 U+FE00", "ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hant,zh-Hans", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+4444 U+FE00", "ja-Jpan,zh-Hans", kZH_HansFont },
+            {"U+4444 U+FE00", "ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hant,zh-Hans", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+4444 U+FE00", "ja-Jpan,zh-Hans", kZH_HansFont},
 
-        { "U+4444 U+FE00", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+4444 U+FE00", "ja-Jpan,zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+4444 U+FE00", "ja-Jpan,zh-Hant,zh-Hans", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hant,zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+4444 U+FE00", "zh-Hant,ja-Jpan,zh-Hans", kZH_HansFont },
+            {"U+4444 U+FE00", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+4444 U+FE00", "ja-Jpan,zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+4444 U+FE00", "ja-Jpan,zh-Hant,zh-Hans", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hant,zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+4444 U+FE00", "zh-Hant,ja-Jpan,zh-Hans", kZH_HansFont},
 
-        // No font supports U+81ED U+E0100 but ja and zh-Hans support its base character U+81ED.
-        // zh-Hans font is listed before ja font.
-        { "U+81ED U+E0100", "", kZH_HansFont },
-        { "U+81ED U+E0100", "ja-Jpan", kJAFont },
-        { "U+81ED U+E0100", "zh-Hant", kZH_HansFont },
-        { "U+81ED U+E0100", "zh-Hans", kZH_HansFont },
+            // No font supports U+81ED U+E0100 but ja and zh-Hans support its base character U+81ED.
+            // zh-Hans font is listed before ja font.
+            {"U+81ED U+E0100", "", kZH_HansFont},
+            {"U+81ED U+E0100", "ja-Jpan", kJAFont},
+            {"U+81ED U+E0100", "zh-Hant", kZH_HansFont},
+            {"U+81ED U+E0100", "zh-Hans", kZH_HansFont},
 
-        { "U+81ED U+E0100", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+81ED U+E0100", "zh-Hant,ja-Jpan", kJAFont },
-        { "U+81ED U+E0100", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+81ED U+E0100", "zh-Hant,zh-Hans", kZH_HansFont },
-        { "U+81ED U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+81ED U+E0100", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+81ED U+E0100", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+81ED U+E0100", "zh-Hant,ja-Jpan", kJAFont},
+            {"U+81ED U+E0100", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+81ED U+E0100", "zh-Hant,zh-Hans", kZH_HansFont},
+            {"U+81ED U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+81ED U+E0100", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+81ED U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+81ED U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+81ED U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+81ED U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+81ED U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+81ED U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kJAFont },
+            {"U+81ED U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+81ED U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+81ED U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+81ED U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+81ED U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+81ED U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kJAFont},
 
-        // No font supports U+9AA8 U+E0100 but all zh-Hans zh-hant ja fonts support its base
-        // character U+9AA8.
-        // zh-Hans font is listed before ja and zh-Hant fonts.
-        { "U+9AA8 U+E0100", "", kZH_HansFont },
-        { "U+9AA8 U+E0100", "ja-Jpan", kJAFont },
-        { "U+9AA8 U+E0100", "zh-Hans", kZH_HansFont },
-        { "U+9AA8 U+E0100", "zh-Hant", kZH_HantFont },
+            // No font supports U+9AA8 U+E0100 but all zh-Hans zh-hant ja fonts support its base
+            // character U+9AA8.
+            // zh-Hans font is listed before ja and zh-Hant fonts.
+            {"U+9AA8 U+E0100", "", kZH_HansFont},
+            {"U+9AA8 U+E0100", "ja-Jpan", kJAFont},
+            {"U+9AA8 U+E0100", "zh-Hans", kZH_HansFont},
+            {"U+9AA8 U+E0100", "zh-Hant", kZH_HantFont},
 
-        { "U+9AA8 U+E0100", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+9AA8 U+E0100", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+9AA8 U+E0100", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+9AA8 U+E0100", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+9AA8 U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+9AA8 U+E0100", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+9AA8 U+E0100", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+9AA8 U+E0100", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+9AA8 U+E0100", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+9AA8 U+E0100", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+9AA8 U+E0100", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+9AA8 U+E0100", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+9AA8 U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+9AA8 U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+9AA8 U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+9AA8 U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+9AA8 U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+9AA8 U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+9AA8 U+E0100", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+9AA8 U+E0100", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+9AA8 U+E0100", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+9AA8 U+E0100", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+9AA8 U+E0100", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+9AA8 U+E0100", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // All zh-Hans,zh-Hant,ja fonts support U+35A8 U+E0100 and its base character U+35A8.
-        // zh-Hans font is listed before ja and zh-Hant fonts.
-        { "U+35A8", "", kZH_HansFont },
-        { "U+35A8", "ja-Jpan", kJAFont },
-        { "U+35A8", "zh-Hans", kZH_HansFont },
-        { "U+35A8", "zh-Hant", kZH_HantFont },
+            // All zh-Hans,zh-Hant,ja fonts support U+35A8 U+E0100 and its base character U+35A8.
+            // zh-Hans font is listed before ja and zh-Hant fonts.
+            {"U+35A8", "", kZH_HansFont},
+            {"U+35A8", "ja-Jpan", kJAFont},
+            {"U+35A8", "zh-Hans", kZH_HansFont},
+            {"U+35A8", "zh-Hant", kZH_HantFont},
 
-        { "U+35A8", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+35A8", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+35A8", "zh-Hans,zh-Hant", kZH_HansFont },
-        { "U+35A8", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+35A8", "zh-Hans,ja-Jpan", kZH_HansFont },
-        { "U+35A8", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+35A8", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+35A8", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+35A8", "zh-Hans,zh-Hant", kZH_HansFont},
+            {"U+35A8", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+35A8", "zh-Hans,ja-Jpan", kZH_HansFont},
+            {"U+35A8", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+35A8", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont },
-        { "U+35A8", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont },
-        { "U+35A8", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+35A8", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+35A8", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+35A8", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+35A8", "zh-Hans,ja-Jpan,zh-Hant", kZH_HansFont},
+            {"U+35A8", "zh-Hans,zh-Hant,ja-Jpan", kZH_HansFont},
+            {"U+35A8", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+35A8", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+35A8", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+35A8", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // All zh-Hans,zh-Hant,ja fonts support U+35B6 U+E0100, but zh-Hant and ja fonts support its
-        // base character U+35B6.
-        // ja font is listed before zh-Hant font.
-        { "U+35B6", "", kJAFont },
-        { "U+35B6", "ja-Jpan", kJAFont },
-        { "U+35B6", "zh-Hant", kZH_HantFont },
-        { "U+35B6", "zh-Hans", kJAFont },
+            // All zh-Hans,zh-Hant,ja fonts support U+35B6 U+E0100, but zh-Hant and ja fonts support
+            // its
+            // base character U+35B6.
+            // ja font is listed before zh-Hant font.
+            {"U+35B6", "", kJAFont},
+            {"U+35B6", "ja-Jpan", kJAFont},
+            {"U+35B6", "zh-Hant", kZH_HantFont},
+            {"U+35B6", "zh-Hans", kJAFont},
 
-        { "U+35B6", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+35B6", "zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+35B6", "zh-Hans,zh-Hant", kZH_HantFont },
-        { "U+35B6", "zh-Hant,zh-Hans", kZH_HantFont },
-        { "U+35B6", "zh-Hans,ja-Jpan", kJAFont },
-        { "U+35B6", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+35B6", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+35B6", "zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+35B6", "zh-Hans,zh-Hant", kZH_HantFont},
+            {"U+35B6", "zh-Hant,zh-Hans", kZH_HantFont},
+            {"U+35B6", "zh-Hans,ja-Jpan", kJAFont},
+            {"U+35B6", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+35B6", "zh-Hans,ja-Jpan,zh-Hant", kJAFont },
-        { "U+35B6", "zh-Hans,zh-Hant,ja-Jpan", kZH_HantFont },
-        { "U+35B6", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+35B6", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+35B6", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont },
-        { "U+35B6", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont },
+            {"U+35B6", "zh-Hans,ja-Jpan,zh-Hant", kJAFont},
+            {"U+35B6", "zh-Hans,zh-Hant,ja-Jpan", kZH_HantFont},
+            {"U+35B6", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+35B6", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+35B6", "zh-Hant,zh-Hans,ja-Jpan", kZH_HantFont},
+            {"U+35B6", "zh-Hant,ja-Jpan,zh-Hans", kZH_HantFont},
 
-        // All zh-Hans,zh-Hant,ja fonts support U+35C5 U+E0100, but only ja font supports its base
-        // character U+35C5.
-        { "U+35C5", "", kJAFont },
-        { "U+35C5", "ja-Jpan", kJAFont },
-        { "U+35C5", "zh-Hant", kJAFont },
-        { "U+35C5", "zh-Hans", kJAFont },
+            // All zh-Hans,zh-Hant,ja fonts support U+35C5 U+E0100, but only ja font supports its
+            // base
+            // character U+35C5.
+            {"U+35C5", "", kJAFont},
+            {"U+35C5", "ja-Jpan", kJAFont},
+            {"U+35C5", "zh-Hant", kJAFont},
+            {"U+35C5", "zh-Hans", kJAFont},
 
-        { "U+35C5", "ja-Jpan,zh-Hant", kJAFont },
-        { "U+35C5", "zh-Hant,ja-Jpan", kJAFont },
-        { "U+35C5", "zh-Hans,zh-Hant", kJAFont },
-        { "U+35C5", "zh-Hant,zh-Hans", kJAFont },
-        { "U+35C5", "zh-Hans,ja-Jpan", kJAFont },
-        { "U+35C5", "ja-Jpan,zh-Hans", kJAFont },
+            {"U+35C5", "ja-Jpan,zh-Hant", kJAFont},
+            {"U+35C5", "zh-Hant,ja-Jpan", kJAFont},
+            {"U+35C5", "zh-Hans,zh-Hant", kJAFont},
+            {"U+35C5", "zh-Hant,zh-Hans", kJAFont},
+            {"U+35C5", "zh-Hans,ja-Jpan", kJAFont},
+            {"U+35C5", "ja-Jpan,zh-Hans", kJAFont},
 
-        { "U+35C5", "zh-Hans,ja-Jpan,zh-Hant", kJAFont },
-        { "U+35C5", "zh-Hans,zh-Hant,ja-Jpan", kJAFont },
-        { "U+35C5", "ja-Jpan,zh-Hans,zh-Hant", kJAFont },
-        { "U+35C5", "ja-Jpan,zh-Hant,zh-Hans", kJAFont },
-        { "U+35C5", "zh-Hant,zh-Hans,ja-Jpan", kJAFont },
-        { "U+35C5", "zh-Hant,ja-Jpan,zh-Hans", kJAFont },
+            {"U+35C5", "zh-Hans,ja-Jpan,zh-Hant", kJAFont},
+            {"U+35C5", "zh-Hans,zh-Hant,ja-Jpan", kJAFont},
+            {"U+35C5", "ja-Jpan,zh-Hans,zh-Hant", kJAFont},
+            {"U+35C5", "ja-Jpan,zh-Hant,zh-Hans", kJAFont},
+            {"U+35C5", "zh-Hant,zh-Hans,ja-Jpan", kJAFont},
+            {"U+35C5", "zh-Hant,ja-Jpan,zh-Hans", kJAFont},
 
-        // None of ja-Jpan, zh-Hant, zh-Hans font supports U+1F469. Emoji font supports it.
-        { "U+1F469", "", kEmojiFont },
-        { "U+1F469", "ja-Jpan", kEmojiFont },
-        { "U+1F469", "zh-Hant", kEmojiFont },
-        { "U+1F469", "zh-Hans", kEmojiFont },
+            // None of ja-Jpan, zh-Hant, zh-Hans font supports U+1F469. Emoji font supports it.
+            {"U+1F469", "", kEmojiFont},
+            {"U+1F469", "ja-Jpan", kEmojiFont},
+            {"U+1F469", "zh-Hant", kEmojiFont},
+            {"U+1F469", "zh-Hans", kEmojiFont},
 
-        { "U+1F469", "ja-Jpan,zh-Hant", kEmojiFont },
-        { "U+1F469", "zh-Hant,ja-Jpan", kEmojiFont },
-        { "U+1F469", "zh-Hans,zh-Hant", kEmojiFont },
-        { "U+1F469", "zh-Hant,zh-Hans", kEmojiFont },
-        { "U+1F469", "zh-Hans,ja-Jpan", kEmojiFont },
-        { "U+1F469", "ja-Jpan,zh-Hans", kEmojiFont },
+            {"U+1F469", "ja-Jpan,zh-Hant", kEmojiFont},
+            {"U+1F469", "zh-Hant,ja-Jpan", kEmojiFont},
+            {"U+1F469", "zh-Hans,zh-Hant", kEmojiFont},
+            {"U+1F469", "zh-Hant,zh-Hans", kEmojiFont},
+            {"U+1F469", "zh-Hans,ja-Jpan", kEmojiFont},
+            {"U+1F469", "ja-Jpan,zh-Hans", kEmojiFont},
 
-        { "U+1F469", "zh-Hans,ja-Jpan,zh-Hant", kEmojiFont },
-        { "U+1F469", "zh-Hans,zh-Hant,ja-Jpan", kEmojiFont },
-        { "U+1F469", "ja-Jpan,zh-Hans,zh-Hant", kEmojiFont },
-        { "U+1F469", "ja-Jpan,zh-Hant,zh-Hans", kEmojiFont },
-        { "U+1F469", "zh-Hant,zh-Hans,ja-Jpan", kEmojiFont },
-        { "U+1F469", "zh-Hant,ja-Jpan,zh-Hans", kEmojiFont },
+            {"U+1F469", "zh-Hans,ja-Jpan,zh-Hant", kEmojiFont},
+            {"U+1F469", "zh-Hans,zh-Hant,ja-Jpan", kEmojiFont},
+            {"U+1F469", "ja-Jpan,zh-Hans,zh-Hant", kEmojiFont},
+            {"U+1F469", "ja-Jpan,zh-Hant,zh-Hans", kEmojiFont},
+            {"U+1F469", "zh-Hant,zh-Hans,ja-Jpan", kEmojiFont},
+            {"U+1F469", "zh-Hant,ja-Jpan,zh-Hans", kEmojiFont},
     };
 
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
@@ -1538,17 +1542,15 @@ TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
     std::shared_ptr<MinikinFont> fontA(new MinikinFontForTest(kZH_HansFont));
     std::shared_ptr<MinikinFont> fontB(new MinikinFontForTest(kZH_HansFont));
 
-    std::shared_ptr<FontFamily> dummyFamily(new FontFamily(
-            std::vector<Font>({ Font(dummyFont, FontStyle()) })));
-    std::shared_ptr<FontFamily> familyA(new FontFamily(
-            std::vector<Font>({ Font(fontA, FontStyle()) })));
-    std::shared_ptr<FontFamily> familyB(new FontFamily(
-            std::vector<Font>({ Font(fontB, FontStyle()) })));
+    std::shared_ptr<FontFamily> dummyFamily(
+            new FontFamily(std::vector<Font>({Font(dummyFont, FontStyle())})));
+    std::shared_ptr<FontFamily> familyA(
+            new FontFamily(std::vector<Font>({Font(fontA, FontStyle())})));
+    std::shared_ptr<FontFamily> familyB(
+            new FontFamily(std::vector<Font>({Font(fontB, FontStyle())})));
 
-    std::vector<std::shared_ptr<FontFamily>> families =
-            { dummyFamily, familyA, familyB };
-    std::vector<std::shared_ptr<FontFamily>> reversedFamilies =
-            { dummyFamily, familyB, familyA };
+    std::vector<std::shared_ptr<FontFamily>> families = {dummyFamily, familyA, familyB};
+    std::vector<std::shared_ptr<FontFamily>> reversedFamilies = {dummyFamily, familyB, familyA};
 
     std::shared_ptr<FontCollection> collection(new FontCollection(families));
     std::shared_ptr<FontCollection> reversedCollection(new FontCollection(reversedFamilies));
@@ -1566,22 +1568,20 @@ TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
 // For b/29585939
 TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
-    std::shared_ptr<MinikinFont> hasCmapFormat14Font(
-            new MinikinFontForTest(kHasCmapFormat14Font));
-    std::shared_ptr<MinikinFont> noCmapFormat14Font(
-            new MinikinFontForTest(kNoCmapFormat14Font));
+    std::shared_ptr<MinikinFont> hasCmapFormat14Font(new MinikinFontForTest(kHasCmapFormat14Font));
+    std::shared_ptr<MinikinFont> noCmapFormat14Font(new MinikinFontForTest(kNoCmapFormat14Font));
 
-    std::shared_ptr<FontFamily> dummyFamily(new FontFamily(
-            std::vector<Font>({ Font(dummyFont, FontStyle()) })));
-    std::shared_ptr<FontFamily> hasCmapFormat14Family(new FontFamily(
-            std::vector<Font>({ Font(hasCmapFormat14Font, FontStyle()) })));
-    std::shared_ptr<FontFamily> noCmapFormat14Family(new FontFamily(
-            std::vector<Font>({ Font(noCmapFormat14Font, FontStyle()) })));
+    std::shared_ptr<FontFamily> dummyFamily(
+            new FontFamily(std::vector<Font>({Font(dummyFont, FontStyle())})));
+    std::shared_ptr<FontFamily> hasCmapFormat14Family(
+            new FontFamily(std::vector<Font>({Font(hasCmapFormat14Font, FontStyle())})));
+    std::shared_ptr<FontFamily> noCmapFormat14Family(
+            new FontFamily(std::vector<Font>({Font(noCmapFormat14Font, FontStyle())})));
 
-    std::vector<std::shared_ptr<FontFamily>> families =
-            { dummyFamily, hasCmapFormat14Family, noCmapFormat14Family };
-    std::vector<std::shared_ptr<FontFamily>> reversedFamilies =
-            { dummyFamily, noCmapFormat14Family, hasCmapFormat14Family };
+    std::vector<std::shared_ptr<FontFamily>> families = {dummyFamily, hasCmapFormat14Family,
+                                                         noCmapFormat14Family};
+    std::vector<std::shared_ptr<FontFamily>> reversedFamilies = {dummyFamily, noCmapFormat14Family,
+                                                                 hasCmapFormat14Family};
 
     std::shared_ptr<FontCollection> collection(new FontCollection(families));
     std::shared_ptr<FontCollection> reversedCollection(new FontCollection(reversedFamilies));

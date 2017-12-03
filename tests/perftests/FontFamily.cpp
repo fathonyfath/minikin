@@ -27,8 +27,8 @@ static void BM_FontFamily_create(benchmark::State& state) {
             std::make_shared<MinikinFontForTest>("/system/fonts/NotoSansCJK-Regular.ttc", 0);
 
     while (state.KeepRunning()) {
-        std::shared_ptr<FontFamily> family = std::make_shared<FontFamily>(
-                std::vector<Font>({Font(minikinFont, FontStyle())}));
+        std::shared_ptr<FontFamily> family =
+                std::make_shared<FontFamily>(std::vector<Font>({Font(minikinFont, FontStyle())}));
     }
 }
 

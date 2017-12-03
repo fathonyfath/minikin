@@ -21,8 +21,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "minikin/MinikinFont.h"
 #include "minikin/FontFamily.h"
+#include "minikin/MinikinFont.h"
 
 namespace minikin {
 
@@ -37,8 +37,8 @@ public:
         int end;
     };
 
-    void itemize(const uint16_t *string, size_t string_length, const MinikinPaint& paint,
-            std::vector<Run>* result) const;
+    void itemize(const uint16_t* string, size_t string_length, const MinikinPaint& paint,
+                 std::vector<Run>* result) const;
 
     // Returns true if there is a glyph for the code point and variation selector pair.
     // Returns false if no fonts have a glyph for the code point and variation
@@ -50,12 +50,10 @@ public:
 
     // Creates new FontCollection based on this collection while applying font variations. Returns
     // nullptr if none of variations apply to this collection.
-    std::shared_ptr<FontCollection>
-            createCollectionWithVariation(const std::vector<FontVariation>& variations);
+    std::shared_ptr<FontCollection> createCollectionWithVariation(
+            const std::vector<FontVariation>& variations);
 
-    const std::unordered_set<AxisTag>& getSupportedTags() const {
-        return mSupportedAxes;
-    }
+    const std::unordered_set<AxisTag>& getSupportedTags() const { return mSupportedAxes; }
 
     uint32_t getId() const;
 
@@ -77,17 +75,18 @@ private:
     void init(const std::vector<std::shared_ptr<FontFamily>>& typefaces);
 
     const std::shared_ptr<FontFamily>& getFamilyForChar(uint32_t ch, uint32_t vs,
-            uint32_t localeListId, FontFamily::Variant variant) const;
+                                                        uint32_t localeListId,
+                                                        FontFamily::Variant variant) const;
 
     uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, FontFamily::Variant variant,
                              uint32_t localeListId,
                              const std::shared_ptr<FontFamily>& fontFamily) const;
 
     uint32_t calcCoverageScore(uint32_t ch, uint32_t vs,
-            const std::shared_ptr<FontFamily>& fontFamily) const;
+                               const std::shared_ptr<FontFamily>& fontFamily) const;
 
     static uint32_t calcLocaleMatchingScore(uint32_t userLocaleListId,
-            const FontFamily& fontFamily);
+                                            const FontFamily& fontFamily);
 
     static uint32_t calcVariantMatchingScore(FontFamily::Variant variant,
                                              const FontFamily& fontFamily);

@@ -19,8 +19,8 @@
 
 // low level file access for mapping ICU data
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <gtest/gtest.h>
 #include <unicode/uclean.h>
@@ -46,9 +46,7 @@ protected:
         ASSERT_TRUE(U_SUCCESS(errorCode));
     }
 
-    virtual void TearDown() override {
-        u_cleanup();
-    }
+    virtual void TearDown() override { u_cleanup(); }
 };
 
 }  // namespace minikin

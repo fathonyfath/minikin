@@ -39,13 +39,13 @@ class LocaleList;
 
 // Enum for making sub-locale from FontLangauge.
 enum class SubtagBits : uint8_t {
-    EMPTY    = 0b00000000,
+    EMPTY = 0b00000000,
     LANGUAGE = 0b00000001,
-    SCRIPT   = 0b00000010,
-    REGION   = 0b00000100,
-    VARIANT  = 0b00001000,
-    EMOJI    = 0b00010000,
-    ALL      = 0b00011111,
+    SCRIPT = 0b00000010,
+    REGION = 0b00000100,
+    VARIANT = 0b00001000,
+    EMOJI = 0b00010000,
+    ALL = 0b00011111,
 };
 
 inline constexpr SubtagBits operator&(SubtagBits l, SubtagBits r) {
@@ -76,24 +76,22 @@ public:
     // Default constructor creates the unsupported locale.
     Locale()
             : mScript(NO_SCRIPT),
-            mLanguage(NO_LANGUAGE),
-            mRegion(NO_REGION),
-            mSubScriptBits(0ul),
-            mVariant(Variant::NO_VARIANT),
-            mEmojiStyle(EMSTYLE_EMPTY) {}
+              mLanguage(NO_LANGUAGE),
+              mRegion(NO_REGION),
+              mSubScriptBits(0ul),
+              mVariant(Variant::NO_VARIANT),
+              mEmojiStyle(EMSTYLE_EMPTY) {}
 
     // Parse from string
     Locale(const StringPiece& buf);
 
     bool operator==(const Locale other) const {
         return !isUnsupported() && isEqualScript(other) && mLanguage == other.mLanguage &&
-                mRegion == other.mRegion && mVariant == other.mVariant &&
-                mEmojiStyle == other.mEmojiStyle;
+               mRegion == other.mRegion && mVariant == other.mVariant &&
+               mEmojiStyle == other.mEmojiStyle;
     }
 
-    bool operator!=(const Locale other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const Locale other) const { return !(*this == other); }
 
     inline bool hasLanguage() const { return mLanguage != NO_LANGUAGE; }
     inline bool hasScript() const { return mScript != NO_SCRIPT; }
@@ -105,9 +103,7 @@ public:
         return hasLanguage() || hasScript() || hasRegion() || hasVariant() || hasEmojiStyle();
     }
 
-    inline bool isUnsupported() const {
-        return !isSupported();
-    }
+    inline bool isUnsupported() const { return !isSupported(); }
 
     EmojiStyle getEmojiStyle() const { return mEmojiStyle; }
 
@@ -126,7 +122,7 @@ public:
 
     uint64_t getIdentifier() const {
         return ((uint64_t)mLanguage << 49) | ((uint64_t)mScript << 29) | ((uint64_t)mRegion << 14) |
-                ((uint64_t)mEmojiStyle << 12) | (uint64_t)mVariant;
+               ((uint64_t)mEmojiStyle << 12) | (uint64_t)mVariant;
     }
 
     Locale getPartialLocale(SubtagBits bits) const;
@@ -180,7 +176,7 @@ public:
 
     size_t size() const { return mLocales.size(); }
     bool empty() const { return mLocales.empty(); }
-    const Locale& operator[] (size_t n) const { return mLocales[n]; }
+    const Locale& operator[](size_t n) const { return mLocales[n]; }
 
     hb_language_t getHbLanguage(size_t n) const { return mHbLangs[n]; }
 
