@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MINIKIN_MACROS_H
-#define MINIKIN_MACROS_H
 
-#define PREVENT_COPY_AND_ASSIGN(Type) \
-    Type(const Type&) = delete;       \
-    Type& operator=(const Type&) = delete
+#include "minikin/MeasuredText.h"
 
-#define PREVENT_COPY_ASSIGN_AND_MOVE(Type) \
-    Type(const Type&) = delete;            \
-    Type& operator=(const Type&) = delete; \
-    Type(Type&&) = delete;                 \
-    Type& operator=(Type&&) = delete
-#endif  // MINIKIN_MACROS_H
+namespace minikin {
+
+void MeasuredText::measure(const U16StringPiece& textBuf) {
+    for (const auto& run : runs) {
+        const uint32_t runOffset = run->getRange().getStart();
+        run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset,
+                        overhangs.data() + runOffset);
+    }
+}
+
+}  // namespace minikin

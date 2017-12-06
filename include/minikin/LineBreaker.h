@@ -28,6 +28,7 @@
 #include "minikin/FontCollection.h"
 #include "minikin/Layout.h"
 #include "minikin/Macros.h"
+#include "minikin/MeasuredText.h"
 #include "minikin/MinikinFont.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
@@ -48,43 +49,6 @@ enum class HyphenationFrequency : uint8_t {
 
 class Hyphenator;
 class WordBreaker;
-
-class Run {
-public:
-    Run(const Range& range) : mRange(range) {}
-    virtual ~Run() {}
-
-    // Returns true if this run is RTL. Otherwise returns false.
-    virtual bool isRtl() const = 0;
-
-    // Returns true if this run is a target of hyphenation. Otherwise return false.
-    virtual bool canHyphenate() const = 0;
-
-    // Returns the locale list ID for this run.
-    virtual uint32_t getLocaleListId() const = 0;
-
-    // Fills the each character's advances, extents and overhangs.
-    virtual void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
-                            LayoutOverhang* overhangs) const = 0;
-
-    // Following two methods are only called when the implementation returns true for
-    // canHyphenate method.
-
-    // Returns the paint pointer used for this run. Do not return null if you returns true for
-    // canHyphenate method.
-    virtual const MinikinPaint* getPaint() const { return nullptr; }
-
-    // Measure the hyphenation piece and fills the each character's advances and overhangs.
-    virtual float measureHyphenPiece(const U16StringPiece&, const Range&, StartHyphenEdit,
-                                     EndHyphenEdit, float*, LayoutOverhang*) const {
-        return 0.0;
-    }
-
-    inline const Range& getRange() const { return mRange; }
-
-protected:
-    const Range mRange;
-};
 
 class TabStops {
 public:
@@ -127,27 +91,6 @@ public:
     virtual float getRightPaddingAt(size_t lineNo) const = 0;
 };
 
-class MeasuredText {
-public:
-    static MeasuredText generate(const U16StringPiece& text,
-                                 const std::vector<std::unique_ptr<Run>>& runs);
-
-    // Following three vectors have the same length.
-    // TODO: Introduce individual character info struct if copy cost in JNI is negligible.
-    std::vector<float> widths;
-    std::vector<MinikinExtent> extents;
-    std::vector<LayoutOverhang> overhangs;
-
-    MeasuredText(MeasuredText&&) = default;
-    MeasuredText& operator=(MeasuredText&&) = default;
-
-    PREVENT_COPY_AND_ASSIGN(MeasuredText);
-
-private:
-    // Use generate method instead.
-    MeasuredText(uint32_t size) : widths(size), extents(size), overhangs(size) {}
-};
-
 struct LineBreakResult {
 public:
     LineBreakResult() = default;
@@ -168,21 +111,20 @@ public:
 
 class LineBreaker {
 public:
-    LineBreaker(const U16StringPiece& textBuffer, const MeasuredText& measuredText,
-                BreakStrategy strategy, HyphenationFrequency frequency, bool justified);
+    LineBreaker(const U16StringPiece& textBuffer, BreakStrategy strategy,
+                HyphenationFrequency frequency, bool justified);
 
     virtual ~LineBreaker();
 
     const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
-    LineBreakResult computeBreaks(const std::vector<std::unique_ptr<Run>>& runs,
-                                  const LineWidth& lineWidth, const TabStops& tabStops);
+    LineBreakResult computeBreaks(const MeasuredText& measuredText, const LineWidth& lineWidth,
+                                  const TabStops& tabStops);
 
 protected:
     // For testing purposes.
     LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16StringPiece& textBuffer,
-                const MeasuredText& measuredText, BreakStrategy strategy,
-                HyphenationFrequency frequency, bool justified);
+                BreakStrategy strategy, HyphenationFrequency frequency, bool justified);
 
 private:
     // ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for
@@ -213,7 +155,8 @@ private:
         bool isRtl;  // The direction of the bidi run containing or ending in this candidate
     };
 
-    void addRun(const Run& run, const LineWidth& lineWidth, const TabStops& tabStops);
+    void addRuns(const MeasuredText& measured, const LineWidth& lineWidth,
+                 const TabStops& tabStops);
 
     void setLocaleList(uint32_t localeListId, size_t restartFrom);
     // A locale list ID and locale ID currently used for word iterator and hyphenator.
@@ -235,7 +178,6 @@ private:
 
     std::unique_ptr<WordBreaker> mWordBreaker;
     U16StringPiece mTextBuf;
-    const MeasuredText& mMeasuredText;
 
     const Hyphenator* mHyphenator;
 
@@ -265,32 +207,33 @@ private:
     static LayoutOverhang computeOverhang(float totalAdvance, const std::vector<float>& advances,
                                           const std::vector<LayoutOverhang>& overhangs, bool isRtl);
 
-    MinikinExtent computeMaxExtent(size_t start, size_t end) const;
+    MinikinExtent computeMaxExtent(const MeasuredText& measured, size_t start, size_t end) const;
 
     //
     // Types, methods, and fields related to the greedy algorithm
     //
 
-    void computeBreaksGreedy(const LineWidth& lineWidth);
+    void computeBreaksGreedy(const MeasuredText& measured, const LineWidth& lineWidth);
 
     // This method is called as a helper to computeBreaksGreedy(), but also when we encounter a
     // tab character, which forces the line breaking algorithm to greedy mode. It computes all
     // the greedy line breaks based on available candidates and returns the preBreak of the last
     // break which would then be used to calculate the width of the tab.
-    ParaWidth computeBreaksGreedyPartial(const LineWidth& lineWidth);
+    ParaWidth computeBreaksGreedyPartial(const MeasuredText& measured, const LineWidth& lineWidth);
 
     // Called by computerBreaksGreedyPartial() on all candidates to determine if the line should
     // be broken at the candidate
-    void considerGreedyBreakCandidate(size_t candIndex, const LineWidth& lineWidth);
+    void considerGreedyBreakCandidate(const MeasuredText& measured, size_t candIndex,
+                                      const LineWidth& lineWidth);
 
     // Adds a greedy break to list of line breaks.
-    void addGreedyBreak(size_t breakIndex);
+    void addGreedyBreak(const MeasuredText& measured, size_t breakIndex);
 
     // Push an actual break to the output. Takes care of setting flags for tab, etc.
     void pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit);
 
-    void addDesperateBreaksGreedy(ParaWidth existingPreBreak, size_t start, size_t end,
-                                  const LineWidth& lineWidth);
+    void addDesperateBreaksGreedy(const MeasuredText& measured, ParaWidth existingPreBreak,
+                                  size_t start, size_t end, const LineWidth& lineWidth);
 
     bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang,
                            const LineWidth& lineWidth) const;
@@ -322,12 +265,13 @@ private:
     // Types, methods, and fields related to the optimal algorithm
     //
 
-    void computeBreaksOptimal(const LineWidth& lineWidth);
+    void computeBreaksOptimal(const MeasuredText& measured, const LineWidth& lineWidth);
 
-    void addDesperateBreaksOptimal(std::vector<Candidate>* out, ParaWidth existingPreBreak,
-                                   size_t postSpaceCount, bool isRtl, size_t start, size_t end);
+    void addDesperateBreaksOptimal(const MeasuredText& measured, std::vector<Candidate>* out,
+                                   ParaWidth existingPreBreak, size_t postSpaceCount, bool isRtl,
+                                   size_t start, size_t end);
 
-    void addAllDesperateBreaksOptimal(const LineWidth& lineWidth);
+    void addAllDesperateBreaksOptimal(const MeasuredText& measuredText, const LineWidth& lineWidth);
 
     // Data used to compute optimal line breaks
     struct OptimalBreaksData {
@@ -335,9 +279,10 @@ private:
         size_t prev;        // index to previous break
         size_t lineNumber;  // the computed line number of the candidate
     };
-    void finishBreaksOptimal(const std::vector<OptimalBreaksData>& breaksData);
+    void finishBreaksOptimal(const MeasuredText& measured,
+                             const std::vector<OptimalBreaksData>& breaksData);
 
-    float getSpaceWidth() const;
+    float getSpaceWidth(const MeasuredText& measured) const;
 
     float mLinePenalty = 0.0f;
     size_t mSpaceCount;  // Number of word spaces seen in the input text

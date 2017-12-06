@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "minikin/AndroidLineBreakerHelper.h"
+#include "minikin/MeasuredText.h"
 
 #include <gtest/gtest.h>
 
@@ -31,38 +31,31 @@ constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 f
 constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
 constexpr const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";
 
-typedef ICUTestBase AndroidLineBreakerHelperTest;
+typedef ICUTestBase MeasuredTextTest;
 
-TEST_F(AndroidLineBreakerHelperTest, RunTests) {
+TEST_F(MeasuredTextTest, RunTests) {
     constexpr uint32_t CHAR_COUNT = 6;
     constexpr float REPLACEMENT_WIDTH = 20.0f;
-    constexpr float LINE_WIDTH = 1024 * 1024;  // enough space to be one line.
     std::shared_ptr<FontCollection> collection =
             getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
 
-    StaticLayoutNative layoutNative(BreakStrategy::Greedy,       // break strategy
-                                    HyphenationFrequency::None,  // hyphenation frequency
-                                    false,                       // not justified
-                                    std::vector<float>(),        // indents
-                                    std::vector<float>(),        // left padding
-                                    std::vector<float>());       // right padding
+    MeasuredTextBuilder builder;
 
-    layoutNative.addStyleRun(0, 2, MinikinPaint(), collection, false /* is RTL */);
-    layoutNative.addReplacementRun(2, 4, REPLACEMENT_WIDTH, 0 /* locale list id */);
-    layoutNative.addStyleRun(4, 6, MinikinPaint(), collection, false /* is RTL */);
+    builder.addStyleRun(0, 2, MinikinPaint(), collection, false /* is RTL */);
+    builder.addReplacementRun(2, 4, REPLACEMENT_WIDTH, 0 /* locale list id */);
+    builder.addStyleRun(4, 6, MinikinPaint(), collection, false /* is RTL */);
 
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
-    MeasuredText measuredText = layoutNative.measureText(text);
-    LineBreakResult result = layoutNative.computeBreaks(text, measuredText, LINE_WIDTH, 1,
-                                                        LINE_WIDTH, 0,   // line width arguments,
-                                                        nullptr, 0, 0);  // tab stop arguments.
+    std::unique_ptr<MeasuredText> measuredText = builder.build(text);
+
+    ASSERT_TRUE(measuredText);
 
     // ReplacementRun assigns all width to the first character and leave zeros others.
     std::vector<float> expectedWidths = {CHAR_WIDTH, CHAR_WIDTH, REPLACEMENT_WIDTH,
                                          0,          CHAR_WIDTH, CHAR_WIDTH};
 
-    EXPECT_EQ(expectedWidths, measuredText.widths);
+    EXPECT_EQ(expectedWidths, measuredText->widths);
 }
 
 }  // namespace android
