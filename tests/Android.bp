@@ -1,8 +1,10 @@
 filegroup {
     name: "minikin-test-data",
     srcs: [
+        "data/Arabic.ttf",
         "data/Bold.ttf",
         "data/BoldItalic.ttf",
+        "data/Cherokee.ttf",
         "data/ColorEmojiFont.ttf",
         "data/ColorTextMixedEmojiFont.ttf",
         "data/Emoji.ttf",

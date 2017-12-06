@@ -61,10 +61,38 @@ const size_t MAX_TEXT_BUF_RETAIN = 32678;
 // Maximum amount that spaces can shrink, in justified text.
 const float SHRINKABILITY = 1.0 / 3.0;
 
-void LineBreaker::setLocale(const icu::Locale& locale, Hyphenator* hyphenator) {
-    mWordBreaker.setLocale(locale);
-    mLocale = locale;
-    mHyphenator = hyphenator;
+void LineBreaker::setLocales(const char* locales, const std::vector<Hyphenator*>& hyphenators) {
+    bool goodLocaleFound = false;
+    const ssize_t numLocales = hyphenators.size();
+    // For now, we ignore all locales except the first valid one.
+    // TODO: Support selecting the locale based on the script of the text.
+    const char* localeStart = locales;
+    for (ssize_t i = 0; i < numLocales - 1; i++) { // Loop over all locales, except the last one.
+        const char* localeEnd = strchr(localeStart, ',');
+        const size_t localeNameLength = localeEnd - localeStart;
+        char localeName[localeNameLength + 1];
+        strncpy(localeName, localeStart, localeNameLength);
+        localeName[localeNameLength] = '\0';
+        mLocale = icu::Locale::createFromName(localeName);
+        goodLocaleFound = !mLocale.isBogus();
+        if (goodLocaleFound) {
+            mHyphenator = hyphenators[i];
+            break;
+        } else {
+            localeStart = localeEnd + 1;
+        }
+    }
+    if (!goodLocaleFound) { // Try the last locale.
+        mLocale = icu::Locale::createFromName(localeStart);
+        if (mLocale.isBogus()) {
+            // No good locale.
+            mLocale = icu::Locale::getRoot();
+            mHyphenator = nullptr;
+        } else {
+            mHyphenator = numLocales == 0 ? nullptr : hyphenators[numLocales - 1];
+        }
+    }
+    mWordBreaker.setLocale(mLocale);
 }
 
 void LineBreaker::setText() {
