@@ -39,7 +39,7 @@ cc_library {
                 "HyphenatorMap.cpp",
                 "Layout.cpp",
                 "LayoutUtils.cpp",
-                "LineBreaker.cpp",
+                "LineBreakerImpl.cpp",
                 "Locale.cpp",
                 "LocaleListCache.cpp",
                 "MeasuredText.cpp",

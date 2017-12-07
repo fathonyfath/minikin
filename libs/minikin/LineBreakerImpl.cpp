@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "minikin/LineBreaker.h"
+#include "LineBreakerImpl.h"
 
 #include <algorithm>
 #include <limits>
@@ -66,13 +66,14 @@ inline static const LocaleList& getLocaleList(uint32_t localeListId) {
     return LocaleListCache::getById(localeListId);
 }
 
-LineBreaker::LineBreaker(const U16StringPiece& textBuffer, BreakStrategy strategy,
-                         HyphenationFrequency frequency, bool justified)
-        : LineBreaker(std::make_unique<WordBreaker>(), textBuffer, strategy, frequency, justified) {
-}
+LineBreakerImpl::LineBreakerImpl(const U16StringPiece& textBuffer, BreakStrategy strategy,
+                                 HyphenationFrequency frequency, bool justified)
+        : LineBreakerImpl(std::make_unique<WordBreaker>(), textBuffer, strategy, frequency,
+                          justified) {}
 
-LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16StringPiece& textBuffer,
-                         BreakStrategy strategy, HyphenationFrequency frequency, bool justified)
+LineBreakerImpl::LineBreakerImpl(std::unique_ptr<WordBreaker>&& breaker,
+                                 const U16StringPiece& textBuffer, BreakStrategy strategy,
+                                 HyphenationFrequency frequency, bool justified)
         : mCurrentLocaleListId(LocaleListCache::kInvalidListId),
           mWordBreaker(std::move(breaker)),
           mTextBuf(textBuffer),
@@ -91,9 +92,9 @@ LineBreaker::LineBreaker(std::unique_ptr<WordBreaker>&& breaker, const U16String
                            false /* isRtl. TODO: may need to be based on input. */});
 }
 
-LineBreaker::~LineBreaker() {}
+LineBreakerImpl::~LineBreakerImpl() {}
 
-const LineBreaker::Candidate& LineBreaker::getLastBreakCandidate() const {
+const LineBreakerImpl::Candidate& LineBreakerImpl::getLastBreakCandidate() const {
     MINIKIN_ASSERT(mLastGreedyBreakIndex != LAST_BREAK_OFFSET_NOWHERE,
                    "Line break hasn't started.");
     return mLastGreedyBreakIndex == LAST_BREAK_OFFSET_DESPERATE
@@ -101,7 +102,7 @@ const LineBreaker::Candidate& LineBreaker::getLastBreakCandidate() const {
                    : mCandidates[mLastGreedyBreakIndex];
 }
 
-void LineBreaker::setLocaleList(uint32_t localeListId, size_t restartFrom) {
+void LineBreakerImpl::setLocaleList(uint32_t localeListId, size_t restartFrom) {
     if (mCurrentLocaleListId == localeListId) {
         return;
     }
@@ -142,7 +143,7 @@ static bool isLineEndSpace(uint16_t c) {
 }
 
 // Hyphenates a string potentially containing non-breaking spaces.
-std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
+std::vector<HyphenationType> LineBreakerImpl::hyphenate(const U16StringPiece& str) {
     std::vector<HyphenationType> out;
     const size_t len = str.size();
     out.reserve(len);
@@ -183,7 +184,7 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
 
 // Compute the total overhang of text based on per-cluster advances and overhangs.
 // The two input vectors are expected to be of the same size.
-/* static */ LayoutOverhang LineBreaker::computeOverhang(
+/* static */ LayoutOverhang LineBreakerImpl::computeOverhang(
         float totalAdvance, const std::vector<float>& advances,
         const std::vector<LayoutOverhang>& overhangs, bool isRtl) {
     ParaWidth left = 0.0;
@@ -224,10 +225,10 @@ std::vector<HyphenationType> LineBreaker::hyphenate(const U16StringPiece& str) {
 // postSpaceCount is the number of spaces that would be seen if we decide to break at the end of the
 //     word (and like postBreak it doesn't count any line-ending space after the word).
 // hyphenPenalty is the amount of penalty for hyphenation.
-void LineBreaker::addHyphenationCandidates(const Run& run, const Range& contextRange,
-                                           const Range& wordRange, ParaWidth lastBreakWidth,
-                                           ParaWidth postBreak, size_t postSpaceCount,
-                                           float hyphenPenalty) {
+void LineBreakerImpl::addHyphenationCandidates(const Run& run, const Range& contextRange,
+                                               const Range& wordRange, ParaWidth lastBreakWidth,
+                                               ParaWidth postBreak, size_t postSpaceCount,
+                                               float hyphenPenalty) {
     MINIKIN_ASSERT(contextRange.contains(wordRange), "Context must contain word range");
 
     const bool isRtlWord = run.isRtl();
@@ -281,8 +282,8 @@ void LineBreaker::addHyphenationCandidates(const Run& run, const Range& contextR
 
 // This method finds the candidate word breaks (using the ICU break iterator) and sends them
 // to addWordBreak.
-void LineBreaker::addRuns(const MeasuredText& measured, const LineWidth& lineWidth,
-                          const TabStops& tabStops) {
+void LineBreakerImpl::addRuns(const MeasuredText& measured, const LineWidth& lineWidth,
+                              const TabStops& tabStops) {
     for (const auto& run : measured.runs) {
         const bool isRtl = run->isRtl();
         const Range& range = run->getRange();
@@ -405,8 +406,9 @@ void LineBreaker::addRuns(const MeasuredText& measured, const LineWidth& lineWid
 // Add desperate breaks for the greedy algorithm.
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
 // are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
-void LineBreaker::addDesperateBreaksGreedy(const MeasuredText& measured, ParaWidth existingPreBreak,
-                                           size_t start, size_t end, const LineWidth& lineWidth) {
+void LineBreakerImpl::addDesperateBreaksGreedy(const MeasuredText& measured,
+                                               ParaWidth existingPreBreak, size_t start, size_t end,
+                                               const LineWidth& lineWidth) {
     ParaWidth width = measured.widths[start];
     for (size_t i = start + 1; i < end; i++) {
         const float w = measured.widths[i];
@@ -436,16 +438,16 @@ void LineBreaker::addDesperateBreaksGreedy(const MeasuredText& measured, ParaWid
 }
 
 // Add a word break (possibly for a hyphenated fragment).
-inline void LineBreaker::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
-                                      float firstOverhang, float secondOverhang,
-                                      size_t preSpaceCount, size_t postSpaceCount, float penalty,
-                                      HyphenationType hyph, bool isRtl) {
+inline void LineBreakerImpl::addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak,
+                                          float firstOverhang, float secondOverhang,
+                                          size_t preSpaceCount, size_t postSpaceCount,
+                                          float penalty, HyphenationType hyph, bool isRtl) {
     mCandidates.push_back({offset, preBreak, postBreak, firstOverhang, secondOverhang, penalty,
                            preSpaceCount, postSpaceCount, hyph, isRtl});
 }
 
 // Go back and adjust earlier line breaks if needed.
-void LineBreaker::adjustSecondOverhang(float secondOverhang) {
+void LineBreakerImpl::adjustSecondOverhang(float secondOverhang) {
     const size_t lastCand = mCandidates.size() - 1;
     const ParaWidth lastPreBreak = mCandidates[lastCand].preBreak;
     for (ssize_t i = lastCand; i >= 0; i--) {
@@ -463,8 +465,8 @@ void LineBreaker::adjustSecondOverhang(float secondOverhang) {
 
 // Find the needed extent between the start and end ranges. start is inclusive and end is exclusive.
 // Both are indices of the source string.
-MinikinExtent LineBreaker::computeMaxExtent(const MeasuredText& measured, size_t start,
-                                            size_t end) const {
+MinikinExtent LineBreakerImpl::computeMaxExtent(const MeasuredText& measured, size_t start,
+                                                size_t end) const {
     MinikinExtent res = {0.0, 0.0, 0.0};
     for (size_t j = start; j < end; j++) {
         res.extendBy(measured.extents[j]);
@@ -472,7 +474,7 @@ MinikinExtent LineBreaker::computeMaxExtent(const MeasuredText& measured, size_t
     return res;
 }
 
-void LineBreaker::addGreedyBreak(const MeasuredText& measured, size_t breakIndex) {
+void LineBreakerImpl::addGreedyBreak(const MeasuredText& measured, size_t breakIndex) {
     const Candidate& candidate = mCandidates[breakIndex];
     const Candidate& lastGreedyBreak = getLastBreakCandidate();
     pushBreak(candidate.offset, candidate.postBreak - lastGreedyBreak.preBreak,
@@ -483,8 +485,8 @@ void LineBreaker::addGreedyBreak(const MeasuredText& measured, size_t breakIndex
 }
 
 // Also add desperate breaks if needed (ie when word exceeds current line width).
-void LineBreaker::considerGreedyBreakCandidate(const MeasuredText& measured, size_t candIndex,
-                                               const LineWidth& lineWidth) {
+void LineBreakerImpl::considerGreedyBreakCandidate(const MeasuredText& measured, size_t candIndex,
+                                                   const LineWidth& lineWidth) {
     const Candidate* cand = &mCandidates[candIndex];
     const Candidate* lastGreedyBreak = &getLastBreakCandidate();
     float leftOverhang, rightOverhang;
@@ -527,7 +529,8 @@ void LineBreaker::considerGreedyBreakCandidate(const MeasuredText& measured, siz
     insertGreedyBreakCandidate(candIndex, cand->penalty);
 }
 
-void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit) {
+void LineBreakerImpl::pushBreak(int offset, float width, MinikinExtent extent,
+                                HyphenEdit hyphenEdit) {
     mBreaks.push_back(offset);
     mWidths.push_back(width);
     mAscents.push_back(extent.ascent);
@@ -537,8 +540,8 @@ void LineBreaker::pushBreak(int offset, float width, MinikinExtent extent, Hyphe
     mFirstTabIndex = INT_MAX;
 }
 
-LineBreaker::ParaWidth LineBreaker::computeBreaksGreedyPartial(const MeasuredText& measured,
-                                                               const LineWidth& lineWidth) {
+LineBreakerImpl::ParaWidth LineBreakerImpl::computeBreaksGreedyPartial(const MeasuredText& measured,
+                                                                       const LineWidth& lineWidth) {
     size_t firstCandidate;
     if (mLastConsideredGreedyCandidate == SIZE_MAX) {
         // Clear results and reset greedy line breaker state if we are here for the first time.
@@ -562,7 +565,7 @@ LineBreaker::ParaWidth LineBreaker::computeBreaksGreedyPartial(const MeasuredTex
 // Get the width of a space. May return 0 if there are no spaces.
 // Note: if there are multiple different widths for spaces (for example, because of mixing of
 // fonts), it's only guaranteed to pick one.
-float LineBreaker::getSpaceWidth(const MeasuredText& measured) const {
+float LineBreakerImpl::getSpaceWidth(const MeasuredText& measured) const {
     for (size_t i = 0; i < mTextBuf.size(); i++) {
         if (isWordSpace(mTextBuf[i])) {
             return measured.widths[i];
@@ -571,8 +574,8 @@ float LineBreaker::getSpaceWidth(const MeasuredText& measured) const {
     return 0.0f;
 }
 
-bool LineBreaker::fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang,
-                                    const LineWidth& lineWidth) const {
+bool LineBreakerImpl::fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang,
+                                        const LineWidth& lineWidth) const {
     const size_t lineNo = mBreaks.size();
     const float availableWidth = lineWidth.getAt(lineNo);
     const float availableLeftPadding = lineWidth.getLeftPaddingAt(lineNo);
@@ -582,7 +585,8 @@ bool LineBreaker::fitsOnCurrentLine(float width, float leftOverhang, float right
     return width + remainingLeftOverhang + remainingRightOverhang <= availableWidth;
 }
 
-void LineBreaker::computeBreaksGreedy(const MeasuredText& measured, const LineWidth& lineWidth) {
+void LineBreakerImpl::computeBreaksGreedy(const MeasuredText& measured,
+                                          const LineWidth& lineWidth) {
     computeBreaksGreedyPartial(measured, lineWidth);
     // All breaks but the last have been added by computeBreaksGreedyPartial() already.
     const Candidate* lastCandidate = &mCandidates.back();
@@ -599,10 +603,10 @@ void LineBreaker::computeBreaksGreedy(const MeasuredText& measured, const LineWi
 // Add desperate breaks for the optimal algorithm.
 // Note: these breaks are based on the shaping of the (non-broken) original text; they
 // are imprecise especially in the presence of kerning, ligatures, overhangs, and Arabic shaping.
-void LineBreaker::addDesperateBreaksOptimal(const MeasuredText& measured,
-                                            std::vector<Candidate>* out, ParaWidth existingPreBreak,
-                                            size_t postSpaceCount, bool isRtl, size_t start,
-                                            size_t end) {
+void LineBreakerImpl::addDesperateBreaksOptimal(const MeasuredText& measured,
+                                                std::vector<Candidate>* out,
+                                                ParaWidth existingPreBreak, size_t postSpaceCount,
+                                                bool isRtl, size_t start, size_t end) {
     ParaWidth width = existingPreBreak + measured.widths[start];
     for (size_t i = start + 1; i < end; i++) {
         const float w = measured.widths[i];
@@ -619,8 +623,8 @@ void LineBreaker::addDesperateBreaksOptimal(const MeasuredText& measured,
     }
 }
 
-void LineBreaker::addAllDesperateBreaksOptimal(const MeasuredText& measured,
-                                               const LineWidth& lineWidth) {
+void LineBreakerImpl::addAllDesperateBreaksOptimal(const MeasuredText& measured,
+                                                   const LineWidth& lineWidth) {
     const ParaWidth minLineWidth = lineWidth.getMin();
     size_t firstDesperateIndex = 0;
     const size_t nCand = mCandidates.size();
@@ -664,8 +668,8 @@ void LineBreaker::addAllDesperateBreaksOptimal(const MeasuredText& measured,
 }
 
 // Follow "prev" links in mCandidates array, and copy to result arrays.
-void LineBreaker::finishBreaksOptimal(const MeasuredText& measured,
-                                      const std::vector<OptimalBreaksData>& breaksData) {
+void LineBreakerImpl::finishBreaksOptimal(const MeasuredText& measured,
+                                          const std::vector<OptimalBreaksData>& breaksData) {
     // clear output vectors.
     clearResults();
 
@@ -691,7 +695,8 @@ void LineBreaker::finishBreaksOptimal(const MeasuredText& measured,
     std::reverse(mFlags.begin(), mFlags.end());
 }
 
-void LineBreaker::computeBreaksOptimal(const MeasuredText& measured, const LineWidth& lineWidth) {
+void LineBreakerImpl::computeBreaksOptimal(const MeasuredText& measured,
+                                           const LineWidth& lineWidth) {
     size_t active = 0;
     const size_t nCand = mCandidates.size();
     const float maxShrink = mJustified ? SHRINKABILITY * getSpaceWidth(measured) : 0.0f;
@@ -771,8 +776,9 @@ void LineBreaker::computeBreaksOptimal(const MeasuredText& measured, const LineW
     finishBreaksOptimal(measured, breaksData);
 }
 
-LineBreakResult LineBreaker::computeBreaks(const MeasuredText& measured, const LineWidth& lineWidth,
-                                           const TabStops& tabStops) {
+LineBreakResult LineBreakerImpl::computeBreaks(const MeasuredText& measured,
+                                               const LineWidth& lineWidth,
+                                               const TabStops& tabStops) {
     addRuns(measured, lineWidth, tabStops);
 
     if (mStrategy == BreakStrategy::Greedy) {
@@ -790,13 +796,13 @@ LineBreakResult LineBreaker::computeBreaks(const MeasuredText& measured, const L
     return result;
 }
 
-size_t LineBreaker::popBestGreedyBreak() {
+size_t LineBreakerImpl::popBestGreedyBreak() {
     const size_t bestBreak = mBestGreedyBreaks.front().index;
     mBestGreedyBreaks.pop_front();
     return bestBreak;
 }
 
-void LineBreaker::insertGreedyBreakCandidate(size_t index, float penalty) {
+void LineBreakerImpl::insertGreedyBreakCandidate(size_t index, float penalty) {
     GreedyBreak gBreak = {index, penalty};
     if (!mBestGreedyBreaks.empty()) {
         // Find the location in the queue where the penalty is <= the current penalty, and drop the
@@ -810,6 +816,14 @@ void LineBreaker::insertGreedyBreakCandidate(size_t index, float penalty) {
         }
     }
     mBestGreedyBreaks.push_back(gBreak);
+}
+
+LineBreakResult breakIntoLines(const U16StringPiece& textBuffer, BreakStrategy strategy,
+                               HyphenationFrequency frequency, bool justified,
+                               const MeasuredText& measuredText, const LineWidth& lineWidth,
+                               const TabStops& tabStops) {
+    LineBreakerImpl impl(textBuffer, strategy, frequency, justified);
+    return impl.computeBreaks(measuredText, lineWidth, tabStops);
 }
 
 }  // namespace minikin
