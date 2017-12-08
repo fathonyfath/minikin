@@ -49,6 +49,7 @@ cc_test {
         "HyphenatorMapTest.cpp",
         "HyphenatorTest.cpp",
         "GraphemeBreakTests.cpp",
+        "GreedyLineBreakerTest.cpp",
         "LayoutTest.cpp",
         "LayoutUtilsTest.cpp",
         "LineBreakerTest.cpp",

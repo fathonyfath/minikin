@@ -90,9 +90,6 @@ private:
     uint32_t mCurrentLocaleListId;
     uint64_t mCurrentLocaleId = 0;
 
-    // Hyphenates a string potentially containing non-breaking spaces.
-    std::vector<HyphenationType> hyphenate(const U16StringPiece& string);
-
     void addHyphenationCandidates(const Run& run, const Range& contextRange, const Range& wordRange,
                                   ParaWidth lastBreakWidth, ParaWidth PostBreak,
                                   size_t postSpaceCount, float hyphenPenalty);
