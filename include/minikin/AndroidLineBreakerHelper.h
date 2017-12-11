@@ -90,7 +90,7 @@ public:
               mLeftPaddings(std::move(leftPaddings)),
               mRightPaddings(std::move(rightPaddings)) {}
 
-    LineBreakResult computeBreaks(const U16StringPiece& text, const MeasuredText& measuredText,
+    LineBreakResult computeBreaks(const U16StringPiece& textBuf, const MeasuredText& measuredText,
                                   // Line width arguments
                                   float firstWidth, int32_t firstWidthLineCount, float restWidth,
                                   int32_t indentsOffset,
@@ -99,9 +99,8 @@ public:
                                   int32_t defaultTabStopWidth) const {
         AndroidLineWidth lineWidth(firstWidth, firstWidthLineCount, restWidth, mIndents,
                                    mLeftPaddings, mRightPaddings, indentsOffset);
-        LineBreaker lineBreaker(text, mStrategy, mFrequency, mIsJustified);
-        return lineBreaker.computeBreaks(measuredText, lineWidth,
-                                         TabStops(tabStops, tabStopSize, defaultTabStopWidth));
+        return breakIntoLines(textBuf, mStrategy, mFrequency, mIsJustified, measuredText, lineWidth,
+                              TabStops(tabStops, tabStopSize, defaultTabStopWidth));
     }
 
     inline BreakStrategy getStrategy() const { return mStrategy; }

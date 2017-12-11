@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "minikin/LineBreaker.h"
-
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -28,6 +26,7 @@
 
 #include "FontTestUtils.h"
 #include "ICUTestBase.h"
+#include "LineBreakerImpl.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
 #include "UnicodeUtils.h"
@@ -201,12 +200,12 @@ public:
     TestableWordBreaker(ICULineBreakerPool* pool) : WordBreaker(pool) {}
 };
 
-class TestableLineBreaker : public LineBreaker {
+class TestableLineBreaker : public LineBreakerImpl {
 public:
     TestableLineBreaker(ICULineBreakerPool* pool, const U16StringPiece& string)
-            : LineBreaker(std::make_unique<TestableWordBreaker>(pool), string,
-                          BreakStrategy::Greedy, HyphenationFrequency::None,
-                          false /* justified */) {}
+            : LineBreakerImpl(std::make_unique<TestableWordBreaker>(pool), string,
+                              BreakStrategy::Greedy, HyphenationFrequency::None,
+                              false /* justified */) {}
 };
 
 class RectangleLineWidthDelegate : public LineWidth {
