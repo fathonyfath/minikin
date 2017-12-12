@@ -155,18 +155,11 @@ std::vector<HyphenationType> LineBreakerImpl::hyphenate(const U16StringPiece& st
         if (i == len || str[i] == CHAR_NBSP) {
             if (inWord) {
                 // A word just ended. Hyphenate it.
-                const size_t wordLen = i - wordStart;
-                if (wordLen <= LONGEST_HYPHENATED_WORD) {
-                    if (wordStart == 0) {
-                        // The string starts with a word. Use out directly.
-                        mHyphenator->hyphenate(&out, str.data(), wordLen);
-                    } else {
-                        std::vector<HyphenationType> wordVec;
-                        mHyphenator->hyphenate(&wordVec, str.data() + wordStart, wordLen);
-                        out.insert(out.end(), wordVec.cbegin(), wordVec.cend());
-                    }
+                const U16StringPiece word = str.substr(Range(wordStart, i));
+                if (word.size() <= LONGEST_HYPHENATED_WORD) {
+                    mHyphenator->hyphenate(word, out.data() + wordStart);
                 } else {  // Word is too long. Inefficient to hyphenate.
-                    out.insert(out.end(), wordLen, HyphenationType::DONT_BREAK);
+                    out.insert(out.end(), word.size(), HyphenationType::DONT_BREAK);
                 }
                 inWord = false;
             }

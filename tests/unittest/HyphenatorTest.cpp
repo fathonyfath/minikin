@@ -49,7 +49,7 @@ TEST(HyphenatorTest, usEnglishAutomaticHyphenation) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(patternData.data(), 2, 3, "en");
     const uint16_t word[] = {'t', 'a', 'b', 'l', 'e'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)5, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -63,7 +63,7 @@ TEST(HyphenatorTest, catalanMiddleDot) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "ca");
     const uint16_t word[] = {'l', 'l', MIDDLE_DOT, 'l', 'l'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)5, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -77,7 +77,7 @@ TEST(HyphenatorTest, catalanMiddleDotShortWord) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "ca");
     const uint16_t word[] = {'l', MIDDLE_DOT, 'l'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -89,7 +89,7 @@ TEST(HyphenatorTest, polishHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "pl");
     const uint16_t word[] = {'x', HYPHEN, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -101,7 +101,7 @@ TEST(HyphenatorTest, polishHyphenButNonLatinWord) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "pl");
     const uint16_t word[] = {GREEK_LOWER_ALPHA, HYPHEN, GREEK_LOWER_ALPHA};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -114,7 +114,7 @@ TEST(HyphenatorTest, polishEnDash) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "pl");
     const uint16_t word[] = {'x', EN_DASH, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -127,7 +127,7 @@ TEST(HyphenatorTest, slovenianHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "sl");
     const uint16_t word[] = {'x', HYPHEN, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -139,7 +139,7 @@ TEST(HyphenatorTest, latinSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {'x', SOFT_HYPHEN, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -151,7 +151,7 @@ TEST(HyphenatorTest, latinSoftHyphenStartingTheWord) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {SOFT_HYPHEN, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)2, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -162,7 +162,7 @@ TEST(HyphenatorTest, malayalamSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {MALAYALAM_KA, SOFT_HYPHEN, MALAYALAM_KA};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -175,7 +175,7 @@ TEST(HyphenatorTest, malayalamAutomaticHyphenation) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(patternData.data(), 2, 2, "en");
     const uint16_t word[] = {MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)5, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -189,7 +189,7 @@ TEST(HyphenatorTest, aremenianSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARMENIAN_AYB, SOFT_HYPHEN, ARMENIAN_AYB};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -202,7 +202,7 @@ TEST(HyphenatorTest, hebrewSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {HEBREW_ALEF, SOFT_HYPHEN, HEBREW_ALEF};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -215,7 +215,7 @@ TEST(HyphenatorTest, arabicSoftHyphenConnecting) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARABIC_BEH, SOFT_HYPHEN, ARABIC_BEH};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -228,7 +228,7 @@ TEST(HyphenatorTest, arabicSoftHyphenNonConnecting) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARABIC_ALEF, SOFT_HYPHEN, ARABIC_BEH};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -240,7 +240,7 @@ TEST(HyphenatorTest, arabicSoftHyphenSkipTransparents) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARABIC_BEH, ARABIC_ZWARAKAY, SOFT_HYPHEN, ARABIC_ZWARAKAY, ARABIC_BEH};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)5, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -255,7 +255,7 @@ TEST(HyphenatorTest, arabicSoftHyphenTransparentsAtEnd) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARABIC_BEH, ARABIC_ZWARAKAY, SOFT_HYPHEN, ARABIC_ZWARAKAY};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)4, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -269,7 +269,7 @@ TEST(HyphenatorTest, arabicSoftHyphenTransparentsAtStart) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {ARABIC_ZWARAKAY, SOFT_HYPHEN, ARABIC_ZWARAKAY, ARABIC_BEH};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)4, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -282,7 +282,7 @@ TEST(HyphenatorTest, ucasSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {UCAS_E, SOFT_HYPHEN, UCAS_E};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -295,7 +295,7 @@ TEST(HyphenatorTest, mixedScriptSoftHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {'a', SOFT_HYPHEN, UCAS_E};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -307,7 +307,7 @@ TEST(HyphenatorTest, hardHyphen) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {'x', HYPHEN, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -319,7 +319,7 @@ TEST(HyphenatorTest, hyphenMinus) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {'x', HYPHEN_MINUS, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)3, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);
@@ -332,7 +332,7 @@ TEST(HyphenatorTest, startingHyphenMinus) {
     Hyphenator* hyphenator = Hyphenator::loadBinary(nullptr, 2, 2, "en");
     const uint16_t word[] = {HYPHEN_MINUS, 'y'};
     std::vector<HyphenationType> result;
-    hyphenator->hyphenate(&result, word, NELEM(word));
+    hyphenator->hyphenate(word, &result);
     EXPECT_EQ((size_t)2, result.size());
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[0]);
     EXPECT_EQ(HyphenationType::DONT_BREAK, result[1]);

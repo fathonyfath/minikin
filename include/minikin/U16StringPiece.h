@@ -29,6 +29,8 @@ public:
     U16StringPiece(const uint16_t* data, uint32_t length) : mData(data), mLength(length) {}
     U16StringPiece(const std::vector<uint16_t>& v)  // Intentionally not explicit.
             : mData(v.data()), mLength(static_cast<uint32_t>(v.size())) {}
+    template <uint32_t length>
+    U16StringPiece(uint16_t const (&data)[length]) : mData(data), mLength(length) {}
 
     U16StringPiece(const U16StringPiece&) = default;
     U16StringPiece& operator=(const U16StringPiece&) = default;

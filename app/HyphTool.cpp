@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
         // ASCII (or possibly ISO Latin 1), but kinda painful to do utf conversion :(
         word.push_back(c);
     }
-    hyph->hyphenate(&result, word.data(), word.size());
+    hyph->hyphenate(word, &result);
     for (size_t i = 0; i < len; i++) {
         if (result[i] != HyphenationType::DONT_BREAK) {
             printf("-");

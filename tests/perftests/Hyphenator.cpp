@@ -32,7 +32,7 @@ static void BM_Hyphenator_short_word(benchmark::State& state) {
     std::vector<uint16_t> word = utf8ToUtf16("hyphen");
     std::vector<HyphenationType> result;
     while (state.KeepRunning()) {
-        hyphenator->hyphenate(&result, word.data(), word.size());
+        hyphenator->hyphenate(word, &result);
     }
 }
 
@@ -45,7 +45,7 @@ static void BM_Hyphenator_long_word(benchmark::State& state) {
     std::vector<uint16_t> word = utf8ToUtf16("Pneumonoultramicroscopicsilicovolcanoconiosis");
     std::vector<HyphenationType> result;
     while (state.KeepRunning()) {
-        hyphenator->hyphenate(&result, word.data(), word.size());
+        hyphenator->hyphenate(word, &result);
     }
 }
 

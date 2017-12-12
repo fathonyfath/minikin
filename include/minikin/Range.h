@@ -17,16 +17,23 @@
 #ifndef MINIKIN_RANGE_H
 #define MINIKIN_RANGE_H
 
+#include <limits>
+
 namespace minikin {
 
 // An undirected range.
 class Range {
 public:
+    static constexpr uint32_t NOWHERE = std::numeric_limits<uint32_t>::max();
+
     // start must be smaller than or equal to end otherwise the behavior is undefined.
     Range(uint32_t start, uint32_t end) : mStart(start), mEnd(end) {}
 
     Range(const Range&) = default;
     Range& operator=(const Range&) = default;
+
+    static Range invalidRange() { return Range(NOWHERE, NOWHERE); }
+    inline bool isValid() const { return mStart != NOWHERE && mEnd != NOWHERE; }
 
     inline uint32_t getStart() const { return mStart; }       // inclusive
     inline void setStart(uint32_t start) { mStart = start; }  // inclusive
@@ -57,6 +64,18 @@ public:
     //   range.contains(1);  // true
     //   range.contains(2);  // false
     inline bool contains(uint32_t pos) const { return mStart <= pos && pos < mEnd; }
+
+    // Returns true if left and right intersect.
+    inline static bool intersects(const Range& left, const Range& right) {
+        return left.isValid() && right.isValid() && left.mStart < right.mEnd &&
+               right.mStart < left.mEnd;
+    }
+
+    // Returns merged range. This method assumes left and right are not invalid ranges and they have
+    // an intersection.
+    static Range merge(const Range& left, const Range& right) {
+        return Range({std::min(left.mStart, right.mStart), std::max(left.mEnd, right.mEnd)});
+    }
 
 private:
     // Helper class for "for (uint32_t i : range)" style for-loop.
