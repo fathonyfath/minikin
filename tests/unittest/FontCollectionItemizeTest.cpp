@@ -467,7 +467,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     ASSERT_EQ(1U, runs.size());
     EXPECT_EQ(0, runs[0].start);
     EXPECT_EQ(3, runs[0].end);
-    EXPECT_EQ(kJAFont, getFontPath(runs[1]));
+    EXPECT_EQ(kJAFont, getFontPath(runs[0]));
 
     // No font supports U+242EE U+FE0E.
     itemize(collection, "U+4FAE U+FE0E", "zh-Hans", &runs);
