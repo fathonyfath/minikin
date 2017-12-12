@@ -20,15 +20,11 @@
 
 #include "minikin/LocaleList.h"
 
-#include "ICUTestBase.h"
 #include "LocaleListCache.h"
 #include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
-
-typedef ICUTestBase LocaleListTest;
-typedef ICUTestBase LocaleTest;
 
 static const LocaleList& createLocaleList(const std::string& input) {
     android::AutoMutex _l(gMinikinLock);
@@ -51,7 +47,7 @@ std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
     return std::make_shared<FontFamily>(std::vector<Font>({Font(font, FontStyle())}));
 }
 
-TEST_F(LocaleTest, basicTests) {
+TEST(LocaleTest, basicTests) {
     Locale defaultLocale;
     Locale emptyLocale("");
     Locale english = createLocale("en");
@@ -84,7 +80,7 @@ TEST_F(LocaleTest, basicTests) {
     EXPECT_FALSE(undZsye.isUnsupported());
 }
 
-TEST_F(LocaleTest, getStringTest) {
+TEST(LocaleTest, getStringTest) {
     EXPECT_EQ("en-Latn-US", createLocale("en").getString());
     EXPECT_EQ("en-Latn-US", createLocale("en-Latn").getString());
 
@@ -126,7 +122,7 @@ TEST_F(LocaleTest, getStringTest) {
     EXPECT_EQ("en-Latn-US", createLocale("und-Abcdefgh").getString());
 }
 
-TEST_F(LocaleTest, testReconstruction) {
+TEST(LocaleTest, testReconstruction) {
     EXPECT_EQ("en", createLocaleWithoutICUSanitization("en").getString());
     EXPECT_EQ("fil", createLocaleWithoutICUSanitization("fil").getString());
     EXPECT_EQ("und", createLocaleWithoutICUSanitization("und").getString());
@@ -154,7 +150,7 @@ TEST_F(LocaleTest, testReconstruction) {
     EXPECT_EQ("zzz-Zzzz-999", createLocaleWithoutICUSanitization("zzz-Zzzz-999").getString());
 }
 
-TEST_F(LocaleTest, ScriptEqualTest) {
+TEST(LocaleTest, ScriptEqualTest) {
     EXPECT_TRUE(createLocale("en").isEqualScript(createLocale("en")));
     EXPECT_TRUE(createLocale("en-Latn").isEqualScript(createLocale("en")));
     EXPECT_TRUE(createLocale("jp-Latn").isEqualScript(createLocale("en-Latn")));
@@ -164,7 +160,7 @@ TEST_F(LocaleTest, ScriptEqualTest) {
     EXPECT_FALSE(createLocale("en-Jpan").isEqualScript(createLocale("en-Hani")));
 }
 
-TEST_F(LocaleTest, ScriptMatchTest) {
+TEST(LocaleTest, ScriptMatchTest) {
     const bool SUPPORTED = true;
     const bool NOT_SUPPORTED = false;
 
@@ -263,7 +259,7 @@ TEST_F(LocaleTest, ScriptMatchTest) {
     }
 }
 
-TEST_F(LocaleListTest, basicTests) {
+TEST(LocaleListTest, basicTests) {
     LocaleList emptyLocales;
     EXPECT_EQ(0u, emptyLocales.size());
 
@@ -279,7 +275,7 @@ TEST_F(LocaleListTest, basicTests) {
     EXPECT_EQ(french, twoLocales[1]);
 }
 
-TEST_F(LocaleListTest, unsupportedLocaleuageTests) {
+TEST(LocaleListTest, unsupportedLocaleuageTests) {
     const LocaleList& oneUnsupported = createLocaleList("abcd-example");
     EXPECT_TRUE(oneUnsupported.empty());
 
@@ -296,7 +292,7 @@ TEST_F(LocaleListTest, unsupportedLocaleuageTests) {
     EXPECT_EQ(english, lastUnsupported[0]);
 }
 
-TEST_F(LocaleListTest, repeatedLocaleuageTests) {
+TEST(LocaleListTest, repeatedLocaleuageTests) {
     Locale english = createLocale("en");
     Locale french = createLocale("fr");
     Locale canadianFrench = createLocale("fr-CA");
@@ -324,7 +320,7 @@ TEST_F(LocaleListTest, repeatedLocaleuageTests) {
     EXPECT_EQ(french, locales2[1]);
 }
 
-TEST_F(LocaleListTest, identifierTest) {
+TEST(LocaleListTest, identifierTest) {
     EXPECT_EQ(createLocale("en-Latn-US"), createLocale("en-Latn-US"));
     EXPECT_EQ(createLocale("zh-Hans-CN"), createLocale("zh-Hans-CN"));
     EXPECT_EQ(createLocale("en-Zsye-US"), createLocale("en-Zsye-US"));
@@ -335,7 +331,7 @@ TEST_F(LocaleListTest, identifierTest) {
     EXPECT_NE(createLocale("zh-Hant-HK"), createLocale("zh-Hant-TW"));
 }
 
-TEST_F(LocaleListTest, undEmojiTests) {
+TEST(LocaleListTest, undEmojiTests) {
     Locale emoji = createLocale("und-Zsye");
     EXPECT_EQ(Locale::EMSTYLE_EMOJI, emoji.getEmojiStyle());
 
@@ -348,7 +344,7 @@ TEST_F(LocaleListTest, undEmojiTests) {
     EXPECT_FALSE(emoji == undExample);
 }
 
-TEST_F(LocaleListTest, subtagEmojiTest) {
+TEST(LocaleListTest, subtagEmojiTest) {
     std::string subtagEmojiStrings[] = {
             // Duplicate subtag case.
             "und-Latn-u-em-emoji-u-em-text",
@@ -375,7 +371,7 @@ TEST_F(LocaleListTest, subtagEmojiTest) {
     }
 }
 
-TEST_F(LocaleListTest, subtagTextTest) {
+TEST(LocaleListTest, subtagTextTest) {
     std::string subtagTextStrings[] = {
             // Duplicate subtag case.
             "und-Latn-u-em-text-u-em-emoji",
@@ -404,7 +400,7 @@ TEST_F(LocaleListTest, subtagTextTest) {
 
 // TODO: add more "und" language cases whose language and script are
 //       unexpectedly translated to en-Latn by ICU.
-TEST_F(LocaleListTest, subtagDefaultTest) {
+TEST(LocaleListTest, subtagDefaultTest) {
     std::string subtagDefaultStrings[] = {
             // Duplicate subtag case.
             "en-Latn-u-em-default-u-em-emoji", "en-Latn-u-em-default-u-em-text",
@@ -430,7 +426,7 @@ TEST_F(LocaleListTest, subtagDefaultTest) {
     }
 }
 
-TEST_F(LocaleListTest, subtagEmptyTest) {
+TEST(LocaleListTest, subtagEmptyTest) {
     std::string subtagEmptyStrings[] = {
             "und",
             "jp",
@@ -449,7 +445,7 @@ TEST_F(LocaleListTest, subtagEmptyTest) {
     }
 }
 
-TEST_F(LocaleListTest, registerLocaleListTest) {
+TEST(LocaleListTest, registerLocaleListTest) {
     EXPECT_EQ(0UL, registerLocaleList(""));
     EXPECT_NE(0UL, registerLocaleList("en"));
     EXPECT_NE(0UL, registerLocaleList("jp"));
@@ -484,10 +480,9 @@ TEST_F(LocaleListTest, registerLocaleListTest) {
 // U+717D U+E0103 (VS20)
 const char kVsTestFont[] = kTestFontDir "VariationSelectorTest-Regular.ttf";
 
-class FontFamilyTest : public ICUTestBase {
+class FontFamilyTest : public testing::Test {
 public:
     virtual void SetUp() override {
-        ICUTestBase::SetUp();
         if (access(kVsTestFont, R_OK) != 0) {
             FAIL() << "Unable to read " << kVsTestFont << ". "
                    << "Please prepare the test data directory. "

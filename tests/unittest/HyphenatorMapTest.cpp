@@ -18,7 +18,6 @@
 
 #include <gtest/gtest.h>
 
-#include "ICUTestBase.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
 
@@ -72,11 +71,9 @@ public:
     using HyphenatorMap::lookupInternal;
 };
 
-class HyphenatorMapTest : public ICUTestBase {
+class HyphenatorMapTest : public testing::Test {
 protected:
     virtual void SetUp() override {
-        ICUTestBase::SetUp();
-
         // Following settings are copied from Hyphenator.java.
         mMap.addInternal("as", AS_HYPHENATOR);
         mMap.addInternal("bg", BG_HYPHENATOR);

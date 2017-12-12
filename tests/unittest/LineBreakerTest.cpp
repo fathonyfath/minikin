@@ -25,7 +25,6 @@
 #include <unicode/uchriter.h>
 
 #include "FontTestUtils.h"
-#include "ICUTestBase.h"
 #include "LineBreakerImpl.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -222,21 +221,19 @@ private:
     float mWidth;
 };
 
-class LineBreakerTest : public ICUTestBase {
+class LineBreakerTest : public testing::Test {
 public:
-    LineBreakerTest() : ICUTestBase(), mTabStops(nullptr, 0, 0) {}
+    LineBreakerTest() : mTabStops(nullptr, 0, 0) {}
 
     virtual ~LineBreakerTest() {}
 
 protected:
     virtual void SetUp() override {
-        ICUTestBase::SetUp();
         mCollection = getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
     }
 
     virtual void TearDown() override {
         mCollection.reset();
-        ICUTestBase::TearDown();
     }
 
     LineBreakResult doLineBreak(ICULineBreakerPool* pool, const U16StringPiece& text,

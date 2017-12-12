@@ -24,7 +24,6 @@
 #include "minikin/LocaleList.h"
 
 #include "FontTestUtils.h"
-#include "ICUTestBase.h"
 #include "Locale.h"
 #include "LocaleListCache.h"
 #include "MinikinFontForTest.h"
@@ -53,8 +52,6 @@ const char kMixedEmojiFont[] = kTestFontDir "ColorTextMixedEmojiFont.ttf";
 
 const char kHasCmapFormat14Font[] = kTestFontDir "NoCmapFormat14.ttf";
 const char kNoCmapFormat14Font[] = kTestFontDir "VariationSelectorTest-Regular.ttf";
-
-typedef ICUTestBase FontCollectionItemizeTest;
 
 // Utility functions for calling itemize function.
 void itemize(const std::shared_ptr<FontCollection>& collection, const char* str, FontStyle style,
@@ -103,7 +100,7 @@ const LocaleList& registerAndGetLocaleList(const std::string& locale_string) {
     return LocaleListCache::getById(LocaleListCache::getId(locale_string));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_latin) {
+TEST(FontCollectionItemizeTest, itemize_latin) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -173,7 +170,7 @@ TEST_F(FontCollectionItemizeTest, itemize_latin) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_newline) {
+TEST(FontCollectionItemizeTest, itemize_newline) {
     // The regular font does not support \n in its cmap table, but the Arabic font does.
     // It should not matter, and \n should be ignored.
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
@@ -192,7 +189,7 @@ TEST_F(FontCollectionItemizeTest, itemize_newline) {
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_combining) {
+TEST(FontCollectionItemizeTest, itemize_combining) {
     // The regular font and the Cherokee font both support U+0301 (COMBINING ACUTE ACCENT). Since
     // it's a combining mark, it should come from whatever font the base character comes from.
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
@@ -235,7 +232,7 @@ TEST_F(FontCollectionItemizeTest, itemize_combining) {
     EXPECT_EQ(kCherokeeFont, getFontPath(runs[1]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_emoji) {
+TEST(FontCollectionItemizeTest, itemize_emoji) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -296,7 +293,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emoji) {
     EXPECT_FALSE(runs[1].fakedFont.fakery.isFakeItalic());
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
+TEST(FontCollectionItemizeTest, itemize_non_latin) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -381,7 +378,7 @@ TEST_F(FontCollectionItemizeTest, itemize_non_latin) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_mixed) {
+TEST(FontCollectionItemizeTest, itemize_mixed) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -418,7 +415,7 @@ TEST_F(FontCollectionItemizeTest, itemize_mixed) {
     EXPECT_FALSE(runs[4].fakedFont.fakery.isFakeItalic());
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
+TEST(FontCollectionItemizeTest, itemize_variationSelector) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -555,7 +552,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelector) {
     EXPECT_EQ(kLatinFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
+TEST(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -678,7 +675,7 @@ TEST_F(FontCollectionItemizeTest, itemize_variationSelectorSupplement) {
     EXPECT_TRUE(runs[0].fakedFont.font == nullptr || kLatinFont == getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_no_crash) {
+TEST(FontCollectionItemizeTest, itemize_no_crash) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -702,7 +699,7 @@ TEST_F(FontCollectionItemizeTest, itemize_no_crash) {
     itemize(collection, "U+FE00 U+302D U+E0100", &runs);
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_fakery) {
+TEST(FontCollectionItemizeTest, itemize_fakery) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -741,7 +738,7 @@ TEST_F(FontCollectionItemizeTest, itemize_fakery) {
     EXPECT_TRUE(runs[0].fakedFont.fakery.isFakeItalic());
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
+TEST(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
     // kVSTestFont supports U+717D U+FE02 but doesn't support U+717D.
     // kVSTestFont should be selected for U+717D U+FE02 even if it does not support the base code
     // point.
@@ -769,7 +766,7 @@ TEST_F(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
     EXPECT_EQ(kVSTestFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_format_chars) {
+TEST(FontCollectionItemizeTest, itemize_format_chars) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kItemizeFontXml));
     std::vector<FontCollection::Run> runs;
 
@@ -834,7 +831,7 @@ TEST_F(FontCollectionItemizeTest, itemize_format_chars) {
     EXPECT_EQ(kEmojiFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
+TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
     struct TestCase {
         std::string userPreferredLocale;
         std::vector<std::string> fontLocales;
@@ -989,7 +986,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleScore) {
     }
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
+TEST(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
     struct TestCase {
         std::string testString;
         std::string requestedLocales;
@@ -1298,7 +1295,7 @@ TEST_F(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
     }
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
+TEST(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
@@ -1378,7 +1375,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0E) {
     EXPECT_EQ(kMixedEmojiFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
+TEST(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
@@ -1458,7 +1455,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_withFE0F) {
     EXPECT_EQ(kMixedEmojiFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_with_skinTone) {
+TEST(FontCollectionItemizeTest, itemize_emojiSelection_with_skinTone) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
@@ -1495,7 +1492,7 @@ TEST_F(FontCollectionItemizeTest, itemize_emojiSelection_with_skinTone) {
     EXPECT_EQ(kColorEmojiFont, getFontPath(runs[1]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_PrivateUseArea) {
+TEST(FontCollectionItemizeTest, itemize_PrivateUseArea) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
@@ -1513,7 +1510,7 @@ TEST_F(FontCollectionItemizeTest, itemize_PrivateUseArea) {
     EXPECT_EQ(kNoGlyphFont, getFontPath(runs[0]));
 }
 
-TEST_F(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
+TEST(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
     std::shared_ptr<FontCollection> collection(getFontCollection(kTestFontDir, kEmojiXmlFile));
     std::vector<FontCollection::Run> runs;
 
@@ -1537,7 +1534,7 @@ TEST_F(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
 }
 
 // For b/29585939
-TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
+TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
     std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
     std::shared_ptr<MinikinFont> fontA(new MinikinFontForTest(kZH_HansFont));
     std::shared_ptr<MinikinFont> fontB(new MinikinFontForTest(kZH_HansFont));
@@ -1566,7 +1563,7 @@ TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
 }
 
 // For b/29585939
-TEST_F(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
+TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
     std::shared_ptr<MinikinFont> hasCmapFormat14Font(new MinikinFontForTest(kHasCmapFormat14Font));
     std::shared_ptr<MinikinFont> noCmapFormat14Font(new MinikinFontForTest(kNoCmapFormat14Font));
