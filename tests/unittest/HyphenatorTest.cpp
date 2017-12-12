@@ -48,7 +48,8 @@ const uint16_t EN_DASH = 0x2013;
 
 // Simple test for US English. This tests "table", which happens to be the in the exceptions list.
 TEST_F(HyphenatorTest, usEnglishAutomaticHyphenation) {
-    Hyphenator* hyphenator = Hyphenator::loadBinary(readWholeFile(usHyph).data(), 2, 3, "en");
+    std::vector<uint8_t> patternData = readWholeFile(usHyph);
+    Hyphenator* hyphenator = Hyphenator::loadBinary(patternData.data(), 2, 3, "en");
     const uint16_t word[] = {'t', 'a', 'b', 'l', 'e'};
     std::vector<HyphenationType> result;
     hyphenator->hyphenate(&result, word, NELEM(word));
@@ -173,8 +174,8 @@ TEST_F(HyphenatorTest, malayalamSoftHyphen) {
 
 // In automatically hyphenated Malayalam script text, we should not insert a visible hyphen.
 TEST_F(HyphenatorTest, malayalamAutomaticHyphenation) {
-    Hyphenator* hyphenator =
-            Hyphenator::loadBinary(readWholeFile(malayalamHyph).data(), 2, 2, "en");
+    std::vector<uint8_t> patternData = readWholeFile(malayalamHyph);
+    Hyphenator* hyphenator = Hyphenator::loadBinary(patternData.data(), 2, 2, "en");
     const uint16_t word[] = {MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA, MALAYALAM_KA};
     std::vector<HyphenationType> result;
     hyphenator->hyphenate(&result, word, NELEM(word));
