@@ -21,7 +21,6 @@
 #include "minikin/LineBreaker.h"
 
 #include "FontTestUtils.h"
-#include "ICUTestBase.h"
 #include "UnicodeUtils.h"
 
 namespace minikin {
@@ -31,9 +30,7 @@ constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 f
 constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
 constexpr const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";
 
-typedef ICUTestBase MeasuredTextTest;
-
-TEST_F(MeasuredTextTest, RunTests) {
+TEST(MeasuredTextTest, RunTests) {
     constexpr uint32_t CHAR_COUNT = 6;
     constexpr float REPLACEMENT_WIDTH = 20.0f;
     std::shared_ptr<FontCollection> collection =

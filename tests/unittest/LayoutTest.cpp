@@ -21,7 +21,6 @@
 #include "minikin/FontCollection.h"
 
 #include "FontTestUtils.h"
-#include "ICUTestBase.h"
 #include "UnicodeUtils.h"
 
 const char* SYSTEM_FONT_PATH = "/system/fonts/";
@@ -47,7 +46,7 @@ static void resetAdvances(float* advances, size_t length) {
     }
 }
 
-class LayoutTest : public ICUTestBase {
+class LayoutTest : public testing::Test {
 protected:
     LayoutTest() : mCollection(nullptr) {}
 
