@@ -25,8 +25,24 @@
 #include "minikin/LocaleList.h"
 
 #include "MinikinFontForTest.h"
+#include "MinikinInternal.h"
 
 namespace minikin {
+
+namespace {
+std::string xmlTrim(const std::string& in) {
+    if (in.empty()) {
+        return in;
+    }
+    const char XML_SPACES[] = "\u0020\u000D\u000A\u0009";
+    const size_t start = in.find_first_not_of(XML_SPACES);  // inclusive
+    const size_t end = in.find_last_not_of(XML_SPACES);     // inclusive
+    MINIKIN_ASSERT(start != std::string::npos, "Not a valid file name \"%s\"", in.c_str());
+    MINIKIN_ASSERT(end != std::string::npos, "Not a valid file name \"%s\"", in.c_str());
+    return in.substr(start, end - start + 1 /* +1 since end is inclusive */);
+}
+
+}  // namespace
 
 std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, const char* fontXml) {
     xmlDoc* doc = xmlReadFile(fontXml, NULL, 0);
@@ -61,8 +77,10 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
             xmlChar* index = xmlGetProp(familyNode, (const xmlChar*)"index");
 
             xmlChar* fontFileName = xmlNodeListGetString(doc, fontNode->xmlChildrenNode, 1);
-            std::string fontPath = fontDir + std::string((const char*)fontFileName);
+            const std::string fontPath = xmlTrim(fontDir + std::string((const char*)fontFileName));
             xmlFree(fontFileName);
+
+            // TODO: Support font variation axis.
 
             if (access(fontPath.c_str(), R_OK) != 0) {
                 ALOGW("%s is not found.", fontPath.c_str());
