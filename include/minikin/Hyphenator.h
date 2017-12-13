@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "minikin/Characters.h"
+#include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
@@ -175,9 +176,19 @@ public:
     // the vector is a "hyphenation type" for a potential hyphenation that can be applied at the
     // corresponding code unit offset in the word.
     //
+    // out must have at least the length of the word capacity.
+    //
     // Example: word is "hyphen", result is the following, corresponding to "hy-phen":
     // [DONT_BREAK, DONT_BREAK, BREAK_AND_INSERT_HYPHEN, DONT_BREAK, DONT_BREAK, DONT_BREAK]
-    void hyphenate(std::vector<HyphenationType>* result, const uint16_t* word, size_t len) const;
+    void hyphenate(const U16StringPiece& word, HyphenationType* out) const;
+
+    // Compute the hyphenation of a word.
+    //
+    // out will be resized to word length.
+    void hyphenate(const U16StringPiece& word, std::vector<HyphenationType>* out) const {
+        out->resize(word.size());
+        return hyphenate(word, out->data());
+    }
 
     // Returns true if the codepoint is like U+2010 HYPHEN in line breaking and usage: a character
     // immediately after which line breaks are allowed, but words containing it should not be
@@ -207,17 +218,17 @@ private:
                HyphenationLocale hyphenLocale);
 
     // apply various hyphenation rules including hard and soft hyphens, ignoring patterns
-    void hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word, size_t len) const;
+    void hyphenateWithNoPatterns(const U16StringPiece& word, HyphenationType* out) const;
 
     // Try looking up word in alphabet table, return DONT_BREAK if any code units fail to map.
     // Otherwise, returns BREAK_AND_INSERT_HYPHEN, BREAK_AND_INSERT_ARMENIAN_HYPHEN, or
     // BREAK_AND_DONT_INSERT_HYPHEN based on the the script of the characters seen.
     // Note that this method writes len+2 entries into alpha_codes (including start and stop)
-    HyphenationType alphabetLookup(uint16_t* alpha_codes, const uint16_t* word, size_t len) const;
+    HyphenationType alphabetLookup(uint16_t* alpha_codes, const U16StringPiece& word) const;
 
     // calculate hyphenation from patterns, assuming alphabet lookup has already been done
-    void hyphenateFromCodes(HyphenationType* result, const uint16_t* codes, size_t len,
-                            HyphenationType hyphenValue) const;
+    void hyphenateFromCodes(const uint16_t* codes, size_t len, HyphenationType hyphenValue,
+                            HyphenationType* out) const;
 
     // See also LONGEST_HYPHENATED_WORD in LineBreaker.cpp. Here the constant is used so
     // that temporary buffers can be stack-allocated without waste, which is a slightly

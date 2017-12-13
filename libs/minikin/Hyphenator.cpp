@@ -117,17 +117,15 @@ Hyphenator::Hyphenator(const uint8_t* patternData, size_t minPrefix, size_t minS
           mMinSuffix(minSuffix),
           mHyphenationLocale(hyphenLocale) {}
 
-void Hyphenator::hyphenate(std::vector<HyphenationType>* result, const uint16_t* word,
-                           size_t len) const {
-    result->clear();
-    result->resize(len);
+void Hyphenator::hyphenate(const U16StringPiece& word, HyphenationType* out) const {
+    const size_t len = word.size();
     const size_t paddedLen = len + 2;  // start and stop code each count for 1
     if (mPatternData != nullptr && len >= mMinPrefix + mMinSuffix &&
         paddedLen <= MAX_HYPHENATED_SIZE) {
         uint16_t alpha_codes[MAX_HYPHENATED_SIZE];
-        const HyphenationType hyphenValue = alphabetLookup(alpha_codes, word, len);
+        const HyphenationType hyphenValue = alphabetLookup(alpha_codes, word);
         if (hyphenValue != HyphenationType::DONT_BREAK) {
-            hyphenateFromCodes(result->data(), alpha_codes, paddedLen, hyphenValue);
+            hyphenateFromCodes(alpha_codes, paddedLen, hyphenValue, out);
             return;
         }
         // TODO: try NFC normalization
@@ -136,7 +134,7 @@ void Hyphenator::hyphenate(std::vector<HyphenationType>* result, const uint16_t*
     // Note that we will always get here if the word contains a hyphen or a soft hyphen, because the
     // alphabet is not expected to contain a hyphen or a soft hyphen character, so alphabetLookup
     // would return DONT_BREAK.
-    hyphenateWithNoPatterns(result->data(), word, len);
+    hyphenateWithNoPatterns(word, out);
 }
 
 // This function determines whether a character is like U+2010 HYPHEN in
@@ -224,11 +222,11 @@ static inline int32_t getJoiningType(UChar32 codepoint) {
 
 // Assumption for caller: location must be >= 2 and word[location] == CHAR_SOFT_HYPHEN.
 // This function decides if the letters before and after the hyphen should appear as joining.
-static inline HyphenationType getHyphTypeForArabic(const uint16_t* word, size_t len,
-                                                   size_t location) {
+static inline HyphenationType getHyphTypeForArabic(const U16StringPiece& word, size_t location) {
     ssize_t i = location;
     int32_t type = U_JT_NON_JOINING;
-    while (static_cast<size_t>(i) < len && (type = getJoiningType(word[i])) == U_JT_TRANSPARENT) {
+    while (static_cast<size_t>(i) < word.size() &&
+           (type = getJoiningType(word[i])) == U_JT_TRANSPARENT) {
         i++;
     }
     if (type == U_JT_DUAL_JOINING || type == U_JT_RIGHT_JOINING || type == U_JT_JOIN_CAUSING) {
@@ -249,10 +247,9 @@ static inline HyphenationType getHyphTypeForArabic(const uint16_t* word, size_t 
 // Use various recommendations of UAX #14 Unicode Line Breaking Algorithm for hyphenating words
 // that didn't match patterns, especially words that contain hyphens or soft hyphens (See sections
 // 5.3, Use of Hyphen, and 5.4, Use of Soft Hyphen).
-void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t* word,
-                                         size_t len) const {
-    result[0] = HyphenationType::DONT_BREAK;
-    for (size_t i = 1; i < len; i++) {
+void Hyphenator::hyphenateWithNoPatterns(const U16StringPiece& word, HyphenationType* out) const {
+    out[0] = HyphenationType::DONT_BREAK;
+    for (size_t i = 1; i < word.size(); i++) {
         const uint16_t prevChar = word[i - 1];
         if (i > 1 && isLineBreakingHyphen(prevChar)) {
             // Break after hyphens, but only if they don't start the word.
@@ -263,9 +260,9 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
                 getScript(word[i]) == USCRIPT_LATIN) {
                 // In Polish and Slovenian, hyphens get repeated at the next line. To be safe,
                 // we will do this only if the next character is Latin.
-                result[i] = HyphenationType::BREAK_AND_INSERT_HYPHEN_AT_NEXT_LINE;
+                out[i] = HyphenationType::BREAK_AND_INSERT_HYPHEN_AT_NEXT_LINE;
             } else {
-                result[i] = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
+                out[i] = HyphenationType::BREAK_AND_DONT_INSERT_HYPHEN;
             }
         } else if (i > 1 && prevChar == CHAR_SOFT_HYPHEN) {
             // Break after soft hyphens, but only if they don't start the word (a soft hyphen
@@ -274,25 +271,25 @@ void Hyphenator::hyphenateWithNoPatterns(HyphenationType* result, const uint16_t
             if (getScript(word[i]) == USCRIPT_ARABIC) {
                 // For Arabic, we need to look and see if the characters around the soft hyphen
                 // actually join. If they don't, we'll just insert a normal hyphen.
-                result[i] = getHyphTypeForArabic(word, len, i);
+                out[i] = getHyphTypeForArabic(word, i);
             } else {
-                result[i] = hyphenationTypeBasedOnScript(word[i]);
+                out[i] = hyphenationTypeBasedOnScript(word[i]);
             }
-        } else if (prevChar == CHAR_MIDDLE_DOT && mMinPrefix < i && i <= len - mMinSuffix &&
+        } else if (prevChar == CHAR_MIDDLE_DOT && mMinPrefix < i && i <= word.size() - mMinSuffix &&
                    ((word[i - 2] == 'l' && word[i] == 'l') ||
                     (word[i - 2] == 'L' && word[i] == 'L')) &&
                    mHyphenationLocale == HyphenationLocale::CATALAN) {
             // In Catalan, "l·l" should break as "l-" on the first line
             // and "l" on the next line.
-            result[i] = HyphenationType::BREAK_AND_REPLACE_WITH_HYPHEN;
+            out[i] = HyphenationType::BREAK_AND_REPLACE_WITH_HYPHEN;
         } else {
-            result[i] = HyphenationType::DONT_BREAK;
+            out[i] = HyphenationType::DONT_BREAK;
         }
     }
 }
 
-HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t* word,
-                                           size_t len) const {
+HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes,
+                                           const U16StringPiece& word) const {
     const Header* header = getHeader();
     HyphenationType result = HyphenationType::BREAK_AND_INSERT_HYPHEN;
     // TODO: check header magic
@@ -302,7 +299,7 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
         uint32_t min_codepoint = alphabet->min_codepoint;
         uint32_t max_codepoint = alphabet->max_codepoint;
         alpha_codes[0] = 0;  // word start
-        for (size_t i = 0; i < len; i++) {
+        for (size_t i = 0; i < word.size(); i++) {
             uint16_t c = word[i];
             if (c < min_codepoint || c >= max_codepoint) {
                 return HyphenationType::DONT_BREAK;
@@ -316,7 +313,7 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
             }
             alpha_codes[i + 1] = code;
         }
-        alpha_codes[len + 1] = 0;  // word termination
+        alpha_codes[word.size() + 1] = 0;  // word termination
         return result;
     } else if (alphabetVersion == 1) {
         const AlphabetTable1* alphabet = header->alphabetTable1();
@@ -324,7 +321,7 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
         const uint32_t* begin = alphabet->data;
         const uint32_t* end = begin + n_entries;
         alpha_codes[0] = 0;
-        for (size_t i = 0; i < len; i++) {
+        for (size_t i = 0; i < word.size(); i++) {
             uint16_t c = word[i];
             auto p = std::lower_bound(begin, end, c << 11);
             if (p == end) {
@@ -339,7 +336,7 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
             }
             alpha_codes[i + 1] = AlphabetTable1::value(entry);
         }
-        alpha_codes[len + 1] = 0;
+        alpha_codes[word.size() + 1] = 0;
         return result;
     }
     return HyphenationType::DONT_BREAK;
@@ -350,11 +347,11 @@ HyphenationType Hyphenator::alphabetLookup(uint16_t* alpha_codes, const uint16_t
  * has been done by now, and all characters have been found in the alphabet.
  * Note: len here is the padded length including 0 codes at start and end.
  **/
-void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* codes, size_t len,
-                                    HyphenationType hyphenValue) const {
+void Hyphenator::hyphenateFromCodes(const uint16_t* codes, size_t len, HyphenationType hyphenValue,
+                                    HyphenationType* out) const {
     static_assert(sizeof(HyphenationType) == sizeof(uint8_t), "HyphnationType must be uint8_t.");
     // Reuse the result array as a buffer for calculating intermediate hyphenation numbers.
-    uint8_t* buffer = reinterpret_cast<uint8_t*>(result);
+    uint8_t* buffer = reinterpret_cast<uint8_t*>(out);
 
     const Header* header = getHeader();
     const Trie* trie = header->trieTable();
@@ -397,7 +394,7 @@ void Hyphenator::hyphenateFromCodes(HyphenationType* result, const uint16_t* cod
     // [mMinPrefix, len - mMinSuffix], they are left as 0 = DONT_BREAK.
     for (size_t i = mMinPrefix; i < maxOffset; i++) {
         // Hyphenation opportunities happen when the hyphenation numbers are odd.
-        result[i] = (buffer[i] & 1u) ? hyphenValue : HyphenationType::DONT_BREAK;
+        out[i] = (buffer[i] & 1u) ? hyphenValue : HyphenationType::DONT_BREAK;
     }
 }
 

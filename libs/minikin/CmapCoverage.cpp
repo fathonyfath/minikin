@@ -27,8 +27,6 @@
 
 namespace minikin {
 
-constexpr uint32_t U32MAX = std::numeric_limits<uint32_t>::max();
-
 // These could perhaps be optimized to use __builtin_bswap16 and friends.
 static uint32_t readU16(const uint8_t* data, size_t offset) {
     return ((uint32_t)data[offset]) << 8 | ((uint32_t)data[offset + 1]);
@@ -63,30 +61,9 @@ static bool addRange(std::vector<uint32_t>& coverage, uint32_t start, uint32_t e
     }
 }
 
-struct Range {
-    uint32_t start;  // inclusive
-    uint32_t end;    // exclusive
-
-    static Range InvalidRange() { return Range({U32MAX, U32MAX}); }
-
-    inline bool isValid() const { return start != U32MAX && end != U32MAX; }
-
-    // Returns true if left and right intersect.
-    inline static bool intersects(const Range& left, const Range& right) {
-        return left.isValid() && right.isValid() && left.start < right.end &&
-               right.start < left.end;
-    }
-
-    // Returns merged range. This method assumes left and right are not invalid ranges and they have
-    // an intersection.
-    static Range merge(const Range& left, const Range& right) {
-        return Range({std::min(left.start, right.start), std::max(left.end, right.end)});
-    }
-};
-
-// Returns Range from given ranges vector. Returns InvalidRange if i is out of range.
+// Returns Range from given ranges vector. Returns invalidRange if i is out of range.
 static inline Range getRange(const std::vector<uint32_t>& r, size_t i) {
-    return i + 1 < r.size() ? Range({r[i], r[i + 1]}) : Range::InvalidRange();
+    return i + 1 < r.size() ? Range({r[i], r[i + 1]}) : Range::invalidRange();
 }
 
 // Merge two sorted lists of ranges into one sorted list.
@@ -107,7 +84,7 @@ static std::vector<uint32_t> mergeRanges(const std::vector<uint32_t>& lRanges,
             // No ranges left in rRanges. Just put all remaining ranges in lRanges.
             do {
                 Range r = getRange(lRanges, li);
-                addRange(out, r.start, r.end);  // Input is sorted. Never returns false.
+                addRange(out, r.getStart(), r.getEnd());  // Input is sorted. Never returns false.
                 li += 2;
             } while (li < lsize);
             break;
@@ -115,17 +92,19 @@ static std::vector<uint32_t> mergeRanges(const std::vector<uint32_t>& lRanges,
             // No ranges left in lRanges. Just put all remaining ranges in rRanges.
             do {
                 Range r = getRange(rRanges, ri);
-                addRange(out, r.start, r.end);  // Input is sorted. Never returns false.
+                addRange(out, r.getStart(), r.getEnd());  // Input is sorted. Never returns false.
                 ri += 2;
             } while (ri < rsize);
             break;
         } else if (!Range::intersects(left, right)) {
             // No intersection. Add smaller range.
-            if (left.start < right.start) {
-                addRange(out, left.start, left.end);  // Input is sorted. Never returns false.
+            if (left.getStart() < right.getStart()) {
+                // Input is sorted. Never returns false.
+                addRange(out, left.getStart(), left.getEnd());
                 li += 2;
             } else {
-                addRange(out, right.start, right.end);  // Input is sorted. Never returns false.
+                // Input is sorted. Never returns false.
+                addRange(out, right.getStart(), right.getEnd());
                 ri += 2;
             }
         } else {
@@ -145,7 +124,8 @@ static std::vector<uint32_t> mergeRanges(const std::vector<uint32_t>& lRanges,
                     right = getRange(rRanges, ri);
                 }
             }
-            addRange(out, merged.start, merged.end);  // Input is sorted. Never returns false.
+            // Input is sorted. Never returns false.
+            addRange(out, merged.getStart(), merged.getEnd());
         }
     }
 

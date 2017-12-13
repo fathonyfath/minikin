@@ -24,8 +24,10 @@
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 
+#include "GreedyLineBreaker.h"
 #include "HyphenatorMap.h"
 #include "LayoutUtils.h"
+#include "LineBreakerUtil.h"
 #include "Locale.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -48,12 +50,6 @@ const float LINE_PENALTY_MULTIPLIER = 2.0f;
 
 // Penalty assigned to shrinking the whitepsace.
 const float SHRINK_PENALTY_MULTIPLIER = 4.0f;
-
-// Very long words trigger O(n^2) behavior in hyphenation, so we disable hyphenation for
-// unreasonably long words. This is somewhat of a heuristic because extremely long words
-// are possible in some languages. This does mean that very long real words can get
-// broken by desperate breaks, with no hyphens.
-const size_t LONGEST_HYPHENATED_WORD = 45;
 
 // Maximum amount that spaces can shrink, in justified text.
 const float SHRINKABILITY = 1.0 / 3.0;
@@ -127,61 +123,6 @@ void LineBreakerImpl::setLocaleList(uint32_t localeListId, size_t restartFrom) {
     }
 }
 
-// This function determines whether a character is a space that disappears at end of line.
-// It is the Unicode set: [[:General_Category=Space_Separator:]-[:Line_Break=Glue:]],
-// plus '\n'.
-// Note: all such characters are in the BMP, so it's ok to use code units for this.
-static bool isLineEndSpace(uint16_t c) {
-    return c == '\n' || c == ' '                           // SPACE
-           || c == 0x1680                                  // OGHAM SPACE MARK
-           || (0x2000 <= c && c <= 0x200A && c != 0x2007)  // EN QUAD, EM QUAD, EN SPACE, EM SPACE,
-                                                           // THREE-PER-EM SPACE, FOUR-PER-EM SPACE,
-                                                           // SIX-PER-EM SPACE, PUNCTUATION SPACE,
-                                                           // THIN SPACE, HAIR SPACE
-           || c == 0x205F                                  // MEDIUM MATHEMATICAL SPACE
-           || c == 0x3000;                                 // IDEOGRAPHIC SPACE
-}
-
-// Hyphenates a string potentially containing non-breaking spaces.
-std::vector<HyphenationType> LineBreakerImpl::hyphenate(const U16StringPiece& str) {
-    std::vector<HyphenationType> out;
-    const size_t len = str.size();
-    out.reserve(len);
-
-    // A word here is any consecutive string of non-NBSP characters.
-    bool inWord = false;
-    size_t wordStart = 0;  // The initial value will never be accessed, but just in case.
-    for (size_t i = 0; i <= len; i++) {
-        if (i == len || str[i] == CHAR_NBSP) {
-            if (inWord) {
-                // A word just ended. Hyphenate it.
-                const size_t wordLen = i - wordStart;
-                if (wordLen <= LONGEST_HYPHENATED_WORD) {
-                    if (wordStart == 0) {
-                        // The string starts with a word. Use out directly.
-                        mHyphenator->hyphenate(&out, str.data(), wordLen);
-                    } else {
-                        std::vector<HyphenationType> wordVec;
-                        mHyphenator->hyphenate(&wordVec, str.data() + wordStart, wordLen);
-                        out.insert(out.end(), wordVec.cbegin(), wordVec.cend());
-                    }
-                } else {  // Word is too long. Inefficient to hyphenate.
-                    out.insert(out.end(), wordLen, HyphenationType::DONT_BREAK);
-                }
-                inWord = false;
-            }
-            if (i < len) {
-                // Insert one DONT_BREAK for the NBSP.
-                out.push_back(HyphenationType::DONT_BREAK);
-            }
-        } else if (!inWord) {
-            inWord = true;
-            wordStart = i;
-        }
-    }
-    return out;
-}
-
 // Compute the total overhang of text based on per-cluster advances and overhangs.
 // The two input vectors are expected to be of the same size.
 /* static */ LayoutOverhang LineBreakerImpl::computeOverhang(
@@ -232,7 +173,8 @@ void LineBreakerImpl::addHyphenationCandidates(const Run& run, const Range& cont
     MINIKIN_ASSERT(contextRange.contains(wordRange), "Context must contain word range");
 
     const bool isRtlWord = run.isRtl();
-    const std::vector<HyphenationType> hyphenResult = hyphenate(mTextBuf.substr(wordRange));
+    const std::vector<HyphenationType> hyphenResult =
+            hyphenate(mTextBuf.substr(wordRange), *mHyphenator);
 
     std::vector<float> advances;
     std::vector<LayoutOverhang> overhangs;
@@ -822,8 +764,13 @@ LineBreakResult breakIntoLines(const U16StringPiece& textBuffer, BreakStrategy s
                                HyphenationFrequency frequency, bool justified,
                                const MeasuredText& measuredText, const LineWidth& lineWidth,
                                const TabStops& tabStops) {
-    LineBreakerImpl impl(textBuffer, strategy, frequency, justified);
-    return impl.computeBreaks(measuredText, lineWidth, tabStops);
+    if (strategy == BreakStrategy::Greedy) {
+        return breakLineGreedy(textBuffer, measuredText, lineWidth, tabStops,
+                               frequency != HyphenationFrequency::None);
+    } else {
+        LineBreakerImpl impl(textBuffer, strategy, frequency, justified);
+        return impl.computeBreaks(measuredText, lineWidth, tabStops);
+    }
 }
 
 }  // namespace minikin

@@ -37,6 +37,9 @@ public:
         getInstance().addAliasInternal(fromLocaleStr, toLocaleStr);
     }
 
+    // Remove all hyphenators from the map. This is test only method.
+    static void clear() { getInstance().clearInternal(); }
+
     // The returned pointer is never a dangling pointer. If nothing found for a given locale,
     // returns a hyphenator which only processes soft hyphens.
     //
@@ -63,6 +66,8 @@ private:
         static HyphenatorMap map;
         return map;
     }
+
+    void clearInternal();
 
     void addInternalLocked(const Locale& locale, const Hyphenator* hyphenator);
     const Hyphenator* lookupByIdentifierLocked(uint64_t id) const;

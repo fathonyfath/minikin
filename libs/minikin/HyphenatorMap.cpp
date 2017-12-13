@@ -57,6 +57,10 @@ void HyphenatorMap::addInternalLocked(const Locale& locale, const Hyphenator* hy
     mMap[locale.getIdentifier()] = hyphenator;
 }
 
+void HyphenatorMap::clearInternal() {
+    android::AutoMutex _l(gMinikinLock);
+    mMap.clear();
+}
 void HyphenatorMap::addAliasInternal(const std::string& fromLocaleStr,
                                      const std::string& toLocaleStr) {
     const Locale fromLocale(fromLocaleStr);
