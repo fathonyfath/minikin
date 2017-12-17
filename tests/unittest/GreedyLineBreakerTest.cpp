@@ -113,7 +113,7 @@ protected:
         builder.addCustomRun<ConstantRun>(Range(0, textBuffer.size()), lang, charWidth);
         std::unique_ptr<MeasuredText> measuredText = builder.build(textBuffer);
         RectangleLineWidth rectangleLineWidth(lineWidth);
-        TabStops tabStops(nullptr, 0, 0);
+        TabStops tabStops(nullptr, 0, 10);
         return breakLineGreedy(textBuffer, *measuredText, rectangleLineWidth, tabStops,
                                doHyphenation);
     }
@@ -821,6 +821,163 @@ TEST_F(GreedyLineBreakerTest, testZeroWidthCharacter) {
                 {"This is an example text.", 0, NO_START_HYPHEN, NO_END_HYPHEN},
         };
         const auto actual = doLineBreak(textBuf, DO_HYPHEN, CHAR_WIDTH, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+TEST_F(GreedyLineBreakerTest, testLocaleSwitchTest) {
+    constexpr float CHAR_WIDTH = 10.0;
+    constexpr bool DO_HYPHEN = true;  // Do hyphenation in this test case.
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    constexpr float LINE_WIDTH = 24 * CHAR_WIDTH;
+    const auto textBuf = utf8ToUtf16("This is an example text.");
+    {
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an example text.", 24 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH);
+        builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "en-US", CHAR_WIDTH);
+        std::unique_ptr<MeasuredText> measuredText = builder.build(textBuf);
+        RectangleLineWidth rectangleLineWidth(LINE_WIDTH);
+        TabStops tabStops(nullptr, 0, 0);
+
+        const auto actual =
+                breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an example text.", 24 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH);
+        builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH);
+        std::unique_ptr<MeasuredText> measuredText = builder.build(textBuf);
+        RectangleLineWidth rectangleLineWidth(LINE_WIDTH);
+        TabStops tabStops(nullptr, 0, 0);
+
+        const auto actual =
+                breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+TEST_F(GreedyLineBreakerTest, testEmailOrUrl) {
+    constexpr float CHAR_WIDTH = 10.0;
+    constexpr bool DO_HYPHEN = true;  // Do hyphenation in this test case.
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+    {
+        constexpr float LINE_WIDTH = 24 * CHAR_WIDTH;
+        const auto textBuf = utf8ToUtf16("This is an url: http://a.b");
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an url: ", 15 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+                {"http://a.b", 10 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+        const auto actual = doLineBreak(textBuf, DO_HYPHEN, CHAR_WIDTH, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 24 * CHAR_WIDTH;
+        const auto textBuf = utf8ToUtf16("This is an email: a@example.com");
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an email: ", 17 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+                {"a@example.com", 13 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+        const auto actual = doLineBreak(textBuf, DO_HYPHEN, CHAR_WIDTH, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+TEST_F(GreedyLineBreakerTest, testLocaleSwitch_InEmailOrUrl) {
+    constexpr float CHAR_WIDTH = 10.0;
+    constexpr bool DO_HYPHEN = true;  // Do hyphenation in this test case.
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    constexpr float LINE_WIDTH = 24 * CHAR_WIDTH;
+    {
+        const auto textBuf = utf8ToUtf16("This is an url: http://a.b");
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an url: ", 15 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+                {"http://a.b", 10 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH);
+        builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH);
+        std::unique_ptr<MeasuredText> measuredText = builder.build(textBuf);
+        RectangleLineWidth rectangleLineWidth(LINE_WIDTH);
+        TabStops tabStops(nullptr, 0, 0);
+
+        const auto actual =
+                breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        const auto textBuf = utf8ToUtf16("This is an email: a@example.com");
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an email: ", 17 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+                {"a@example.com", 13 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH);
+        builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH);
+        std::unique_ptr<MeasuredText> measuredText = builder.build(textBuf);
+        RectangleLineWidth rectangleLineWidth(LINE_WIDTH);
+        TabStops tabStops(nullptr, 0, 0);
+
+        const auto actual =
+                breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+// b/68669534
+TEST_F(GreedyLineBreakerTest, CrashFix_Space_Tab) {
+    constexpr float CHAR_WIDTH = 10.0;
+    constexpr bool DO_HYPHEN = true;  // Do hyphenation in this test case.
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+    {
+        constexpr float LINE_WIDTH = 5 * CHAR_WIDTH;
+        const auto textBuf = utf8ToUtf16("a \tb");
+        std::vector<LineBreakExpectation> expect = {
+                {"a \tb", 4 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN},
+        };
+
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, textBuf.size()), "en-US", CHAR_WIDTH);
+        std::unique_ptr<MeasuredText> measuredText = builder.build(textBuf);
+        RectangleLineWidth rectangleLineWidth(LINE_WIDTH);
+        TabStops tabStops(nullptr, 0, CHAR_WIDTH);
+
+        const auto actual =
+                breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
         EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
                                                    << " vs " << std::endl
                                                    << toString(textBuf, actual);

@@ -45,8 +45,7 @@ public:
 
     const static int kTab_Shift = 29;  // keep synchronized with TAB_MASK in StaticLayout.java
 
-    LineBreakResult computeBreaks(const MeasuredText& measuredText, const LineWidth& lineWidth,
-                                  const TabStops& tabStops);
+    LineBreakResult computeBreaks(const MeasuredText& measuredText, const LineWidth& lineWidth);
 
 protected:
     // For testing purposes.
@@ -69,12 +68,6 @@ private:
                               // between two candidates. The line width between two line break
                               // candidates i and j is calculated as postBreak(j) - preBreak(i).
         ParaWidth postBreak;  // width of text until this point, if we decide to break here
-
-        float firstOverhang;   // amount of overhang needed on the end of the line if we decide
-                               // to break here
-        float secondOverhang;  // amount of overhang needed on the beginning of the next line
-                               // if we decide to break here
-
         float penalty;          // penalty of this break (for example, hyphen penalty)
         size_t preSpaceCount;   // preceding space count before breaking
         size_t postSpaceCount;  // preceding space count after breaking
@@ -82,8 +75,7 @@ private:
         bool isRtl;  // The direction of the bidi run containing or ending in this candidate
     };
 
-    void addRuns(const MeasuredText& measured, const LineWidth& lineWidth,
-                 const TabStops& tabStops);
+    void addRuns(const MeasuredText& measured, const LineWidth& lineWidth);
 
     void setLocaleList(uint32_t localeListId, size_t restartFrom);
     // A locale list ID and locale ID currently used for word iterator and hyphenator.
@@ -94,11 +86,8 @@ private:
                                   ParaWidth lastBreakWidth, ParaWidth PostBreak,
                                   size_t postSpaceCount, float hyphenPenalty);
 
-    void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak, float firstOverhang,
-                      float secondOverhang, size_t preSpaceCount, size_t postSpaceCount,
-                      float penalty, HyphenationType hyph, bool isRtl);
-
-    void adjustSecondOverhang(float secondOverhang);
+    void addWordBreak(size_t offset, ParaWidth preBreak, ParaWidth postBreak, size_t preSpaceCount,
+                      size_t postSpaceCount, float penalty, HyphenationType hyph, bool isRtl);
 
     std::unique_ptr<WordBreaker> mWordBreaker;
     U16StringPiece mTextBuf;
@@ -128,66 +117,7 @@ private:
     ParaWidth mWidth = 0;                // Total width of text seen, assuming no line breaks
     std::vector<Candidate> mCandidates;  // All line breaking candidates
 
-    static LayoutOverhang computeOverhang(float totalAdvance, const std::vector<float>& advances,
-                                          const std::vector<LayoutOverhang>& overhangs, bool isRtl);
-
     MinikinExtent computeMaxExtent(const MeasuredText& measured, size_t start, size_t end) const;
-
-    //
-    // Types, methods, and fields related to the greedy algorithm
-    //
-
-    void computeBreaksGreedy(const MeasuredText& measured, const LineWidth& lineWidth);
-
-    // This method is called as a helper to computeBreaksGreedy(), but also when we encounter a
-    // tab character, which forces the line breaking algorithm to greedy mode. It computes all
-    // the greedy line breaks based on available candidates and returns the preBreak of the last
-    // break which would then be used to calculate the width of the tab.
-    ParaWidth computeBreaksGreedyPartial(const MeasuredText& measured, const LineWidth& lineWidth);
-
-    // Called by computerBreaksGreedyPartial() on all candidates to determine if the line should
-    // be broken at the candidate
-    void considerGreedyBreakCandidate(const MeasuredText& measured, size_t candIndex,
-                                      const LineWidth& lineWidth);
-
-    // Adds a greedy break to list of line breaks.
-    void addGreedyBreak(const MeasuredText& measured, size_t breakIndex);
-
-    // Push an actual break to the output. Takes care of setting flags for tab, etc.
-    void pushBreak(int offset, float width, MinikinExtent extent, HyphenEdit hyphenEdit);
-
-    void addDesperateBreaksGreedy(const MeasuredText& measured, ParaWidth existingPreBreak,
-                                  size_t start, size_t end, const LineWidth& lineWidth);
-
-    bool fitsOnCurrentLine(float width, float leftOverhang, float rightOverhang,
-                           const LineWidth& lineWidth) const;
-
-    struct GreedyBreak {
-        size_t index;
-        float penalty;
-    };
-    // This will hold a list of greedy breaks, with strictly increasing indices and penalties.
-    // The top of the list always holds the best break.
-    std::deque<GreedyBreak> mBestGreedyBreaks;
-    // Return the best greedy break from the top of the queue.
-    size_t popBestGreedyBreak();
-    // Insert a greedy break in mBestGreedyBreaks.
-    void insertGreedyBreakCandidate(size_t index, float penalty);
-
-    // The following are state for greedy breaker. They get updated during calculation of
-    // greedy breaks (including when a partial greedy algorithm is run when adding style runs
-    // containing tabs).
-    size_t mLastGreedyBreakIndex;  // The last greedy break index of mCandidates.
-    const Candidate& getLastBreakCandidate() const;
-    size_t mLastConsideredGreedyCandidate;  // The index of the last candidate considered
-    int mFirstTabIndex;  // The index of the first tab character seen in current line
-
-    // Used to hold a desperate break as the last greedy break
-    Candidate mFakeDesperateCandidate;
-
-    //
-    // Types, methods, and fields related to the optimal algorithm
-    //
 
     void computeBreaksOptimal(const MeasuredText& measured, const LineWidth& lineWidth);
 

@@ -47,6 +47,11 @@ public:
         return U16StringPiece(mData + range.getStart(), range.getLength());
     }
 
+    inline bool hasChar(uint16_t c) const {
+        const uint16_t* end = mData + mLength;
+        return std::find(mData, end, c) != end;
+    }
+
 private:
     const uint16_t* mData;
     const uint32_t mLength;
