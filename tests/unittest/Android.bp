@@ -55,6 +55,7 @@ cc_test {
         "LocaleListTest.cpp",
         "MeasuredTextTest.cpp",
         "MeasurementTests.cpp",
+        "OptimalLineBreakerTest.cpp",
         "SparseBitSetTest.cpp",
         "StringPieceTest.cpp",
         "TestMain.cpp",

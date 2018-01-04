@@ -22,6 +22,8 @@
 #include <unicode/utf.h>
 #include <unicode/utf8.h>
 
+#include "minikin/U16StringPiece.h"
+
 namespace minikin {
 
 // src is of the form "U+1F431 | 'h' 'i'". Position of "|" gets saved to offset if non-null.
@@ -115,6 +117,25 @@ std::vector<uint16_t> utf8ToUtf16(const std::string& text) {
         }
     }
     return result;
+}
+
+std::string utf16ToUtf8(const U16StringPiece& u16String) {
+    const uint32_t textLength = u16String.size();
+    uint32_t i = 0;
+    uint32_t c = 0;
+
+    std::string out;
+    out.reserve(textLength * 4);
+
+    while (i < textLength) {
+        U16_NEXT(u16String.data(), i, textLength, c);
+
+        char buf[U8_MAX_LENGTH] = {};
+        uint32_t outIndex = 0;
+        U8_APPEND_UNSAFE(buf, outIndex, c);
+        out.append(buf, outIndex);
+    }
+    return out;
 }
 
 }  // namespace minikin
