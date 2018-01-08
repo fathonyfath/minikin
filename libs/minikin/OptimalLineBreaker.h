@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2015 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_CHARACTERS_H
-#define MINIKIN_CHARACTERS_H
+#ifndef MINIKIN_OPTIMAL_LINE_BREAKER_H
+#define MINIKIN_OPTIMAL_LINE_BREAKER_H
 
-#include <cstdint>
+#include "minikin/LineBreaker.h"
+#include "minikin/MeasuredText.h"
+#include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
-// Code point order
-constexpr uint32_t CHAR_TAB = 0x0009;
-constexpr uint32_t CHAR_HYPHEN_MINUS = 0x002D;
-constexpr uint32_t CHAR_NBSP = 0x00A0;
-constexpr uint32_t CHAR_SOFT_HYPHEN = 0x00AD;
-constexpr uint32_t CHAR_MIDDLE_DOT = 0x00B7;
-constexpr uint32_t CHAR_ARMENIAN_HYPHEN = 0x058A;
-constexpr uint32_t CHAR_MAQAF = 0x05BE;
-constexpr uint32_t CHAR_UCAS_HYPHEN = 0x1400;
-constexpr uint32_t CHAR_ZWJ = 0x200D;
-constexpr uint32_t CHAR_HYPHEN = 0x2010;
+LineBreakResult breakLineOptimal(const U16StringPiece& textBuf, const MeasuredText& measured,
+                                 const LineWidth& lineWidthLimits, BreakStrategy strategy,
+                                 HyphenationFrequency frequency, bool justified);
 
 }  // namespace minikin
 
-#endif  // MINIKIN_CHARACTERS_H
+#endif  // MINIKIN_OPTIMAL_LINE_BREAKER_H
