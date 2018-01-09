@@ -457,6 +457,9 @@ void LineBreakerImpl::computeBreaksOptimal(const MeasuredText& measured,
 
 LineBreakResult LineBreakerImpl::computeBreaks(const MeasuredText& measured,
                                                const LineWidth& lineWidth) {
+    if (mTextBuf.size() == 0) {
+        return LineBreakResult();
+    }
     addRuns(measured, lineWidth);
     addAllDesperateBreaksOptimal(measured, lineWidth);
     computeBreaksOptimal(measured, lineWidth);
