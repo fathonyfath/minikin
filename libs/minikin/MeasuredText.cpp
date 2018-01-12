@@ -16,13 +16,37 @@
 
 #include "minikin/MeasuredText.h"
 
+#include "LineBreakerUtil.h"
+
 namespace minikin {
 
-void MeasuredText::measure(const U16StringPiece& textBuf) {
+void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenation) {
+    if (textBuf.size() == 0) {
+        return;
+    }
+    CharProcessor proc(textBuf);
     for (const auto& run : runs) {
-        const uint32_t runOffset = run->getRange().getStart();
+        const Range& range = run->getRange();
+        const uint32_t runOffset = range.getStart();
         run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset,
-                        overhangs.data() + runOffset);
+                        nullptr /* overhangs */);
+
+        if (!computeHyphenation || !run->canHyphenate()) {
+            continue;
+        }
+
+        proc.updateLocaleIfNecessary(*run);
+        for (uint32_t i = range.getStart(); i < range.getEnd(); ++i) {
+            proc.feedChar(i, textBuf[i], widths[i]);
+
+            const uint32_t nextCharOffset = i + 1;
+            if (nextCharOffset != proc.nextWordBreak) {
+                continue;  // Wait until word break point.
+            }
+
+            populateHyphenationPoints(textBuf, *run, *proc.hyphenator, proc.contextRange(),
+                                      proc.wordRange(), &hyphenBreaks);
+        }
     }
 }
 
