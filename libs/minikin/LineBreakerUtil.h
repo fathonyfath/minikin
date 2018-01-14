@@ -22,6 +22,10 @@
 #include "minikin/Hyphenator.h"
 #include "minikin/U16StringPiece.h"
 
+#include "Locale.h"
+#include "LocaleListCache.h"
+#include "MinikinInternal.h"
+
 namespace minikin {
 
 // Hyphenates a string potentially containing non-breaking spaces.
@@ -39,6 +43,12 @@ inline bool isLineEndSpace(uint16_t c) {
            // THIN SPACE, HAIR SPACE
            || c == 0x205F  // MEDIUM MATHEMATICAL SPACE
            || c == 0x3000;
+}
+
+inline Locale getEffectiveLocale(uint32_t localeListId) {
+    android::AutoMutex _l(gMinikinLock);
+    const LocaleList& localeList = LocaleListCache::getById(localeListId);
+    return localeList.empty() ? Locale() : localeList[0];
 }
 }  // namespace minikin
 

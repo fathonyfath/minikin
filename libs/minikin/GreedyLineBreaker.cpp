@@ -16,9 +16,9 @@
 
 #define LOG_TAG "GreedyLineBreak"
 
-#include "LineBreakerImpl.h"
-
 #include "minikin/Characters.h"
+#include "minikin/LineBreaker.h"
+#include "minikin/MeasuredText.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 
@@ -26,7 +26,6 @@
 #include "LineBreakerUtil.h"
 #include "Locale.h"
 #include "LocaleListCache.h"
-#include "MinikinInternal.h"
 #include "WordBreaker.h"
 
 namespace minikin {
@@ -68,12 +67,6 @@ private:
 
     inline uint32_t getPrevLineBreakOffset() {
         return mBreakPoints.empty() ? 0 : mBreakPoints.back().offset;
-    }
-
-    inline Locale getEffectiveLocale(uint32_t localeListId) const {
-        android::AutoMutex _l(gMinikinLock);
-        const LocaleList& localeList = LocaleListCache::getById(localeListId);
-        return localeList.empty() ? Locale() : localeList[0];
     }
 
     // Registers the break point and prepares for next line computation.

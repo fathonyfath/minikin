@@ -23,10 +23,10 @@
 #include "FileUtils.h"
 #include "FontTestUtils.h"
 #include "HyphenatorMap.h"
-#include "LineBreakerImpl.h"
 #include "LineBreakerTestHelper.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
+#include "OptimalLineBreaker.h"
 #include "UnicodeUtils.h"
 #include "WordBreaker.h"
 
@@ -73,10 +73,9 @@ protected:
     LineBreakResult doLineBreak(const U16StringPiece& textBuffer, const MeasuredText& measuredText,
                                 BreakStrategy strategy, HyphenationFrequency frequency,
                                 float lineWidth) {
-        LineBreakerImpl impl(textBuffer, strategy, frequency, false /* justified */);
         RectangleLineWidth rectangleLineWidth(lineWidth);
-        TabStops tabStops(nullptr, 0, 10);
-        return impl.computeBreaks(measuredText, rectangleLineWidth);
+        return breakLineOptimal(textBuffer, measuredText, rectangleLineWidth, strategy, frequency,
+                                false /* justified */);
     }
 
 private:
@@ -809,29 +808,6 @@ TEST_F(OptimalLineBreakerTest, testBreakWithoutHyphenation) {
         EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
                                                    << " vs " << std::endl
                                                    << toString(textBuf, actual);
-        // clang-format off
-        expect = {
-                { "T" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "h" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "i" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "s ", 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "i" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "s ", 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "a" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "n ", 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                // TODO: Fix this. This must behave the same as above.
-                { "ex-" , 3 * CHAR_WIDTH, NO_START_HYPHEN, END_HYPHEN },
-                { "am-" , 3 * CHAR_WIDTH, NO_START_HYPHEN, END_HYPHEN },
-                { "p" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "l" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "e ", 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "t" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "e" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "x" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "t" , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-                { "." , 1 * CHAR_WIDTH, NO_START_HYPHEN, NO_END_HYPHEN },
-        };
-        // clang-format on
         actual = doLineBreak(textBuf, HIGH_QUALITY, NORMAL_HYPHENATION, CHAR_WIDTH, LINE_WIDTH);
         EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
                                                    << " vs " << std::endl

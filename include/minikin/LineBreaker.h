@@ -106,6 +106,15 @@ public:
     LineBreakResult(LineBreakResult&&) = default;
     LineBreakResult& operator=(LineBreakResult&&) = default;
 
+    void reverse() {
+        std::reverse(breakPoints.begin(), breakPoints.end());
+        std::reverse(widths.begin(), widths.end());
+        std::reverse(ascents.begin(), ascents.end());
+        std::reverse(descents.begin(), descents.end());
+        std::reverse(flags.begin(), flags.end());
+    }
+
+private:
     PREVENT_COPY_AND_ASSIGN(LineBreakResult);
 };
 

@@ -17,7 +17,9 @@
 #ifndef MINIKIN_RANGE_H
 #define MINIKIN_RANGE_H
 
+#include <algorithm>
 #include <limits>
+#include <utility>
 
 namespace minikin {
 

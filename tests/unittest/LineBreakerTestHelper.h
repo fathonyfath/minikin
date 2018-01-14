@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/Hyphenator.h"
+#include "minikin/LineBreaker.h"
 
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
