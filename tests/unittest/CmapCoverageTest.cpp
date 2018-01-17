@@ -988,6 +988,54 @@ TEST(CmapCoverageTest, TableSelection_brokenVSTable) {
         SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
         ASSERT_TRUE(vsTables.empty());
     }
+    {
+        // http://b/70808908
+        SCOPED_TRACE("OOB access due to integer overflow in non default UVS table");
+        std::vector<uint8_t> vsTable = buildCmapFormat14Table(
+                std::vector<VariationSelectorRecord>({{0xFE0F, {'a', 'a'}, {'b'}}}));
+        // 6 is the offset of the numRecords in the Cmap format14 subtable header.
+        writeU32(0x1745d174 /* 2^32 / kRecordSize(=11) */, vsTable.data(), 6);
+        CmapBuilder builder(2);
+        builder.appendTable(3, 1, cmap12Table);
+        builder.appendTable(VS_PLATFORM_ID, VS_ENCODING_ID, vsTable);
+        std::vector<uint8_t> cmap = builder.build();
+
+        std::vector<std::unique_ptr<SparseBitSet>> vsTables;
+        SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
+        ASSERT_TRUE(vsTables.empty());
+    }
+    {
+        // http://b/70808908
+        SCOPED_TRACE("OOB access due to integer overflow in non default UVS table");
+        std::vector<uint8_t> vsTable = buildCmapFormat14Table(
+                std::vector<VariationSelectorRecord>({{0xFE0F, {'a', 'a'}, {'b'}}}));
+        // 29 is the offset of the numUVSMappings in the fist non defulat UVS table.
+        writeU32(0x33333333 /* 2^32 / kUVSMappingRecordSize(=5) */, vsTable.data(), 29);
+        CmapBuilder builder(2);
+        builder.appendTable(3, 1, cmap12Table);
+        builder.appendTable(VS_PLATFORM_ID, VS_ENCODING_ID, vsTable);
+        std::vector<uint8_t> cmap = builder.build();
+
+        std::vector<std::unique_ptr<SparseBitSet>> vsTables;
+        SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
+        ASSERT_TRUE(vsTables.empty());
+    }
+    {
+        // http://b/70808908
+        SCOPED_TRACE("OOB access due to integer overflow in default UVS table");
+        std::vector<uint8_t> vsTable = buildCmapFormat14Table(
+                std::vector<VariationSelectorRecord>({{0xFE0F, {'a', 'a'}, {'b'}}}));
+        // 21 is the offset of the numUnicodeValueRanges in the fist defulat UVS table.
+        writeU32(0x40000000 /* 2^32 / kUnicodeRangeRecordSize(=4) */, vsTable.data(), 21);
+        CmapBuilder builder(2);
+        builder.appendTable(3, 1, cmap12Table);
+        builder.appendTable(VS_PLATFORM_ID, VS_ENCODING_ID, vsTable);
+        std::vector<uint8_t> cmap = builder.build();
+
+        std::vector<std::unique_ptr<SparseBitSet>> vsTables;
+        SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
+        ASSERT_TRUE(vsTables.empty());
+    }
 }
 
 TEST(CmapCoverageTest, TableSelection_brokenVSTable_bestEffort) {
