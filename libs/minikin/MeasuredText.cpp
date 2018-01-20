@@ -28,8 +28,7 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
     for (const auto& run : runs) {
         const Range& range = run->getRange();
         const uint32_t runOffset = range.getStart();
-        run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset,
-                        nullptr /* overhangs */);
+        run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset);
 
         if (!computeHyphenation || !run->canHyphenate()) {
             continue;

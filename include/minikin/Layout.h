@@ -39,12 +39,6 @@ struct LayoutGlyph {
     float y;
 };
 
-struct LayoutOverhang {
-    // The amount of space needed to draw a glyph or glyph cluster beyond its advance box.
-    float left = 0.0;
-    float right = 0.0;
-};
-
 // Internal state used during layout operation
 struct LayoutContext;
 
@@ -74,7 +68,6 @@ public:
             : mGlyphs(),
               mAdvances(),
               mExtents(),
-              mClusterBounds(),
               mFaces(),
               mAdvance(0),
               mBounds() {
@@ -103,37 +96,33 @@ public:
                              Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
                              EndHyphenEdit endHyphen,
                              const std::shared_ptr<FontCollection>& collection, float* advances,
-                             MinikinExtent* extents, LayoutOverhang* overhangs);
+                             MinikinExtent* extents);
 
     static inline float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                                     Bidi bidiFlags, const MinikinPaint& paint,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(buf, start, count, bufSize, bidiFlags, paint,
                            startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                           collection, advances, extents, overhangs);
+                           collection, advances, extents);
     }
 
     static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                                     const MinikinPaint& paint, StartHyphenEdit startHyphen,
                                     EndHyphenEdit endHyphen,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
-                           paint, startHyphen, endHyphen, collection, advances, extents, overhangs);
+                           paint, startHyphen, endHyphen, collection, advances, extents);
     }
 
     static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                                     const MinikinPaint& paint,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
                            paint, startHyphenEdit(paint.hyphenEdit),
-                           endHyphenEdit(paint.hyphenEdit), collection, advances, extents,
-                           overhangs);
+                           endHyphenEdit(paint.hyphenEdit), collection, advances, extents);
     }
 
     // public accessors
@@ -153,10 +142,6 @@ public:
     // Get extents, copying into caller-provided buffer. The size of this buffer must match the
     // length of the string (count arg to doLayout).
     void getExtents(MinikinExtent* extents);
-
-    // Get overhangs, copying into caller-provided buffer. The size of this buffer must match the
-    // length of the string (count arg to doLayout).
-    void getOverhangs(LayoutOverhang* overhangs);
 
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
@@ -187,15 +172,14 @@ private:
                                    size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                    const std::shared_ptr<FontCollection>& collection,
-                                   Layout* layout, float* advances, MinikinExtent* extents,
-                                   LayoutOverhang* overhangs);
+                                   Layout* layout, float* advances, MinikinExtent* extents);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                               bool isRtl, LayoutContext* ctx, size_t bufStart,
                               StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                               const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                              float* advances, MinikinExtent* extents, LayoutOverhang* overhangs);
+                              float* advances, MinikinExtent* extents);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
@@ -211,9 +195,6 @@ private:
     // input text.
     std::vector<float> mAdvances;
     std::vector<MinikinExtent> mExtents;
-    std::vector<MinikinRect>
-            mClusterBounds;  // per-cluster bounds, without a shift based on
-                             // previously-shaped text. Used to calculate overhangs.
 
     std::vector<FakedFont> mFaces;
     float mAdvance;

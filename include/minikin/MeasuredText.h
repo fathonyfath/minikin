@@ -44,8 +44,8 @@ public:
     virtual uint32_t getLocaleListId() const = 0;
 
     // Fills the each character's advances, extents and overhangs.
-    virtual void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
-                            LayoutOverhang* overhangs) const = 0;
+    virtual void getMetrics(const U16StringPiece& text, float* advances,
+                            MinikinExtent* extents) const = 0;
 
     // Following two methods are only called when the implementation returns true for
     // canHyphenate method.
@@ -58,8 +58,7 @@ public:
     virtual float measureHyphenPiece(const U16StringPiece& /* text */,
                                      const Range& /* hyphenPieceRange */,
                                      StartHyphenEdit /* startHyphen */,
-                                     EndHyphenEdit /* endHyphen */, float* /* advances */,
-                                     LayoutOverhang* /* overhangs */) const {
+                                     EndHyphenEdit /* endHyphen */, float* /* advances */) const {
         return 0.0;
     }
 
@@ -82,21 +81,20 @@ public:
     uint32_t getLocaleListId() const override { return mPaint.localeListId; }
     bool isRtl() const override { return mIsRtl; }
 
-    void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
-                    LayoutOverhang* overhangs) const override {
+    void getMetrics(const U16StringPiece& text, float* advances,
+                    MinikinExtent* extents) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::measureText(text, mRange, bidiFlag, mPaint, mCollection, advances, extents,
-                            overhangs);
+        Layout::measureText(text, mRange, bidiFlag, mPaint, mCollection, advances, extents);
     }
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
 
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
-                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, float* advances,
-                             LayoutOverhang* overhangs) const override {
+                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                             float* advances) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
         return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen,
-                                   mCollection, advances, nullptr /* extent */, overhangs);
+                                   mCollection, advances, nullptr /* extent */);
     }
 
 private:
@@ -115,7 +113,7 @@ public:
     uint32_t getLocaleListId() const { return mLocaleListId; }
 
     void getMetrics(const U16StringPiece& /* unused */, float* advances,
-                    MinikinExtent* /* unused */, LayoutOverhang* /* unused */) const override {
+                    MinikinExtent* /* unused */) const override {
         advances[0] = mWidth;
         // TODO: Get the extents information from the caller.
     }
