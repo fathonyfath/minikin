@@ -55,12 +55,6 @@ constexpr float SHRINK_PENALTY_MULTIPLIER = 4.0f;
 // Maximum amount that spaces can shrink, in justified text.
 constexpr float SHRINKABILITY = 1.0 / 3.0;
 
-// ParaWidth is used to hold cumulative width from beginning of paragraph. Note that for very large
-// paragraphs, accuracy could degrade using only 32-bit float. Note however that float is used
-// extensively on the Java side for this. This is a typedef so that we can easily change it based
-// on performance/accuracy tradeoff.
-typedef double ParaWidth;
-
 // A single candidate break
 struct Candidate {
     uint32_t offset;  // offset to text buffer, in code units
@@ -154,146 +148,6 @@ std::pair<float, float> computePenalties(const Run& run, const LineWidth& lineWi
     return std::make_pair(hyphenPenalty, linePenalty);
 }
 
-// Processes and retrieve informations from characters in the paragraph.
-struct CharProcessor {
-    // The number of spaces.
-    uint32_t rawSpaceCount = 0;
-
-    // The number of spaces minus trailing spaces.
-    uint32_t effectiveSpaceCount = 0;
-
-    // The sum of character width from the paragraph start.
-    ParaWidth sumOfCharWidths = 0.0;
-
-    // The sum of character width from the paragraph start minus trailing line end spaces.
-    // This means that the line width from the paragraph start if we decided break now.
-    ParaWidth effectiveWidth = 0.0;
-
-    // The total amount of character widths at the previous word break point.
-    ParaWidth sumOfCharWidthsAtPrevWordBreak = 0.0;
-
-    // The next word break offset.
-    // This is initialized by the first call of updateLocaleIfNecessary.
-    uint32_t nextWordBreak = 0;
-
-    // The previous word break offset.
-    uint32_t prevWordBreak = 0;
-
-    // The width of a space. May be 0 if there are no spaces.
-    float spaceWidth = 0.0f;
-
-    // The current hyphenator.
-    // This is initialized by the first call of updateLocaleIfNecessary.
-    const Hyphenator* hyphenator = nullptr;
-
-    // Retrieve the current word range.
-    inline Range wordRange() const { return breaker.wordRange(); }
-
-    // Retrieve the current context range.
-    inline Range contextRange() const { return Range(prevWordBreak, nextWordBreak); }
-
-    // Returns the width from the last word break point.
-    inline ParaWidth widthFromLastWordBreak() const {
-        return effectiveWidth - sumOfCharWidthsAtPrevWordBreak;
-    }
-
-    // Returns the break penalty for the current word break point.
-    inline int wordBreakPenalty() const { return breaker.breakBadness(); }
-
-    CharProcessor(const U16StringPiece& text) { breaker.setText(text.data(), text.size()); }
-
-    void updateLocaleIfNecessary(const Run& run) {
-        // Update locale if necessary.
-        uint32_t newLocaleListId = run.getLocaleListId();
-        if (localeListId != newLocaleListId) {
-            Locale locale = getEffectiveLocale(newLocaleListId);
-            nextWordBreak = breaker.followingWithLocale(locale, run.getRange().getStart());
-            hyphenator = HyphenatorMap::lookup(locale);
-            localeListId = newLocaleListId;
-        }
-    }
-
-    // Process one character.
-    void feedChar(uint32_t idx, uint16_t c, float w) {
-        MINIKIN_ASSERT(c != CHAR_TAB, "TAB is not supported in optimal line breaking.");
-        if (idx == nextWordBreak) {
-            prevWordBreak = nextWordBreak;
-            nextWordBreak = breaker.next();
-            sumOfCharWidthsAtPrevWordBreak = sumOfCharWidths;
-        }
-        if (isWordSpace(c)) {
-            rawSpaceCount += 1;
-            spaceWidth = w;
-        }
-        sumOfCharWidths += w;
-        if (isLineEndSpace(c)) {
-            // If we break a line on a line-ending space, that space goes away. So postBreak
-            // and postSpaceCount, which keep the width and number of spaces if we decide to
-            // break at this point, don't need to get adjusted.
-        } else {
-            effectiveSpaceCount = rawSpaceCount;
-            effectiveWidth = sumOfCharWidths;
-        }
-    }
-
-private:
-    // The current locale list id.
-    uint32_t localeListId = LocaleListCache::kInvalidListId;
-
-    WordBreaker breaker;
-};
-
-// Represents a hyphenation break point.
-struct HyphenBreak {
-    // The break offset.
-    uint32_t offset;
-
-    // The hyphenation type.
-    HyphenationType type;
-
-    // The width of preceding piece after break at hyphenation point.
-    float first;
-
-    // The width of following piece after break at hyphenation point.
-    float second;
-
-    HyphenBreak(uint32_t offset, HyphenationType type, float first, float second)
-            : offset(offset), type(type), first(first), second(second) {}
-};
-
-// Retrieves hyphenation break points from a word.
-std::vector<HyphenBreak> populateHyphenationPoints(
-        const U16StringPiece& textBuf,  // A text buffer.
-        const Run& run,                 // A run of this region.
-        const Hyphenator& hyphenator,   // A hyphenator to be used for hyphenation.
-        const Range& contextRange,      // A context range for measuring hyphenated piece.
-        const Range& wordRange) {       // A word range.
-    std::vector<HyphenBreak> out;
-    if (!run.getRange().contains(contextRange) || !contextRange.contains(wordRange)) {
-        return out;
-    }
-
-    const std::vector<HyphenationType> hyphenResult =
-            hyphenate(textBuf.substr(wordRange), hyphenator);
-    for (uint32_t i = wordRange.getStart(); i < wordRange.getEnd(); ++i) {
-        const HyphenationType hyph = hyphenResult[wordRange.toRangeOffset(i)];
-        if (hyph == HyphenationType::DONT_BREAK) {
-            continue;  // Not a hyphenation point.
-        }
-
-        auto hyphenPart = contextRange.split(i);
-        const float first = run.measureHyphenPiece(textBuf, hyphenPart.first,
-                                                   StartHyphenEdit::NO_EDIT, editForThisLine(hyph),
-                                                   nullptr /* advances */, nullptr /* overhang */);
-        const float second = run.measureHyphenPiece(
-                textBuf, hyphenPart.second, editForNextLine(hyph), EndHyphenEdit::NO_EDIT,
-                nullptr /* advances */, nullptr /* overhangs */);
-
-        out.emplace_back(i, hyph, first, second);
-    }
-    return out;
-}
-
 // Represents a desperate break point.
 struct DesperateBreak {
     // The break offset.
@@ -328,22 +182,23 @@ std::vector<DesperateBreak> populateDesperatePoints(const MeasuredText& measured
 // break is shorter than hyphenation break.
 // This is important since DP in computeBreaksOptimal assumes that the result line width is
 // increased by break offset.
-void appendWithMerging(const std::vector<HyphenBreak>& hyphens,
+void appendWithMerging(std::vector<HyphenBreak>::const_iterator hyIter,
+                       std::vector<HyphenBreak>::const_iterator endHyIter,
                        const std::vector<DesperateBreak>& desperates, const CharProcessor& proc,
                        float hyphenPenalty, bool isRtl, OptimizeContext* out) {
-    auto h = hyphens.begin();
     auto d = desperates.begin();
-    while (h != hyphens.end() || d != desperates.end()) {
-        // If hyphen breaks and desperate breaks points the same offset, put desperate breaks first.
-        if (d != desperates.end() && (h == hyphens.end() || d->offset <= h->offset)) {
+    while (hyIter != endHyIter || d != desperates.end()) {
+        // If both hyphen breaks and desperate breaks point to the same offset, push desperate
+        // breaks first.
+        if (d != desperates.end() && (hyIter == endHyIter || d->offset <= hyIter->offset)) {
             out->pushDesperate(d->offset, proc.sumOfCharWidthsAtPrevWordBreak + d->sumOfChars,
                                proc.effectiveSpaceCount, isRtl);
             d++;
         } else {
-            out->pushHyphenation(h->offset, proc.sumOfCharWidths - h->second,
-                                 proc.sumOfCharWidthsAtPrevWordBreak + h->first, hyphenPenalty,
-                                 proc.effectiveSpaceCount, h->type, isRtl);
-            h++;
+            out->pushHyphenation(hyIter->offset, proc.sumOfCharWidths - hyIter->second,
+                                 proc.sumOfCharWidthsAtPrevWordBreak + hyIter->first, hyphenPenalty,
+                                 proc.effectiveSpaceCount, hyIter->type, isRtl);
+            hyIter++;
         }
     }
 }
@@ -356,6 +211,9 @@ OptimizeContext populateCandidates(const U16StringPiece& textBuf, const Measured
     CharProcessor proc(textBuf);
 
     OptimizeContext result;
+
+    const bool doHyphenation = frequency != HyphenationFrequency::None;
+    auto hyIter = std::begin(measured.hyphenBreaks);
 
     for (const auto& run : measured.runs) {
         const bool isRtl = run->isRtl();
@@ -372,6 +230,7 @@ OptimizeContext populateCandidates(const U16StringPiece& textBuf, const Measured
         proc.updateLocaleIfNecessary(*run);
 
         for (uint32_t i = range.getStart(); i < range.getEnd(); ++i) {
+            MINIKIN_ASSERT(textBuf[i] != CHAR_TAB, "TAB is not supported in optimal line breaker");
             proc.feedChar(i, textBuf[i], measured.widths[i]);
 
             const uint32_t nextCharOffset = i + 1;
@@ -383,15 +242,17 @@ OptimizeContext populateCandidates(const U16StringPiece& textBuf, const Measured
             std::vector<HyphenBreak> hyphenedBreaks;
             std::vector<DesperateBreak> desperateBreaks;
             const Range contextRange = proc.contextRange();
-            if (run->canHyphenate() && frequency != HyphenationFrequency::None) {
-                const Range wordRange = proc.wordRange();
-                hyphenedBreaks = populateHyphenationPoints(textBuf, *run, *proc.hyphenator,
-                                                           contextRange, wordRange);
+
+            auto beginHyIter = hyIter;
+            while (hyIter != std::end(measured.hyphenBreaks) &&
+                   hyIter->offset < contextRange.getEnd()) {
+                hyIter++;
             }
             if (proc.widthFromLastWordBreak() > minLineWidth) {
                 desperateBreaks = populateDesperatePoints(measured, contextRange);
             }
-            appendWithMerging(hyphenedBreaks, desperateBreaks, proc, hyphenPenalty, isRtl, &result);
+            appendWithMerging(beginHyIter, doHyphenation ? hyIter : beginHyIter, desperateBreaks,
+                              proc, hyphenPenalty, isRtl, &result);
 
             // We skip breaks for zero-width characters inside replacement spans.
             if (nextCharOffset == range.getEnd() || measured.widths[nextCharOffset] > 0) {

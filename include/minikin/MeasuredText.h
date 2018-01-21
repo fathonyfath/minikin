@@ -125,12 +125,35 @@ private:
     const uint32_t mLocaleListId;
 };
 
+// Represents a hyphenation break point.
+struct HyphenBreak {
+    // The break offset.
+    uint32_t offset;
+
+    // The hyphenation type.
+    HyphenationType type;
+
+    // The width of preceding piece after break at hyphenation point.
+    float first;
+
+    // The width of following piece after break at hyphenation point.
+    float second;
+
+    HyphenBreak(uint32_t offset, HyphenationType type, float first, float second)
+            : offset(offset), type(type), first(first), second(second) {}
+};
+
 class MeasuredText {
 public:
-    // Following three vectors have the same length.
+    // Character widths.
     std::vector<float> widths;
+
+    // Font vertical extents for characters.
+    // TODO: Introduce compression for extents. Usually, this has the same values for all chars.
     std::vector<MinikinExtent> extents;
-    std::vector<LayoutOverhang> overhangs;
+
+    // Hyphenation points.
+    std::vector<HyphenBreak> hyphenBreaks;
 
     // The style information.
     std::vector<std::unique_ptr<Run>> runs;
@@ -143,15 +166,13 @@ public:
 private:
     friend class MeasuredTextBuilder;
 
-    void measure(const U16StringPiece& textBuf);
+    void measure(const U16StringPiece& textBuf, bool computeHyphenation);
 
     // Use MeasuredTextBuilder instead.
-    MeasuredText(const U16StringPiece& textBuf, std::vector<std::unique_ptr<Run>>&& runs)
-            : widths(textBuf.size()),
-              extents(textBuf.size()),
-              overhangs(textBuf.size()),
-              runs(std::move(runs)) {
-        measure(textBuf);
+    MeasuredText(const U16StringPiece& textBuf, std::vector<std::unique_ptr<Run>>&& runs,
+                 bool computeHyphenation)
+            : widths(textBuf.size()), extents(textBuf.size()), runs(std::move(runs)) {
+        measure(textBuf, computeHyphenation);
     }
 };
 
@@ -175,9 +196,10 @@ public:
         mRuns.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
-    std::unique_ptr<MeasuredText> build(const U16StringPiece& textBuf) {
+    std::unique_ptr<MeasuredText> build(const U16StringPiece& textBuf, bool computeHyphenation) {
         // Unable to use make_unique here since make_unique is not a friend of MeasuredText.
-        return std::unique_ptr<MeasuredText>(new MeasuredText(textBuf, std::move(mRuns)));
+        return std::unique_ptr<MeasuredText>(
+                new MeasuredText(textBuf, std::move(mRuns), computeHyphenation));
     }
 
     PREVENT_COPY_ASSIGN_AND_MOVE(MeasuredTextBuilder);

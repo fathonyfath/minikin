@@ -44,7 +44,7 @@ TEST(MeasuredTextTest, RunTests) {
 
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
-    std::unique_ptr<MeasuredText> measuredText = builder.build(text);
+    std::unique_ptr<MeasuredText> measuredText = builder.build(text, true);
 
     ASSERT_TRUE(measuredText);
 
