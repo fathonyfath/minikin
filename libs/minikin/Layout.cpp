@@ -463,6 +463,9 @@ public:
     };
 
     BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags);
+    BidiText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags)
+            : BidiText(textBuf.data(), range.getStart(), range.getLength(), textBuf.size(),
+                       bidiFlags){};
 
     ~BidiText() {
         if (mBidi) {
@@ -595,8 +598,33 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
         doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize, runInfo.mIsRtl, &ctx,
                           start, startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                          collection, this, nullptr, nullptr);
+                          collection, this, nullptr, nullptr, nullptr);
     }
+    ctx.clearHbFonts();
+}
+
+// static
+void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
+                               const MinikinPaint& paint,
+                               const std::shared_ptr<FontCollection>& collection,
+                               LayoutPieces* out) {
+    android::AutoMutex _l(gMinikinLock);
+    LayoutContext ctx(paint);
+
+    float advance = 0;
+    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlag)) {
+        advance += doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength,
+                                     textBuf.size(), runInfo.mIsRtl, &ctx,
+                                     0,                         // Destination start. Not used.
+                                     StartHyphenEdit::NO_EDIT,  // Hyphen edit, not used.
+                                     EndHyphenEdit::NO_EDIT,    // Hyphen edit, not used.
+                                     collection,
+                                     nullptr,  // output layout. Not used
+                                     nullptr,  // advances. Not used
+                                     nullptr,  // extents. Not used.
+                                     out);
+    }
+
     ctx.clearHbFonts();
 }
 
@@ -616,7 +644,7 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
         advance += doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize,
                                      runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, collection,
-                                     NULL, advancesForRun, extentsForRun);
+                                     NULL, advancesForRun, extentsForRun, nullptr);
     }
 
     ctx.clearHbFonts();
@@ -627,7 +655,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                 bool isRtl, LayoutContext* ctx, size_t dstStart,
                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                 const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                                float* advances, MinikinExtent* extents) {
+                                float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     float advance = 0;
     if (!isRtl) {
         // left to right
@@ -644,7 +672,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     wordend >= start + count ? endHyphen : EndHyphenEdit::NO_EDIT,
                                     collection, layout, advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr);
+                                    extents ? extents + offset : nullptr, lpOut);
             wordstart = wordend;
         }
     } else {
@@ -663,7 +691,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, collection,
                                     layout, advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr);
+                                    extents ? extents + offset : nullptr, lpOut);
             wordend = wordstart;
         }
     }
@@ -674,7 +702,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            bool isRtl, LayoutContext* ctx, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                            const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                           float* advances, MinikinExtent* extents) {
+                           float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
     LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl, startHyphen,
                        endHyphen);
@@ -695,6 +723,9 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
             layoutForWord.getExtents(extents);
         }
         advance = layoutForWord.getAdvance();
+        if (lpOut != nullptr) {
+            lpOut->offsetMap.insert(std::make_pair(bufStart, layoutForWord));
+        }
     } else {
         Layout* layoutForWord = cache.get(key, ctx, collection);
         if (layout) {
@@ -707,6 +738,9 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
             layoutForWord->getExtents(extents);
         }
         advance = layoutForWord->getAdvance();
+        if (lpOut != nullptr) {
+            lpOut->offsetMap.insert(std::make_pair(bufStart, *layoutForWord));
+        }
     }
 
     if (wordSpacing != 0) {

@@ -54,6 +54,8 @@ public:
     // Returns null if canHyphenate has not returned true.
     virtual const MinikinPaint* getPaint() const { return nullptr; }
 
+    virtual void addToLayoutPieces(const U16StringPiece&, LayoutPieces*) const {}
+
     // Measures the hyphenation piece and fills each character's advances and overhangs.
     virtual float measureHyphenPiece(const U16StringPiece& /* text */,
                                      const Range& /* hyphenPieceRange */,
@@ -88,6 +90,11 @@ public:
     }
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
+
+    virtual void addToLayoutPieces(const U16StringPiece& textBuf, LayoutPieces* out) const {
+        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+        Layout::addToLayoutPieces(textBuf, mRange, bidiFlag, mPaint, mCollection, out);
+    }
 
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
@@ -156,6 +163,14 @@ public:
     // The style information.
     std::vector<std::unique_ptr<Run>> runs;
 
+    // The copied layout pieces for construcing final layouts.
+    // TODO: Stop assigning width/extents if layout pieces are available for reducing memory impact.
+    LayoutPieces layoutPieces;
+
+    bool buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
+                     const std::shared_ptr<FontCollection>& fc, Bidi bidiFlag, int mtOffset,
+                     Layout* layout);
+
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;
 
@@ -164,13 +179,13 @@ public:
 private:
     friend class MeasuredTextBuilder;
 
-    void measure(const U16StringPiece& textBuf, bool computeHyphenation);
+    void measure(const U16StringPiece& textBuf, bool computeHyphenation, bool computeLayout);
 
     // Use MeasuredTextBuilder instead.
     MeasuredText(const U16StringPiece& textBuf, std::vector<std::unique_ptr<Run>>&& runs,
-                 bool computeHyphenation)
+                 bool computeHyphenation, bool computeLayout)
             : widths(textBuf.size()), extents(textBuf.size()), runs(std::move(runs)) {
-        measure(textBuf, computeHyphenation);
+        measure(textBuf, computeHyphenation, computeLayout);
     }
 };
 
@@ -194,10 +209,11 @@ public:
         mRuns.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
-    std::unique_ptr<MeasuredText> build(const U16StringPiece& textBuf, bool computeHyphenation) {
+    std::unique_ptr<MeasuredText> build(const U16StringPiece& textBuf, bool computeHyphenation,
+                                        bool computeLayout) {
         // Unable to use make_unique here since make_unique is not a friend of MeasuredText.
         return std::unique_ptr<MeasuredText>(
-                new MeasuredText(textBuf, std::move(mRuns), computeHyphenation));
+                new MeasuredText(textBuf, std::move(mRuns), computeHyphenation, computeLayout));
     }
 
     PREVENT_COPY_ASSIGN_AND_MOVE(MeasuredTextBuilder);

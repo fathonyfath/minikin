@@ -18,13 +18,18 @@
 #define MINIKIN_LAYOUT_H
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
+
+#include <gtest/gtest_prod.h>
 
 #include "minikin/FontCollection.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 
 namespace minikin {
+
+class Layout;
 
 struct LayoutGlyph {
     // index into mFaces and mHbFonts vectors. We could imagine
@@ -59,6 +64,11 @@ inline bool isOverride(Bidi bidi) {
     return static_cast<uint8_t>(bidi) & 0b0100;
 }
 
+struct LayoutPieces {
+    // TODO: Sorted vector of pairs may be faster?
+    std::unordered_map<uint32_t, Layout> offsetMap;  // start offset to layout index map.
+};
+
 // Lifecycle and threading assumptions for Layout:
 // The object is assumed to be owned by a single thread; multiple threads
 // may not mutate it at the same time.
@@ -76,9 +86,8 @@ public:
 
     Layout(Layout&& layout) = default;
 
-    // Forbid copying and assignment.
-    Layout(const Layout&) = delete;
-    void operator=(const Layout&) = delete;
+    Layout(const Layout&) = default;
+    Layout& operator=(const Layout&) = default;
 
     void dump() const;
 
@@ -91,6 +100,11 @@ public:
         doLayout(str.data(), range.getStart(), range.getLength(), str.size(), bidiFlags, paint,
                  collection);
     }
+
+    static void addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
+                                  const MinikinPaint& paint,
+                                  const std::shared_ptr<FontCollection>& collection,
+                                  LayoutPieces* out);
 
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                              Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
@@ -125,6 +139,8 @@ public:
                            endHyphenEdit(paint.hyphenEdit), collection, advances, extents);
     }
 
+    inline const std::vector<float>& advances() const { return mAdvances; }
+
     // public accessors
     size_t nGlyphs() const;
     const MinikinFont* getFont(int i) const;
@@ -158,6 +174,12 @@ public:
 private:
     friend class LayoutCacheKey;
 
+    // TODO: Remove friend class with decoupling building logic from Layout.
+    friend class LayoutCompositer;
+
+    // TODO: Remove friend test by doing text layout in unit test.
+    FRIEND_TEST(MeasuredTextTest, buildLayoutTest);
+
     // Find a face in the mFaces vector. If not found, push back the entry to mFaces.
     // If ctx is provided, push back hb_font_t to LayoutContext::hbFonts as well.
     int findOrPushBackFace(const FakedFont& face, LayoutContext* ctx);
@@ -172,14 +194,15 @@ private:
                                    size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                    const std::shared_ptr<FontCollection>& collection,
-                                   Layout* layout, float* advances, MinikinExtent* extents);
+                                   Layout* layout, float* advances, MinikinExtent* extents,
+                                   LayoutPieces* lpOut);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                               bool isRtl, LayoutContext* ctx, size_t bufStart,
                               StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                               const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                              float* advances, MinikinExtent* extents);
+                              float* advances, MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
@@ -199,6 +222,25 @@ private:
     std::vector<FakedFont> mFaces;
     float mAdvance;
     MinikinRect mBounds;
+};
+
+class LayoutCompositer {
+public:
+    LayoutCompositer(uint32_t size) {
+        mLayout.reset();
+        mLayout.mAdvances.resize(size, 0);
+        mLayout.mExtents.resize(size);
+    }
+
+    void append(const Layout& layout, uint32_t start, float extraAdvance) {
+        // TODO: remove const cast.
+        mLayout.appendLayout(const_cast<Layout*>(&layout), start, extraAdvance);
+    }
+
+    Layout build() { return std::move(mLayout); }
+
+private:
+    Layout mLayout;
 };
 
 }  // namespace minikin

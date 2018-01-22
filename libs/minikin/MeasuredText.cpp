@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "Minikin"
 #include "minikin/MeasuredText.h"
+
+#include "minikin/Layout.h"
 
 #include "LineBreakerUtil.h"
 
 namespace minikin {
 
-void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenation) {
+void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenation,
+                           bool computeLayout) {
     if (textBuf.size() == 0) {
         return;
     }
@@ -29,6 +33,10 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
         const Range& range = run->getRange();
         const uint32_t runOffset = range.getStart();
         run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset);
+
+        if (computeLayout) {
+            run->addToLayoutPieces(textBuf, &layoutPieces);
+        }
 
         if (!computeHyphenation || !run->canHyphenate()) {
             continue;
@@ -47,6 +55,38 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
                                       proc.wordRange(), &hyphenBreaks);
         }
     }
+}
+
+bool MeasuredText::buildLayout(const U16StringPiece& /*textBuf*/, const Range& range,
+                               const MinikinPaint& paint,
+                               const std::shared_ptr<FontCollection>& /*fc*/, Bidi /*bidiFlag*/,
+                               int mtOffset, Layout* layout) {
+    if (paint.wordSpacing != 0.0f || paint.hyphenEdit != 0) {
+        // TODO: Use layout result as much as possible even if justified lines and hyphenated lines.
+        return false;
+    }
+
+    uint32_t start = range.getStart() + mtOffset;
+    const uint32_t end = range.getEnd() + mtOffset;
+    LayoutCompositer compositer(range.getLength());
+    while (start < end) {
+        auto ite = layoutPieces.offsetMap.find(start);
+        if (ite == layoutPieces.offsetMap.end()) {
+            // The layout result not found, possibly due to hyphenation or desperate breaks.
+            // TODO: Do layout here only for necessary piece and keep composing final layout.
+            return false;
+        }
+        if (start + ite->second.advances().size() > end) {
+            // The width of the layout piece exceeds the end of line, possibly due to hyphenation
+            // or desperate breaks.
+            // TODO: Do layout here only for necessary piece and keep composing final layout.
+            return false;
+        }
+        compositer.append(ite->second, start - mtOffset, 0);
+        start += ite->second.advances().size();
+    }
+    *layout = std::move(compositer.build());
+    return true;
 }
 
 }  // namespace minikin
