@@ -24,6 +24,7 @@
 #include "minikin/FontFamily.h"
 #include "minikin/LocaleList.h"
 
+#include "FreeTypeMinikinFontForTest.h"
 #include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
@@ -111,8 +112,15 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
     xmlFreeDoc(doc);
     return families;
 }
+
 std::shared_ptr<FontCollection> getFontCollection(const char* fontDir, const char* fontXml) {
     return std::make_shared<FontCollection>(getFontFamilies(fontDir, fontXml));
+}
+
+std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath) {
+    auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
+    auto family = std::make_shared<FontFamily>(std::vector<Font>({Font(font, FontStyle())}));
+    return std::make_shared<FontCollection>(std::move(family));
 }
 
 }  // namespace minikin

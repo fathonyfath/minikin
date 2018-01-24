@@ -4,6 +4,7 @@ cc_library_static {
         "FileUtils.cpp",
         "FontTestUtils.cpp",
         "MinikinFontForTest.cpp",
+        "FreeTypeMinikinFontForTest.cpp",
         "UnicodeUtils.cpp",
     ],
     cflags: ["-Wall", "-Werror"],
