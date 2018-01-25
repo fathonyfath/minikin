@@ -167,6 +167,11 @@ public:
     // TODO: Stop assigning width/extents if layout pieces are available for reducing memory impact.
     LayoutPieces layoutPieces;
 
+    uint32_t getMemoryUsage() const {
+        return sizeof(float) * widths.size() + sizeof(MinikinExtent) * extents.size() +
+               sizeof(HyphenBreak) * hyphenBreaks.size() + layoutPieces.getMemoryUsage();
+    }
+
     bool buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
                      const std::shared_ptr<FontCollection>& fc, Bidi bidiFlag, int mtOffset,
                      Layout* layout);
