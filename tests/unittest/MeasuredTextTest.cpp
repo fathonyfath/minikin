@@ -24,7 +24,6 @@
 #include "UnicodeUtils.h"
 
 namespace minikin {
-namespace android {
 
 constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 for advance.
 constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
@@ -44,7 +43,8 @@ TEST(MeasuredTextTest, RunTests) {
 
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
-    std::unique_ptr<MeasuredText> measuredText = builder.build(text, true);
+    std::unique_ptr<MeasuredText> measuredText =
+            builder.build(text, true /* compute hyphenation */, false /* compute full layout */);
 
     ASSERT_TRUE(measuredText);
 
@@ -55,5 +55,88 @@ TEST(MeasuredTextTest, RunTests) {
     EXPECT_EQ(expectedWidths, measuredText->widths);
 }
 
-}  // namespace android
+TEST(MeasuredTextTest, buildLayoutTest) {
+    std::vector<uint16_t> text = utf8ToUtf16("Hello, world.");
+    Range range(0, text.size());
+    MinikinPaint paint;
+    std::shared_ptr<FontCollection> collection =
+            getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
+    Bidi bidi = Bidi::FORCE_LTR;
+
+    MeasuredTextBuilder builder;
+    builder.addStyleRun(0, text.size(), MinikinPaint(), collection, false /* is RTL */);
+    std::unique_ptr<MeasuredText> mt = builder.build(
+            text, true /* compute hyphenation */,
+            false /* compute full layout. Fill manually later for testing purposes */);
+
+    auto& offsetMap = mt->layoutPieces.offsetMap;
+    {
+        // If there is no pre-computed layouts, do not touch layout and return false.
+        Layout layout;
+        offsetMap.clear();
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, collection, bidi, 0, &layout));
+        EXPECT_EQ(0U, layout.nGlyphs());
+    }
+    {
+        // If layout result size is different, do not touch layout and return false.
+        Layout outLayout;
+        Layout inLayout;
+        inLayout.mAdvances.resize(text.size() + 1);
+        offsetMap.clear();
+        offsetMap[0] = inLayout;
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, collection, bidi, 0, &outLayout));
+        EXPECT_EQ(0U, outLayout.nGlyphs());
+    }
+    {
+        // If requested layout starts from unknown position, do not touch layout and return false.
+        Layout outLayout;
+        Layout inLayout;
+        inLayout.mAdvances.resize(text.size());
+        offsetMap.clear();
+        offsetMap[0] = inLayout;
+        EXPECT_FALSE(mt->buildLayout(text, Range(range.getStart() + 1, range.getEnd()), paint,
+                                     collection, bidi, 0, &outLayout));
+        EXPECT_EQ(0U, outLayout.nGlyphs());
+    }
+    {
+        // If requested layout starts from unknown position, do not touch layout and return false.
+        // (MeasuredText offset moves forward.)
+        Layout outLayout;
+        Layout inLayout;
+        inLayout.mAdvances.resize(text.size());
+        offsetMap.clear();
+        offsetMap[0] = inLayout;
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, collection, bidi, 1, &outLayout));
+        EXPECT_EQ(0U, outLayout.nGlyphs());
+    }
+    {
+        // Currently justification is not supported.
+        Layout outLayout;
+        Layout inLayout;
+        inLayout.mAdvances.resize(text.size());
+        offsetMap.clear();
+        offsetMap[0] = inLayout;
+        MinikinPaint justifiedPaint;
+        justifiedPaint.wordSpacing = 1.0;
+        EXPECT_FALSE(mt->buildLayout(text, range, justifiedPaint, collection, bidi, 0, &outLayout));
+        EXPECT_EQ(0U, outLayout.nGlyphs());
+    }
+    {
+        // Currently hyphenation is not supported.
+        Layout outLayout;
+        Layout inLayout;
+        inLayout.mAdvances.resize(text.size());
+        offsetMap.clear();
+        offsetMap[0] = inLayout;
+        MinikinPaint hyphenatedPaint;
+        hyphenatedPaint.hyphenEdit =
+                packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN);
+        EXPECT_FALSE(
+                mt->buildLayout(text, range, hyphenatedPaint, collection, bidi, 0, &outLayout));
+        EXPECT_EQ(0U, outLayout.nGlyphs());
+    }
+
+    // TODO: Add positive test case. This requires Layout refactoring or real text layout in test.
+}
+
 }  // namespace minikin

@@ -82,16 +82,14 @@ inline void populateHyphenationPoints(
         }
 
         auto hyphenPart = contextRange.split(i);
-        const float first = run.measureHyphenPiece(textBuf /* text */,
-                                                   hyphenPart.first /* hyphenated piece range */,
-                                                   StartHyphenEdit::NO_EDIT /* start hyphen edit */,
-                                                   editForThisLine(hyph) /* end hyphen edit */,
-                                                   nullptr /* advances */, nullptr /* overhang */);
+        const float first = run.measureHyphenPiece(
+                textBuf /* text */, hyphenPart.first /* hyphenated piece range */,
+                StartHyphenEdit::NO_EDIT /* start hyphen edit */,
+                editForThisLine(hyph) /* end hyphen edit */, nullptr /* advances */);
         const float second = run.measureHyphenPiece(
                 textBuf /* text */, hyphenPart.second /* hyphenated piece range */,
                 editForNextLine(hyph) /* start hyphen edit */,
-                EndHyphenEdit::NO_EDIT /* end hyphen edit */, nullptr /* advances */,
-                nullptr /* overhangs */);
+                EndHyphenEdit::NO_EDIT /* end hyphen edit */, nullptr /* advances */);
 
         out->emplace_back(i, hyph, first, second);
     }

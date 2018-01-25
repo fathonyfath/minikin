@@ -453,6 +453,54 @@ TEST_F(LayoutTest, verticalExtentTest) {
     }
 }
 
+TEST_F(LayoutTest, measuredTextTest) {
+    // The test font has following coverage and width.
+    // U+0020: 10em
+    // U+002E (.): 10em
+    // U+0043 (C): 100em
+    // U+0049 (I): 1em
+    // U+004C (L): 50em
+    // U+0056 (V): 5em
+    // U+0058 (X): 10em
+    // U+005F (_): 0em
+    // U+FFFD (invalid surrogate will be replaced to this): 7em
+    // U+10331 (\uD800\uDF31): 10em
+    auto fc = buildFontCollection(kTestFontDir "/LayoutTestFont.ttf");
+    {
+        MinikinPaint paint;
+        std::vector<uint16_t> text = utf8ToUtf16("I");
+        std::vector<float> advances(text.size());
+        Range range(0, text.size());
+        EXPECT_EQ(1.0f,
+                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+        ASSERT_EQ(1u, advances.size());
+        EXPECT_EQ(1.0f, advances[0]);
+    }
+    {
+        MinikinPaint paint;
+        std::vector<uint16_t> text = utf8ToUtf16("IV");
+        std::vector<float> advances(text.size());
+        Range range(0, text.size());
+        EXPECT_EQ(6.0f,
+                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+        ASSERT_EQ(2u, advances.size());
+        EXPECT_EQ(1.0f, advances[0]);
+        EXPECT_EQ(5.0f, advances[1]);
+    }
+    {
+        MinikinPaint paint;
+        std::vector<uint16_t> text = utf8ToUtf16("IVX");
+        std::vector<float> advances(text.size());
+        Range range(0, text.size());
+        EXPECT_EQ(16.0f,
+                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+        ASSERT_EQ(3u, advances.size());
+        EXPECT_EQ(1.0f, advances[0]);
+        EXPECT_EQ(5.0f, advances[1]);
+        EXPECT_EQ(10.0f, advances[2]);
+    }
+}
+
 // TODO: Add more test cases, e.g. measure text, letter spacing.
 
 }  // namespace minikin

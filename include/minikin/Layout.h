@@ -18,13 +18,18 @@
 #define MINIKIN_LAYOUT_H
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
+
+#include <gtest/gtest_prod.h>
 
 #include "minikin/FontCollection.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 
 namespace minikin {
+
+class Layout;
 
 struct LayoutGlyph {
     // index into mFaces and mHbFonts vectors. We could imagine
@@ -37,12 +42,6 @@ struct LayoutGlyph {
     unsigned int glyph_id;
     float x;
     float y;
-};
-
-struct LayoutOverhang {
-    // The amount of space needed to draw a glyph or glyph cluster beyond its advance box.
-    float left = 0.0;
-    float right = 0.0;
 };
 
 // Internal state used during layout operation
@@ -65,6 +64,11 @@ inline bool isOverride(Bidi bidi) {
     return static_cast<uint8_t>(bidi) & 0b0100;
 }
 
+struct LayoutPieces {
+    // TODO: Sorted vector of pairs may be faster?
+    std::unordered_map<uint32_t, Layout> offsetMap;  // start offset to layout index map.
+};
+
 // Lifecycle and threading assumptions for Layout:
 // The object is assumed to be owned by a single thread; multiple threads
 // may not mutate it at the same time.
@@ -74,7 +78,6 @@ public:
             : mGlyphs(),
               mAdvances(),
               mExtents(),
-              mClusterBounds(),
               mFaces(),
               mAdvance(0),
               mBounds() {
@@ -83,9 +86,8 @@ public:
 
     Layout(Layout&& layout) = default;
 
-    // Forbid copying and assignment.
-    Layout(const Layout&) = delete;
-    void operator=(const Layout&) = delete;
+    Layout(const Layout&) = default;
+    Layout& operator=(const Layout&) = default;
 
     void dump() const;
 
@@ -99,42 +101,45 @@ public:
                  collection);
     }
 
+    static void addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
+                                  const MinikinPaint& paint,
+                                  const std::shared_ptr<FontCollection>& collection,
+                                  LayoutPieces* out);
+
     static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                              Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
                              EndHyphenEdit endHyphen,
                              const std::shared_ptr<FontCollection>& collection, float* advances,
-                             MinikinExtent* extents, LayoutOverhang* overhangs);
+                             MinikinExtent* extents);
 
     static inline float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                                     Bidi bidiFlags, const MinikinPaint& paint,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(buf, start, count, bufSize, bidiFlags, paint,
                            startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                           collection, advances, extents, overhangs);
+                           collection, advances, extents);
     }
 
     static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                                     const MinikinPaint& paint, StartHyphenEdit startHyphen,
                                     EndHyphenEdit endHyphen,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
-                           paint, startHyphen, endHyphen, collection, advances, extents, overhangs);
+                           paint, startHyphen, endHyphen, collection, advances, extents);
     }
 
     static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                                     const MinikinPaint& paint,
                                     const std::shared_ptr<FontCollection>& collection,
-                                    float* advances, MinikinExtent* extents,
-                                    LayoutOverhang* overhangs) {
+                                    float* advances, MinikinExtent* extents) {
         return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
                            paint, startHyphenEdit(paint.hyphenEdit),
-                           endHyphenEdit(paint.hyphenEdit), collection, advances, extents,
-                           overhangs);
+                           endHyphenEdit(paint.hyphenEdit), collection, advances, extents);
     }
+
+    inline const std::vector<float>& advances() const { return mAdvances; }
 
     // public accessors
     size_t nGlyphs() const;
@@ -154,10 +159,6 @@ public:
     // length of the string (count arg to doLayout).
     void getExtents(MinikinExtent* extents);
 
-    // Get overhangs, copying into caller-provided buffer. The size of this buffer must match the
-    // length of the string (count arg to doLayout).
-    void getOverhangs(LayoutOverhang* overhangs);
-
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
     float getCharAdvance(size_t i) const { return mAdvances[i]; }
@@ -172,6 +173,12 @@ public:
 
 private:
     friend class LayoutCacheKey;
+
+    // TODO: Remove friend class with decoupling building logic from Layout.
+    friend class LayoutCompositer;
+
+    // TODO: Remove friend test by doing text layout in unit test.
+    FRIEND_TEST(MeasuredTextTest, buildLayoutTest);
 
     // Find a face in the mFaces vector. If not found, push back the entry to mFaces.
     // If ctx is provided, push back hb_font_t to LayoutContext::hbFonts as well.
@@ -188,14 +195,14 @@ private:
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                    const std::shared_ptr<FontCollection>& collection,
                                    Layout* layout, float* advances, MinikinExtent* extents,
-                                   LayoutOverhang* overhangs);
+                                   LayoutPieces* lpOut);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                               bool isRtl, LayoutContext* ctx, size_t bufStart,
                               StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                               const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                              float* advances, MinikinExtent* extents, LayoutOverhang* overhangs);
+                              float* advances, MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
@@ -211,13 +218,29 @@ private:
     // input text.
     std::vector<float> mAdvances;
     std::vector<MinikinExtent> mExtents;
-    std::vector<MinikinRect>
-            mClusterBounds;  // per-cluster bounds, without a shift based on
-                             // previously-shaped text. Used to calculate overhangs.
 
     std::vector<FakedFont> mFaces;
     float mAdvance;
     MinikinRect mBounds;
+};
+
+class LayoutCompositer {
+public:
+    LayoutCompositer(uint32_t size) {
+        mLayout.reset();
+        mLayout.mAdvances.resize(size, 0);
+        mLayout.mExtents.resize(size);
+    }
+
+    void append(const Layout& layout, uint32_t start, float extraAdvance) {
+        // TODO: remove const cast.
+        mLayout.appendLayout(const_cast<Layout*>(&layout), start, extraAdvance);
+    }
+
+    Layout build() { return std::move(mLayout); }
+
+private:
+    Layout mLayout;
 };
 
 }  // namespace minikin

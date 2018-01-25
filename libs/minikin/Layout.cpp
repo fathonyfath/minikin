@@ -129,7 +129,6 @@ public:
                   const std::shared_ptr<FontCollection>& collection) const {
         layout->mAdvances.resize(mCount, 0);
         layout->mExtents.resize(mCount);
-        layout->mClusterBounds.resize(mCount);
         ctx->clearHbFonts();
         layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen,
                             collection);
@@ -280,7 +279,6 @@ void Layout::reset() {
     mBounds.setEmpty();
     mAdvances.clear();
     mExtents.clear();
-    mClusterBounds.clear();
     mAdvance = 0;
 }
 
@@ -465,6 +463,9 @@ public:
     };
 
     BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags);
+    BidiText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags)
+            : BidiText(textBuf.data(), range.getStart(), range.getLength(), textBuf.size(),
+                       bidiFlags){};
 
     ~BidiText() {
         if (mBidi) {
@@ -593,7 +594,6 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
     reset();
     mAdvances.resize(count, 0);
     mExtents.resize(count);
-    mClusterBounds.resize(count);
 
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
         doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize, runInfo.mIsRtl, &ctx,
@@ -603,11 +603,36 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
     ctx.clearHbFonts();
 }
 
+// static
+void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
+                               const MinikinPaint& paint,
+                               const std::shared_ptr<FontCollection>& collection,
+                               LayoutPieces* out) {
+    android::AutoMutex _l(gMinikinLock);
+    LayoutContext ctx(paint);
+
+    float advance = 0;
+    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlag)) {
+        advance += doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength,
+                                     textBuf.size(), runInfo.mIsRtl, &ctx,
+                                     0,                         // Destination start. Not used.
+                                     StartHyphenEdit::NO_EDIT,  // Hyphen edit, not used.
+                                     EndHyphenEdit::NO_EDIT,    // Hyphen edit, not used.
+                                     collection,
+                                     nullptr,  // output layout. Not used
+                                     nullptr,  // advances. Not used
+                                     nullptr,  // extents. Not used.
+                                     out);
+    }
+
+    ctx.clearHbFonts();
+}
+
 float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                           Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
                           EndHyphenEdit endHyphen,
                           const std::shared_ptr<FontCollection>& collection, float* advances,
-                          MinikinExtent* extents, LayoutOverhang* overhangs) {
+                          MinikinExtent* extents) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx(paint);
@@ -617,10 +642,9 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
         const size_t offset = runInfo.mRunStart - start;
         float* advancesForRun = advances ? advances + offset : nullptr;
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
-        LayoutOverhang* overhangsForRun = overhangs ? overhangs + offset : nullptr;
         advance += doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize,
                                      runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, collection,
-                                     NULL, advancesForRun, extentsForRun, overhangsForRun);
+                                     NULL, advancesForRun, extentsForRun, nullptr);
     }
 
     ctx.clearHbFonts();
@@ -631,8 +655,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                 bool isRtl, LayoutContext* ctx, size_t dstStart,
                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                 const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                                float* advances, MinikinExtent* extents,
-                                LayoutOverhang* overhangs) {
+                                float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     float advance = 0;
     if (!isRtl) {
         // left to right
@@ -649,8 +672,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     wordend >= start + count ? endHyphen : EndHyphenEdit::NO_EDIT,
                                     collection, layout, advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr,
-                                    overhangs ? overhangs + offset : nullptr);
+                                    extents ? extents + offset : nullptr, lpOut);
             wordstart = wordend;
         }
     } else {
@@ -669,8 +691,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, collection,
                                     layout, advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr,
-                                    overhangs ? overhangs + offset : nullptr);
+                                    extents ? extents + offset : nullptr, lpOut);
             wordend = wordstart;
         }
     }
@@ -681,7 +702,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            bool isRtl, LayoutContext* ctx, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                            const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                           float* advances, MinikinExtent* extents, LayoutOverhang* overhangs) {
+                           float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
     LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl, startHyphen,
                        endHyphen);
@@ -701,10 +722,10 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
         if (extents) {
             layoutForWord.getExtents(extents);
         }
-        if (overhangs) {
-            layoutForWord.getOverhangs(overhangs);
-        }
         advance = layoutForWord.getAdvance();
+        if (lpOut != nullptr) {
+            lpOut->offsetMap.insert(std::make_pair(bufStart, layoutForWord));
+        }
     } else {
         Layout* layoutForWord = cache.get(key, ctx, collection);
         if (layout) {
@@ -716,10 +737,10 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
         if (extents) {
             layoutForWord->getExtents(extents);
         }
-        if (overhangs) {
-            layoutForWord->getOverhangs(overhangs);
-        }
         advance = layoutForWord->getAdvance();
+        if (lpOut != nullptr) {
+            lpOut->offsetMap.insert(std::make_pair(bufStart, *layoutForWord));
+        }
     }
 
     if (wordSpacing != 0) {
@@ -1031,7 +1052,6 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
 
                 if (clusterBaseIndex < count) {
                     mAdvances[clusterBaseIndex] += xAdvance;
-                    mClusterBounds[clusterBaseIndex].join(glyphBounds);
                 } else {
                     ALOGE("cluster %zu (start %zu) out of bounds of count %zu", clusterBaseIndex,
                           start, count);
@@ -1077,7 +1097,6 @@ void Layout::appendLayout(Layout* src, size_t start, float extraAdvance) {
             mAdvances[start] += extraAdvance;
         }
         mExtents[i + start] = src->mExtents[i];
-        mClusterBounds[i + start] = src->mClusterBounds[i];
     }
     MinikinRect srcBounds(src->mBounds);
     srcBounds.offset(x0, 0);
@@ -1128,18 +1147,6 @@ void Layout::getAdvances(float* advances) {
 
 void Layout::getExtents(MinikinExtent* extents) {
     memcpy(extents, &mExtents[0], mExtents.size() * sizeof(MinikinExtent));
-}
-
-void Layout::getOverhangs(LayoutOverhang* overhangs) {
-    const size_t len = mAdvances.size();
-    for (size_t i = 0; i < len; i++) {
-        if (mAdvances[i] == 0.0) {
-            overhangs[i] = {0.0, 0.0};
-        } else {
-            overhangs[i].left = std::max(0.0f, -mClusterBounds[i].mLeft);
-            overhangs[i].right = std::max(0.0f, mClusterBounds[i].mRight - mAdvances[i]);
-        }
-    }
 }
 
 void Layout::getBounds(MinikinRect* bounds) const {
