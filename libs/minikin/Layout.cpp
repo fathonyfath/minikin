@@ -91,14 +91,13 @@ struct LayoutContext {
 
 class LayoutCacheKey {
 public:
-    LayoutCacheKey(const std::shared_ptr<FontCollection>& collection, const MinikinPaint& paint,
-                   const uint16_t* chars, size_t start, size_t count, size_t nchars, bool dir,
-                   StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
+    LayoutCacheKey(const MinikinPaint& paint, const uint16_t* chars, size_t start, size_t count,
+                   size_t nchars, bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
             : mChars(chars),
               mNchars(nchars),
               mStart(start),
               mCount(count),
-              mId(collection->getId()),
+              mId(paint.font->getId()),
               mStyle(paint.fontStyle),
               mSize(paint.size),
               mScaleX(paint.scaleX),
@@ -125,13 +124,11 @@ public:
         mChars = NULL;
     }
 
-    void doLayout(Layout* layout, LayoutContext* ctx,
-                  const std::shared_ptr<FontCollection>& collection) const {
+    void doLayout(Layout* layout, LayoutContext* ctx) const {
         layout->mAdvances.resize(mCount, 0);
         layout->mExtents.resize(mCount);
         ctx->clearHbFonts();
-        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen,
-                            collection);
+        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen);
     }
 
 private:
@@ -166,14 +163,13 @@ public:
 
     void clear() { mCache.clear(); }
 
-    Layout* get(LayoutCacheKey& key, LayoutContext* ctx,
-                const std::shared_ptr<FontCollection>& collection) {
+    Layout* get(LayoutCacheKey& key, LayoutContext* ctx) {
         Layout* layout = mCache.get(key);
         mRequestCount++;
         if (layout == NULL) {
             key.copyText();
             layout = new Layout();
-            key.doLayout(layout, ctx, collection);
+            key.doLayout(layout, ctx);
             mCache.put(key, layout);
         } else {
             mCacheHitCount++;
@@ -585,8 +581,7 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
 }
 
 void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                      Bidi bidiFlags, const MinikinPaint& paint,
-                      const std::shared_ptr<FontCollection>& collection) {
+                      Bidi bidiFlags, const MinikinPaint& paint) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx(paint);
@@ -598,7 +593,7 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
     for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
         doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize, runInfo.mIsRtl, &ctx,
                           start, startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                          collection, this, nullptr, nullptr, nullptr);
+                          this, nullptr, nullptr, nullptr);
     }
     ctx.clearHbFonts();
 }
@@ -606,7 +601,6 @@ void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bu
 // static
 void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
                                const MinikinPaint& paint,
-                               const std::shared_ptr<FontCollection>& collection,
                                LayoutPieces* out) {
     android::AutoMutex _l(gMinikinLock);
     LayoutContext ctx(paint);
@@ -618,7 +612,6 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
                                      0,                         // Destination start. Not used.
                                      StartHyphenEdit::NO_EDIT,  // Hyphen edit, not used.
                                      EndHyphenEdit::NO_EDIT,    // Hyphen edit, not used.
-                                     collection,
                                      nullptr,  // output layout. Not used
                                      nullptr,  // advances. Not used
                                      nullptr,  // extents. Not used.
@@ -630,9 +623,7 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
 
 float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                           Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
-                          EndHyphenEdit endHyphen,
-                          const std::shared_ptr<FontCollection>& collection, float* advances,
-                          MinikinExtent* extents) {
+                          EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx(paint);
@@ -643,8 +634,8 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
         float* advancesForRun = advances ? advances + offset : nullptr;
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
         advance += doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize,
-                                     runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, collection,
-                                     NULL, advancesForRun, extentsForRun, nullptr);
+                                     runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, NULL,
+                                     advancesForRun, extentsForRun, nullptr);
     }
 
     ctx.clearHbFonts();
@@ -654,8 +645,8 @@ float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_
 float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                                 bool isRtl, LayoutContext* ctx, size_t dstStart,
                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                const std::shared_ptr<FontCollection>& collection, Layout* layout,
-                                float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
+                                Layout* layout, float* advances, MinikinExtent* extents,
+                                LayoutPieces* lpOut) {
     float advance = 0;
     if (!isRtl) {
         // left to right
@@ -671,7 +662,7 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     // Only apply hyphen to the first or last word in the string.
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     wordend >= start + count ? endHyphen : EndHyphenEdit::NO_EDIT,
-                                    collection, layout, advances ? advances + offset : nullptr,
+                                    layout, advances ? advances + offset : nullptr,
                                     extents ? extents + offset : nullptr, lpOut);
             wordstart = wordend;
         }
@@ -689,8 +680,8 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
                                     // Only apply hyphen to the first (rightmost) or last (leftmost)
                                     // word in the string.
                                     wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
-                                    iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, collection,
-                                    layout, advances ? advances + offset : nullptr,
+                                    iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, layout,
+                                    advances ? advances + offset : nullptr,
                                     extents ? extents + offset : nullptr, lpOut);
             wordend = wordstart;
         }
@@ -700,19 +691,17 @@ float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count,
 
 float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                            bool isRtl, LayoutContext* ctx, size_t bufStart,
-                           StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                           const std::shared_ptr<FontCollection>& collection, Layout* layout,
+                           StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                            float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
-    LayoutCacheKey key(collection, ctx->paint, buf, start, count, bufSize, isRtl, startHyphen,
-                       endHyphen);
+    LayoutCacheKey key(ctx->paint, buf, start, count, bufSize, isRtl, startHyphen, endHyphen);
 
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
 
     float advance;
     if (ctx->paint.skipCache()) {
         Layout layoutForWord;
-        key.doLayout(&layoutForWord, ctx, collection);
+        key.doLayout(&layoutForWord, ctx);
         if (layout) {
             layout->appendLayout(&layoutForWord, bufStart, wordSpacing);
         }
@@ -727,7 +716,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
             lpOut->offsetMap.insert(std::make_pair(bufStart, layoutForWord));
         }
     } else {
-        Layout* layoutForWord = cache.get(key, ctx, collection);
+        Layout* layoutForWord = cache.get(key, ctx);
         if (layout) {
             layout->appendLayout(layoutForWord, bufStart, wordSpacing);
         }
@@ -901,11 +890,10 @@ static inline uint32_t addToHbBuffer(hb_buffer_t* buffer, const uint16_t* buf, s
 
 void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                          bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen,
-                         EndHyphenEdit endHyphen,
-                         const std::shared_ptr<FontCollection>& collection) {
+                         EndHyphenEdit endHyphen) {
     hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
     std::vector<FontCollection::Run> items;
-    collection->itemize(buf + start, count, ctx->paint, &items);
+    ctx->paint.font->itemize(buf + start, count, ctx->paint, &items);
 
     std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing

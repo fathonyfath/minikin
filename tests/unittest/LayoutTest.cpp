@@ -63,7 +63,7 @@ protected:
 };
 
 TEST_F(LayoutTest, doLayoutTest) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -76,7 +76,7 @@ TEST_F(LayoutTest, doLayoutTest) {
     {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -94,7 +94,7 @@ TEST_F(LayoutTest, doLayoutTest) {
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(90.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -112,7 +112,7 @@ TEST_F(LayoutTest, doLayoutTest) {
     {
         SCOPED_TRACE("three words");
         text = utf8ToUtf16("three words test");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(160.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -130,7 +130,7 @@ TEST_F(LayoutTest, doLayoutTest) {
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(110.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -148,7 +148,7 @@ TEST_F(LayoutTest, doLayoutTest) {
 }
 
 TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -163,7 +163,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -181,7 +181,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(95.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -203,7 +203,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     {
         SCOPED_TRACE("three words test");
         text = utf8ToUtf16("three words test");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(170.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -223,7 +223,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(120.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -243,7 +243,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
 }
 
 TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -258,7 +258,7 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -276,7 +276,7 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(85.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -295,7 +295,7 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     {
         SCOPED_TRACE("three words");
         text = utf8ToUtf16("three word test");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(140.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -315,7 +315,7 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(100.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
@@ -336,17 +336,15 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
 
 // Test that a forced-RTL layout correctly mirros a forced-LTR layout.
 TEST_F(LayoutTest, doLayoutTest_rtlTest) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
 
     std::vector<uint16_t> text = parseUnicodeString("'a' 'b' U+3042 U+3043 'c' 'd'");
 
     Layout ltrLayout;
-    ltrLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::FORCE_LTR, paint,
-                       mCollection);
+    ltrLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::FORCE_LTR, paint);
 
     Layout rtlLayout;
-    rtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::FORCE_RTL, paint,
-                       mCollection);
+    rtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::FORCE_RTL, paint);
 
     ASSERT_EQ(ltrLayout.nGlyphs(), rtlLayout.nGlyphs());
     ASSERT_EQ(6u, ltrLayout.nGlyphs());
@@ -360,19 +358,18 @@ TEST_F(LayoutTest, doLayoutTest_rtlTest) {
 
 // Test that single-run RTL layouts of LTR-only text is laid out identical to an LTR layout.
 TEST_F(LayoutTest, singleRunBidiTest) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
 
     std::vector<uint16_t> text = parseUnicodeString("'1' '2' '3'");
 
     Layout ltrLayout;
-    ltrLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+    ltrLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
 
     Layout rtlLayout;
-    rtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::RTL, paint, mCollection);
+    rtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::RTL, paint);
 
     Layout defaultRtlLayout;
-    defaultRtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::DEFAULT_RTL, paint,
-                              mCollection);
+    defaultRtlLayout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::DEFAULT_RTL, paint);
 
     const size_t nGlyphs = ltrLayout.nGlyphs();
     ASSERT_EQ(3u, nGlyphs);
@@ -396,54 +393,54 @@ TEST_F(LayoutTest, hyphenationTest) {
     {
         SCOPED_TRACE("one word with no hyphen edit");
         text = utf8ToUtf16("oneword");
-        MinikinPaint paint;
+        MinikinPaint paint(mCollection);
         paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT);
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the end");
         text = utf8ToUtf16("oneword");
-        MinikinPaint paint;
+        MinikinPaint paint(mCollection);
         paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN);
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen replacement at the end");
         text = utf8ToUtf16("oneword");
-        MinikinPaint paint;
+        MinikinPaint paint(mCollection);
         paint.hyphenEdit =
                 packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::REPLACE_WITH_HYPHEN);
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the start");
         text = utf8ToUtf16("oneword");
-        MinikinPaint paint;
+        MinikinPaint paint(mCollection);
         paint.hyphenEdit = packHyphenEdit(StartHyphenEdit::INSERT_HYPHEN, EndHyphenEdit::NO_EDIT);
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the both ends");
         text = utf8ToUtf16("oneword");
-        MinikinPaint paint;
+        MinikinPaint paint(mCollection);
         paint.hyphenEdit =
                 packHyphenEdit(StartHyphenEdit::INSERT_HYPHEN, EndHyphenEdit::INSERT_HYPHEN);
-        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+        layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
         EXPECT_EQ(90.0f, layout.getAdvance());
     }
 }
 
 TEST_F(LayoutTest, verticalExtentTest) {
-    MinikinPaint paint;
+    MinikinPaint paint(mCollection);
 
     std::vector<uint16_t> text = utf8ToUtf16("ab");
 
     Layout layout;
-    layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint, mCollection);
+    layout.doLayout(text.data(), 0, text.size(), text.size(), Bidi::LTR, paint);
     MinikinExtent extents[text.size()];
     layout.getExtents(extents);
     for (size_t i = 0; i < text.size(); i++) {
@@ -467,33 +464,33 @@ TEST_F(LayoutTest, measuredTextTest) {
     // U+10331 (\uD800\uDF31): 10em
     auto fc = buildFontCollection(kTestFontDir "/LayoutTestFont.ttf");
     {
-        MinikinPaint paint;
+        MinikinPaint paint(fc);
         std::vector<uint16_t> text = utf8ToUtf16("I");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
         EXPECT_EQ(1.0f,
-                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+                  Layout::measureText(text, range, Bidi::LTR, paint, advances.data(), nullptr));
         ASSERT_EQ(1u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
     }
     {
-        MinikinPaint paint;
+        MinikinPaint paint(fc);
         std::vector<uint16_t> text = utf8ToUtf16("IV");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
         EXPECT_EQ(6.0f,
-                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+                  Layout::measureText(text, range, Bidi::LTR, paint, advances.data(), nullptr));
         ASSERT_EQ(2u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);
     }
     {
-        MinikinPaint paint;
+        MinikinPaint paint(fc);
         std::vector<uint16_t> text = utf8ToUtf16("IVX");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
         EXPECT_EQ(16.0f,
-                  Layout::measureText(text, range, Bidi::LTR, paint, fc, advances.data(), nullptr));
+                  Layout::measureText(text, range, Bidi::LTR, paint, advances.data(), nullptr));
         ASSERT_EQ(3u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);
