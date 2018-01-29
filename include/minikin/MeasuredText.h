@@ -82,7 +82,8 @@ public:
     void getMetrics(const U16StringPiece& text, float* advances,
                     MinikinExtent* extents) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::measureText(text, mRange, bidiFlag, mPaint, advances, extents);
+        Layout::measureText(text, mRange, bidiFlag, mPaint, StartHyphenEdit::NO_EDIT,
+                            EndHyphenEdit::NO_EDIT, advances, extents);
     }
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
@@ -168,7 +169,8 @@ public:
     }
 
     bool buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                     Bidi bidiFlag, int mtOffset, Layout* layout);
+                     Bidi bidiFlag, int mtOffset, StartHyphenEdit startHyphen,
+                     EndHyphenEdit endHyphen, Layout* layout);
 
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;

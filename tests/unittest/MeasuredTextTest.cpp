@@ -72,7 +72,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         // If there is no pre-computed layouts, do not touch layout and return false.
         Layout layout;
         offsetMap.clear();
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, &layout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &layout));
         EXPECT_EQ(0U, layout.nGlyphs());
     }
     {
@@ -82,7 +83,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         inLayout.mAdvances.resize(text.size() + 1);
         offsetMap.clear();
         offsetMap[0] = inLayout;
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -93,7 +95,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap.clear();
         offsetMap[0] = inLayout;
         EXPECT_FALSE(mt->buildLayout(text, Range(range.getStart() + 1, range.getEnd()), paint, bidi,
-                                     0, &outLayout));
+                                     0, StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT,
+                                     &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -104,7 +107,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         inLayout.mAdvances.resize(text.size());
         offsetMap.clear();
         offsetMap[0] = inLayout;
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 1, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 1, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -116,7 +120,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap[0] = inLayout;
         MinikinPaint justifiedPaint(font);
         justifiedPaint.wordSpacing = 1.0;
-        EXPECT_FALSE(mt->buildLayout(text, range, justifiedPaint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, justifiedPaint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -127,9 +132,9 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap.clear();
         offsetMap[0] = inLayout;
         MinikinPaint hyphenatedPaint(font);
-        hyphenatedPaint.hyphenEdit =
-                packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN);
-        EXPECT_FALSE(mt->buildLayout(text, range, hyphenatedPaint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, hyphenatedPaint, bidi, 0,
+                                     StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN,
+                                     &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
 
