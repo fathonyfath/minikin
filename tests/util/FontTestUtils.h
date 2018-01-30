@@ -34,16 +34,18 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
  * Returns FontCollection from installed fonts.
  *
  * This function reads an XML file and makes font families and collections of them.
- * MinikinFontForTest is used for FontFamily creation.
  */
 std::shared_ptr<FontCollection> getFontCollection(const char* fontDir, const char* fontXml);
 
 /**
  * Build new FontCollection from single file.
- *
- * FreeType implementation of the MinikinFont is used.
  */
 std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath);
+
+/**
+ * Build new FontFamily from single file.
+ */
+std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath);
 
 }  // namespace minikin
 #endif  // MINIKIN_FONT_TEST_UTILS_H

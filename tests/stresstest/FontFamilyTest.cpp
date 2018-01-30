@@ -22,7 +22,6 @@
 
 #include "FontTestUtils.h"
 #include "HbFontCache.h"
-#include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -35,12 +34,10 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
     const std::string& fontPath = GetParam().first;
     int ttcIndex = GetParam().second;
 
-    std::shared_ptr<MinikinFont> font(new MinikinFontForTest(fontPath, ttcIndex));
-    std::shared_ptr<FontFamily> family =
-            std::make_shared<FontFamily>(std::vector<Font>({Font(font, FontStyle())}));
+    std::shared_ptr<FontFamily> family = buildFontFamily(fontPath);
 
     android::AutoMutex _l(gMinikinLock);
-    hb_font_t* hbFont = getHbFontLocked(font.get());
+    hb_font_t* hbFont = getHbFontLocked(family->getFont(0).get());
 
     for (uint32_t codePoint = 0; codePoint < MAX_UNICODE_CODE_POINT; ++codePoint) {
         uint32_t unusedGlyph;
