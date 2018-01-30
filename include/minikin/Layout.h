@@ -30,6 +30,7 @@
 namespace minikin {
 
 class Layout;
+struct LayoutPieces;
 
 struct LayoutGlyph {
     // index into mFaces and mHbFonts vectors. We could imagine
@@ -63,11 +64,6 @@ inline bool isRtl(Bidi bidi) {
 inline bool isOverride(Bidi bidi) {
     return static_cast<uint8_t>(bidi) & 0b0100;
 }
-
-struct LayoutPieces {
-    // TODO: Sorted vector of pairs may be faster?
-    std::unordered_map<uint32_t, Layout> offsetMap;  // start offset to layout index map.
-};
 
 // Lifecycle and threading assumptions for Layout:
 // The object is assumed to be owned by a single thread; multiple threads
@@ -171,6 +167,12 @@ public:
     // Dump minikin internal statistics, cache usage, cache hit ratio, etc.
     static void dumpMinikinStats(int fd);
 
+    uint32_t getMemoryUsage() const {
+        return sizeof(LayoutGlyph) * nGlyphs() + sizeof(float) * mAdvances.size() +
+               sizeof(MinikinExtent) * mExtents.size() + sizeof(FakedFont) * mFaces.size() +
+               sizeof(float /* mAdvance */) + sizeof(MinikinRect /* mBounds */);
+    }
+
 private:
     friend class LayoutCacheKey;
 
@@ -222,6 +224,19 @@ private:
     std::vector<FakedFont> mFaces;
     float mAdvance;
     MinikinRect mBounds;
+};
+
+struct LayoutPieces {
+    // TODO: Sorted vector of pairs may be faster?
+    std::unordered_map<uint32_t, Layout> offsetMap;  // start offset to layout index map.
+
+    uint32_t getMemoryUsage() const {
+        uint32_t result = 0;
+        for (const auto& i : offsetMap) {
+            result += i.second.getMemoryUsage();
+        }
+        return result;
+    }
 };
 
 class LayoutCompositer {
