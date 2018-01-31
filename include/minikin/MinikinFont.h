@@ -27,12 +27,13 @@
 
 namespace minikin {
 
+class FontCollection;
 class MinikinFont;
 
 // Possibly move into own .h file?
 // Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
 struct MinikinPaint {
-    MinikinPaint()
+    MinikinPaint(const std::shared_ptr<FontCollection>& font)
             : size(0),
               scaleX(0),
               skewX(0),
@@ -42,7 +43,8 @@ struct MinikinPaint {
               localeListId(0),
               familyVariant(FontFamily::Variant::DEFAULT),
               hyphenEdit(),
-              fontFeatureSettings() {}
+              fontFeatureSettings(),
+              font(font) {}
 
     bool skipCache() const { return !fontFeatureSettings.empty(); }
 
@@ -57,6 +59,7 @@ struct MinikinPaint {
     FontFamily::Variant familyVariant;
     HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
+    std::shared_ptr<FontCollection> font;
 
     void copyFrom(const MinikinPaint& paint) { *this = paint; }
 

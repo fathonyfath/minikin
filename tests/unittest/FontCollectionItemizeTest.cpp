@@ -63,7 +63,7 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
     result->clear();
     ParseUnicode(buf, BUF_SIZE, str, &len, NULL);
     const uint32_t localeListId = registerLocaleList(localeList);
-    MinikinPaint paint;
+    MinikinPaint paint(collection);
     paint.fontStyle = style;
     paint.localeListId = localeListId;
     android::AutoMutex _l(gMinikinLock);

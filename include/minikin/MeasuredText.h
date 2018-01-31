@@ -72,12 +72,8 @@ protected:
 
 class StyleRun : public Run {
 public:
-    StyleRun(const Range& range, MinikinPaint&& paint, std::shared_ptr<FontCollection>&& collection,
-             bool isRtl)
-            : Run(range),
-              mPaint(std::move(paint)),
-              mCollection(std::move(collection)),
-              mIsRtl(isRtl) {}
+    StyleRun(const Range& range, MinikinPaint&& paint, bool isRtl)
+            : Run(range), mPaint(std::move(paint)), mIsRtl(isRtl) {}
 
     bool canHyphenate() const override { return true; }
     uint32_t getLocaleListId() const override { return mPaint.localeListId; }
@@ -86,27 +82,26 @@ public:
     void getMetrics(const U16StringPiece& text, float* advances,
                     MinikinExtent* extents) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::measureText(text, mRange, bidiFlag, mPaint, mCollection, advances, extents);
+        Layout::measureText(text, mRange, bidiFlag, mPaint, advances, extents);
     }
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
 
     virtual void addToLayoutPieces(const U16StringPiece& textBuf, LayoutPieces* out) const {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::addToLayoutPieces(textBuf, mRange, bidiFlag, mPaint, mCollection, out);
+        Layout::addToLayoutPieces(textBuf, mRange, bidiFlag, mPaint, out);
     }
 
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                              float* advances) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen,
-                                   mCollection, advances, nullptr /* extent */);
+        return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen, advances,
+                                   nullptr /* extent */);
     }
 
 private:
     MinikinPaint mPaint;
-    std::shared_ptr<FontCollection> mCollection;
     const bool mIsRtl;
 };
 
@@ -173,8 +168,7 @@ public:
     }
 
     bool buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                     const std::shared_ptr<FontCollection>& fc, Bidi bidiFlag, int mtOffset,
-                     Layout* layout);
+                     Bidi bidiFlag, int mtOffset, Layout* layout);
 
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;
@@ -198,10 +192,8 @@ class MeasuredTextBuilder {
 public:
     MeasuredTextBuilder() {}
 
-    void addStyleRun(int32_t start, int32_t end, MinikinPaint&& paint,
-                     std::shared_ptr<FontCollection> collection, bool isRtl) {
-        mRuns.emplace_back(std::make_unique<StyleRun>(Range(start, end), std::move(paint),
-                                                      std::move(collection), isRtl));
+    void addStyleRun(int32_t start, int32_t end, MinikinPaint&& paint, bool isRtl) {
+        mRuns.emplace_back(std::make_unique<StyleRun>(Range(start, end), std::move(paint), isRtl));
     }
 
     void addReplacementRun(int32_t start, int32_t end, float width, uint32_t localeListId) {

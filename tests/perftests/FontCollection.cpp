@@ -90,7 +90,7 @@ static void BM_FontCollection_itemize(benchmark::State& state) {
     ParseUnicode(buffer, 64, ITEMIZE_TEST_CASES[testIndex].itemizeText.c_str(), &utf16_length,
                  nullptr);
     std::vector<FontCollection::Run> result;
-    MinikinPaint paint;
+    MinikinPaint paint(collection);
     paint.localeListId = registerLocaleList(ITEMIZE_TEST_CASES[testIndex].languageTag);
 
     android::AutoMutex _l(gMinikinLock);
