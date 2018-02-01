@@ -117,7 +117,7 @@ class MinikinFont {
 public:
     explicit MinikinFont(int32_t uniqueId) : mUniqueId(uniqueId) {}
 
-    virtual ~MinikinFont();
+    virtual ~MinikinFont() {}
 
     virtual float GetHorizontalAdvance(uint32_t glyph_id, const MinikinPaint& paint,
                                        const FontFakery& fakery) const = 0;

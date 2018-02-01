@@ -58,7 +58,7 @@ private:
     FT_Library mFtLibrary;
     FT_Face mFtFace;
 
-    PREVENT_COPY_AND_ASSIGN(FreeTypeMinikinFontForTest);
+    MINIKIN_PREVENT_COPY_AND_ASSIGN(FreeTypeMinikinFontForTest);
 };
 
 }  // namespace minikin
