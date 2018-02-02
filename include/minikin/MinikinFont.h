@@ -113,9 +113,6 @@ struct MinikinExtent {
     }
 };
 
-// Callback for freeing data
-typedef void (*MinikinDestroyFunc)(void* data);
-
 class MinikinFont {
 public:
     explicit MinikinFont(int32_t uniqueId) : mUniqueId(uniqueId) {}

@@ -20,8 +20,9 @@
 
 #include "minikin/LocaleList.h"
 
+#include "FontTestUtils.h"
+#include "FreeTypeMinikinFontForTest.h"
 #include "LocaleListCache.h"
-#include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -40,11 +41,6 @@ static Locale createLocale(const std::string& input) {
 
 static Locale createLocaleWithoutICUSanitization(const std::string& input) {
     return Locale(input);
-}
-
-std::shared_ptr<FontFamily> makeFamily(const std::string& fontPath) {
-    std::shared_ptr<MinikinFont> font(new MinikinFontForTest(fontPath));
-    return std::make_shared<FontFamily>(std::vector<Font>({Font(font, FontStyle())}));
 }
 
 TEST(LocaleTest, basicTests) {
@@ -510,9 +506,7 @@ void expectVSGlyphs(FontFamily* family, uint32_t codepoint, const std::set<uint3
 }
 
 TEST_F(FontFamilyTest, hasVariationSelectorTest) {
-    std::shared_ptr<MinikinFont> minikinFont(new MinikinFontForTest(kVsTestFont));
-    std::shared_ptr<FontFamily> family(
-            new FontFamily(std::vector<Font>{Font(minikinFont, FontStyle())}));
+    std::shared_ptr<FontFamily> family = buildFontFamily(kVsTestFont);
 
     const uint32_t kVS1 = 0xFE00;
     const uint32_t kVS2 = 0xFE01;
@@ -559,9 +553,7 @@ TEST_F(FontFamilyTest, hasVSTableTest) {
                                          : "Font " + testCase.fontPath +
                                                    " shouldn't have a variation sequence table.");
 
-        std::shared_ptr<MinikinFont> minikinFont(new MinikinFontForTest(testCase.fontPath));
-        std::shared_ptr<FontFamily> family(
-                new FontFamily(std::vector<Font>{Font(minikinFont, FontStyle())}));
+        std::shared_ptr<FontFamily> family = buildFontFamily(testCase.fontPath);
         EXPECT_EQ(testCase.hasVSTable, family->hasVSTable());
     }
 }
@@ -571,8 +563,8 @@ TEST_F(FontFamilyTest, createFamilyWithVariationTest) {
     const char kMultiAxisFont[] = kTestFontDir "/MultiAxis.ttf";
     const char kNoAxisFont[] = kTestFontDir "/Regular.ttf";
 
-    std::shared_ptr<FontFamily> multiAxisFamily = makeFamily(kMultiAxisFont);
-    std::shared_ptr<FontFamily> noAxisFamily = makeFamily(kNoAxisFont);
+    std::shared_ptr<FontFamily> multiAxisFamily = buildFontFamily(kMultiAxisFont);
+    std::shared_ptr<FontFamily> noAxisFamily = buildFontFamily(kNoAxisFont);
 
     {
         // Do not ceate new instance if none of variations are specified.
@@ -631,9 +623,9 @@ TEST_F(FontFamilyTest, coverageTableSelectionTest) {
     // U+0061 is listed in both subtable but U+1F926 is only listed in latter.
     const char kUnicodeEncoding4Font[] = kTestFontDir "UnicodeUCS4.ttf";
 
-    std::shared_ptr<FontFamily> unicodeEnc1Font = makeFamily(kUnicodeEncoding1Font);
-    std::shared_ptr<FontFamily> unicodeEnc3Font = makeFamily(kUnicodeEncoding3Font);
-    std::shared_ptr<FontFamily> unicodeEnc4Font = makeFamily(kUnicodeEncoding4Font);
+    std::shared_ptr<FontFamily> unicodeEnc1Font = buildFontFamily(kUnicodeEncoding1Font);
+    std::shared_ptr<FontFamily> unicodeEnc3Font = buildFontFamily(kUnicodeEncoding3Font);
+    std::shared_ptr<FontFamily> unicodeEnc4Font = buildFontFamily(kUnicodeEncoding4Font);
 
     android::AutoMutex _l(gMinikinLock);
 
@@ -731,7 +723,7 @@ TEST_F(FontFamilyTest, closestMatch) {
         std::vector<std::shared_ptr<MinikinFont>> dummyFonts;
         std::vector<Font> fonts;
         for (auto familyStyle : testCase.familyStyles) {
-            std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(ROBOTO));
+            std::shared_ptr<MinikinFont> dummyFont(new FreeTypeMinikinFontForTest(ROBOTO));
             dummyFonts.push_back(dummyFont);
             fonts.push_back(Font(dummyFont, familyStyle));
         }

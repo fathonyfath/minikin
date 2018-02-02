@@ -37,9 +37,6 @@ namespace minikin {
 Font::Font(const std::shared_ptr<MinikinFont>& typeface, FontStyle style)
         : typeface(typeface), style(style) {}
 
-Font::Font(std::shared_ptr<MinikinFont>&& typeface, FontStyle style)
-        : typeface(typeface), style(style) {}
-
 std::unordered_set<AxisTag> Font::getSupportedAxesLocked() const {
     const uint32_t fvarTag = MinikinFont::MakeTag('f', 'v', 'a', 'r');
     HbBlob fvarTable(getFontTable(typeface.get(), fvarTag));
@@ -50,17 +47,6 @@ std::unordered_set<AxisTag> Font::getSupportedAxesLocked() const {
     std::unordered_set<AxisTag> supportedAxes;
     analyzeAxes(fvarTable.get(), fvarTable.size(), &supportedAxes);
     return supportedAxes;
-}
-
-Font::Font(Font&& o) {
-    typeface = std::move(o.typeface);
-    style = o.style;
-    o.typeface = nullptr;
-}
-
-Font::Font(const Font& o) {
-    typeface = o.typeface;
-    style = o.style;
 }
 
 // static

@@ -23,9 +23,6 @@
 #include "FontTestUtils.h"
 #include "UnicodeUtils.h"
 
-const char* SYSTEM_FONT_PATH = "/system/fonts/";
-const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";
-
 namespace minikin {
 
 const float UNTOUCHED_MARKER = 1e+38;
@@ -52,10 +49,7 @@ protected:
 
     virtual ~LayoutTest() {}
 
-    virtual void SetUp() override {
-        mCollection = std::shared_ptr<FontCollection>(
-                getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
-    }
+    virtual void SetUp() override { mCollection = buildFontCollection(kTestFontDir "Ascii.ttf"); }
 
     virtual void TearDown() override {}
 
@@ -64,6 +58,7 @@ protected:
 
 TEST_F(LayoutTest, doLayoutTest) {
     MinikinPaint paint(mCollection);
+    paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -82,9 +77,9 @@ TEST_F(LayoutTest, doLayoutTest) {
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -102,9 +97,9 @@ TEST_F(LayoutTest, doLayoutTest) {
         EXPECT_EQ(90.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(90.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -122,9 +117,9 @@ TEST_F(LayoutTest, doLayoutTest) {
         EXPECT_EQ(160.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(160.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -142,9 +137,9 @@ TEST_F(LayoutTest, doLayoutTest) {
         EXPECT_EQ(110.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(110.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -157,6 +152,7 @@ TEST_F(LayoutTest, doLayoutTest) {
 
 TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     MinikinPaint paint(mCollection);
+    paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -177,9 +173,9 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -197,9 +193,9 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
         EXPECT_EQ(95.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(95.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         EXPECT_EQ(UNTOUCHED_MARKER, advances[text.size()]);
@@ -221,9 +217,9 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
         EXPECT_EQ(170.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(170.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -243,9 +239,9 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
         EXPECT_EQ(120.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(120.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -260,6 +256,7 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
 
 TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     MinikinPaint paint(mCollection);
+    paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
     const size_t kMaxAdvanceLength = 32;
     float advances[kMaxAdvanceLength];
@@ -280,9 +277,9 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -300,9 +297,9 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
         EXPECT_EQ(85.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(85.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -321,9 +318,9 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
         EXPECT_EQ(140.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(140.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -343,9 +340,9 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
         EXPECT_EQ(100.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
-        EXPECT_EQ(0.0f, rect.mTop);
+        EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(100.0f, rect.mRight);
-        EXPECT_EQ(10.0f, rect.mBottom);
+        EXPECT_EQ(0.0f, rect.mBottom);
         resetAdvances(advances, kMaxAdvanceLength);
         layout.getAdvances(advances);
         expectedValues.resize(text.size());
@@ -417,6 +414,8 @@ TEST_F(LayoutTest, singleRunBidiTest) {
 }
 
 TEST_F(LayoutTest, hyphenationTest) {
+    MinikinPaint paint(mCollection);
+    paint.size = 10.0f;  // make 1em = 10px
     Layout layout;
     std::vector<uint16_t> text;
 
@@ -425,7 +424,6 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with no hyphen edit");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        MinikinPaint paint(mCollection);
         layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
                         EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(70.0f, layout.getAdvance());
@@ -434,7 +432,6 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the end");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        MinikinPaint paint(mCollection);
         layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
                         EndHyphenEdit::INSERT_HYPHEN);
         EXPECT_EQ(80.0f, layout.getAdvance());
@@ -443,7 +440,6 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen replacement at the end");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        MinikinPaint paint(mCollection);
         layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
                         EndHyphenEdit::REPLACE_WITH_HYPHEN);
         EXPECT_EQ(70.0f, layout.getAdvance());
@@ -452,7 +448,6 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the start");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        MinikinPaint paint(mCollection);
         layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
                         EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(80.0f, layout.getAdvance());
@@ -461,7 +456,6 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with hyphen insertion at the both ends");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        MinikinPaint paint(mCollection);
         layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
                         EndHyphenEdit::INSERT_HYPHEN);
         EXPECT_EQ(90.0f, layout.getAdvance());
