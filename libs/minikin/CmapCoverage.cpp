@@ -288,8 +288,11 @@ static bool getVSCoverage(std::vector<uint32_t>* out_ranges, const uint8_t* data
             return false;
         }
         const uint64_t numRecords = readU32(nonDefaultUVSTable, 0);
-        if (numRecords * kUVSMappingRecordSize + kHeaderSize > nonDefaultUVSTableRemaining) {
-            android_errorWriteLog(0x534e4554, "70808908");
+        const uint64_t sizeToRead = numRecords * kUVSMappingRecordSize + kHeaderSize;
+        if (sizeToRead > nonDefaultUVSTableRemaining) {
+            if (sizeToRead > UINT_MAX) {
+                android_errorWriteLog(0x534e4554, "70808908");
+            }
             return false;
         }
         for (uint32_t i = 0; i < numRecords; ++i) {
@@ -317,8 +320,11 @@ static bool getVSCoverage(std::vector<uint32_t>* out_ranges, const uint8_t* data
             return false;
         }
         const uint64_t numRecords = readU32(defaultUVSTable, 0);
-        if (numRecords * kUnicodeRangeRecordSize + kHeaderSize > defaultUVSTableRemaining) {
-            android_errorWriteLog(0x534e4554, "70808908");
+        const uint64_t sizeToRead = numRecords * kUnicodeRangeRecordSize + kHeaderSize;
+        if (sizeToRead > defaultUVSTableRemaining) {
+            if (sizeToRead > UINT_MAX) {
+                android_errorWriteLog(0x534e4554, "70808908");
+            }
             return false;
         }
 
@@ -363,9 +369,12 @@ static void getCoverageFormat14(std::vector<std::unique_ptr<SparseBitSet>>* out,
         return;
     }
 
-    uint64_t numRecords = readU32(data, kNumRecordOffset);
-    if (numRecords == 0 || kHeaderSize + kRecordSize * numRecords > length) {
-        android_errorWriteLog(0x534e4554, "70808908");
+    const uint64_t numRecords = readU32(data, kNumRecordOffset);
+    const uint64_t sizeToRead = kHeaderSize + kRecordSize * numRecords;
+    if (numRecords == 0 || sizeToRead > length) {
+        if (sizeToRead > UINT_MAX) {
+            android_errorWriteLog(0x534e4554, "70808908");
+        }
         return;
     }
 
