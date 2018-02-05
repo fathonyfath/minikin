@@ -24,9 +24,9 @@
 #include "minikin/LocaleList.h"
 
 #include "FontTestUtils.h"
+#include "FreeTypeMinikinFontForTest.h"
 #include "Locale.h"
 #include "LocaleListCache.h"
-#include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 #include "UnicodeUtils.h"
 
@@ -91,7 +91,7 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
 // Utility function to obtain font path associated with run.
 const std::string& getFontPath(const FontCollection::Run& run) {
     EXPECT_NE(nullptr, run.fakedFont.font);
-    return ((MinikinFontForTest*)run.fakedFont.font)->fontPath();
+    return ((FreeTypeMinikinFontForTest*)run.fakedFont.font)->fontPath();
 }
 
 // Utility function to obtain LocaleList from string.
@@ -745,15 +745,8 @@ TEST(FontCollectionItemizeTest, itemize_vs_sequence_but_no_base_char) {
     const std::string kVSTestFont = kTestFontDir "VariationSelectorTest-Regular.ttf";
 
     std::vector<std::shared_ptr<FontFamily>> families;
-    std::shared_ptr<MinikinFont> font(new MinikinFontForTest(kLatinFont));
-    std::shared_ptr<FontFamily> family1(new FontFamily(FontFamily::Variant::DEFAULT,
-                                                       std::vector<Font>{Font(font, FontStyle())}));
-    families.push_back(family1);
-
-    std::shared_ptr<MinikinFont> font2(new MinikinFontForTest(kVSTestFont));
-    std::shared_ptr<FontFamily> family2(new FontFamily(
-            FontFamily::Variant::DEFAULT, std::vector<Font>{Font(font2, FontStyle())}));
-    families.push_back(family2);
+    families.push_back(buildFontFamily(kLatinFont));
+    families.push_back(buildFontFamily(kVSTestFont));
 
     std::shared_ptr<FontCollection> collection(new FontCollection(families));
 
@@ -950,10 +943,11 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::vector<std::shared_ptr<FontFamily>> families;
 
         // Prepare first font which doesn't supports U+9AA8
-        std::shared_ptr<MinikinFont> firstFamilyMinikinFont(new MinikinFontForTest(kNoGlyphFont));
-        std::shared_ptr<FontFamily> firstFamily(
-                new FontFamily(registerLocaleList("und"), FontFamily::Variant::DEFAULT,
-                               std::vector<Font>({Font(firstFamilyMinikinFont, FontStyle())})));
+        auto firstFamilyMinikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kNoGlyphFont);
+        std::vector<Font> fonts;
+        fonts.push_back(Font(firstFamilyMinikinFont, FontStyle()));
+        auto firstFamily = std::make_shared<FontFamily>(
+                registerLocaleList("und"), FontFamily::Variant::DEFAULT, std::move(fonts));
         families.push_back(firstFamily);
 
         // Prepare font families
@@ -962,12 +956,14 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
         std::unordered_map<MinikinFont*, int> fontLocaleIdxMap;
 
         for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
-            std::shared_ptr<MinikinFont> minikin_font(new MinikinFontForTest(kJAFont));
-            std::shared_ptr<FontFamily> family(new FontFamily(
-                    registerLocaleList(testCase.fontLocales[i]), FontFamily::Variant::DEFAULT,
-                    std::vector<Font>({Font(minikin_font, FontStyle())})));
+            auto minikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kJAFont);
+            std::vector<Font> fonts;
+            fonts.push_back(Font(minikinFont, FontStyle()));
+            auto family =
+                    std::make_shared<FontFamily>(registerLocaleList(testCase.fontLocales[i]),
+                                                 FontFamily::Variant::DEFAULT, std::move(fonts));
             families.push_back(family);
-            fontLocaleIdxMap.insert(std::make_pair(minikin_font.get(), i));
+            fontLocaleIdxMap.insert(std::make_pair(minikinFont.get(), i));
         }
         std::shared_ptr<FontCollection> collection(new FontCollection(families));
         // Do itemize
@@ -1535,16 +1531,9 @@ TEST(FontCollectionItemizeTest, itemize_genderBalancedEmoji) {
 
 // For b/29585939
 TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
-    std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
-    std::shared_ptr<MinikinFont> fontA(new MinikinFontForTest(kZH_HansFont));
-    std::shared_ptr<MinikinFont> fontB(new MinikinFontForTest(kZH_HansFont));
-
-    std::shared_ptr<FontFamily> dummyFamily(
-            new FontFamily(std::vector<Font>({Font(dummyFont, FontStyle())})));
-    std::shared_ptr<FontFamily> familyA(
-            new FontFamily(std::vector<Font>({Font(fontA, FontStyle())})));
-    std::shared_ptr<FontFamily> familyB(
-            new FontFamily(std::vector<Font>({Font(fontB, FontStyle())})));
+    std::shared_ptr<FontFamily> dummyFamily = buildFontFamily(kNoGlyphFont);
+    std::shared_ptr<FontFamily> familyA = buildFontFamily(kZH_HansFont);
+    std::shared_ptr<FontFamily> familyB = buildFontFamily(kZH_HansFont);
 
     std::vector<std::shared_ptr<FontFamily>> families = {dummyFamily, familyA, familyB};
     std::vector<std::shared_ptr<FontFamily>> reversedFamilies = {dummyFamily, familyB, familyA};
@@ -1556,24 +1545,17 @@ TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
     // selected.
     std::vector<FontCollection::Run> runs;
     itemize(collection, "U+35A8 U+E0100", &runs);
-    EXPECT_EQ(fontA.get(), runs[0].fakedFont.font);
+    EXPECT_EQ(familyA->getFont(0).get(), runs[0].fakedFont.font);
 
     itemize(reversedCollection, "U+35A8 U+E0100", &runs);
-    EXPECT_EQ(fontB.get(), runs[0].fakedFont.font);
+    EXPECT_EQ(familyB->getFont(0).get(), runs[0].fakedFont.font);
 }
 
 // For b/29585939
 TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
-    std::shared_ptr<MinikinFont> dummyFont(new MinikinFontForTest(kNoGlyphFont));
-    std::shared_ptr<MinikinFont> hasCmapFormat14Font(new MinikinFontForTest(kHasCmapFormat14Font));
-    std::shared_ptr<MinikinFont> noCmapFormat14Font(new MinikinFontForTest(kNoCmapFormat14Font));
-
-    std::shared_ptr<FontFamily> dummyFamily(
-            new FontFamily(std::vector<Font>({Font(dummyFont, FontStyle())})));
-    std::shared_ptr<FontFamily> hasCmapFormat14Family(
-            new FontFamily(std::vector<Font>({Font(hasCmapFormat14Font, FontStyle())})));
-    std::shared_ptr<FontFamily> noCmapFormat14Family(
-            new FontFamily(std::vector<Font>({Font(noCmapFormat14Font, FontStyle())})));
+    std::shared_ptr<FontFamily> dummyFamily = buildFontFamily(kNoGlyphFont);
+    std::shared_ptr<FontFamily> hasCmapFormat14Family = buildFontFamily(kHasCmapFormat14Font);
+    std::shared_ptr<FontFamily> noCmapFormat14Family = buildFontFamily(kNoCmapFormat14Font);
 
     std::vector<std::shared_ptr<FontFamily>> families = {dummyFamily, hasCmapFormat14Family,
                                                          noCmapFormat14Family};
@@ -1587,10 +1569,10 @@ TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     // The first font should be selected.
     std::vector<FontCollection::Run> runs;
     itemize(collection, "U+5380 U+E0100", &runs);
-    EXPECT_EQ(hasCmapFormat14Font.get(), runs[0].fakedFont.font);
+    EXPECT_EQ(hasCmapFormat14Family->getFont(0).get(), runs[0].fakedFont.font);
 
     itemize(reversedCollection, "U+5380 U+E0100", &runs);
-    EXPECT_EQ(noCmapFormat14Font.get(), runs[0].fakedFont.font);
+    EXPECT_EQ(noCmapFormat14Family->getFont(0).get(), runs[0].fakedFont.font);
 }
 
 }  // namespace minikin

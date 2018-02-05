@@ -580,20 +580,22 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
     mRunCount = rc;
 }
 
-void Layout::doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                      Bidi bidiFlags, const MinikinPaint& paint) {
+void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
+                      const MinikinPaint& paint, StartHyphenEdit startHyphen,
+                      EndHyphenEdit endHyphen) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx(paint);
 
+    const uint32_t count = range.getLength();
     reset();
     mAdvances.resize(count, 0);
     mExtents.resize(count);
 
-    for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
-        doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize, runInfo.mIsRtl, &ctx,
-                          start, startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                          this, nullptr, nullptr, nullptr);
+    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
+        doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength, textBuf.size(),
+                          runInfo.mIsRtl, &ctx, range.getStart(), startHyphen, endHyphen, this,
+                          nullptr, nullptr, nullptr);
     }
     ctx.clearHbFonts();
 }
@@ -621,21 +623,21 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
     ctx.clearHbFonts();
 }
 
-float Layout::measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                          Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
+float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
+                          const MinikinPaint& paint, StartHyphenEdit startHyphen,
                           EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents) {
     android::AutoMutex _l(gMinikinLock);
 
     LayoutContext ctx(paint);
 
     float advance = 0;
-    for (const BidiText::Iter::RunInfo& runInfo : BidiText(buf, start, count, bufSize, bidiFlags)) {
-        const size_t offset = runInfo.mRunStart - start;
+    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
+        const size_t offset = range.toRangeOffset(runInfo.mRunStart);
         float* advancesForRun = advances ? advances + offset : nullptr;
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
-        advance += doLayoutRunCached(buf, runInfo.mRunStart, runInfo.mRunLength, bufSize,
-                                     runInfo.mIsRtl, &ctx, 0, startHyphen, endHyphen, NULL,
-                                     advancesForRun, extentsForRun, nullptr);
+        advance += doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength,
+                                     textBuf.size(), runInfo.mIsRtl, &ctx, 0, startHyphen,
+                                     endHyphen, NULL, advancesForRun, extentsForRun, nullptr);
     }
 
     ctx.clearHbFonts();

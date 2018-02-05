@@ -37,9 +37,6 @@ namespace minikin {
 Font::Font(const std::shared_ptr<MinikinFont>& typeface, FontStyle style)
         : typeface(typeface), style(style) {}
 
-Font::Font(std::shared_ptr<MinikinFont>&& typeface, FontStyle style)
-        : typeface(typeface), style(style) {}
-
 std::unordered_set<AxisTag> Font::getSupportedAxesLocked() const {
     const uint32_t fvarTag = MinikinFont::MakeTag('f', 'v', 'a', 'r');
     HbBlob fvarTable(getFontTable(typeface.get(), fvarTag));
@@ -52,17 +49,6 @@ std::unordered_set<AxisTag> Font::getSupportedAxesLocked() const {
     return supportedAxes;
 }
 
-Font::Font(Font&& o) {
-    typeface = std::move(o.typeface);
-    style = o.style;
-    o.typeface = nullptr;
-}
-
-Font::Font(const Font& o) {
-    typeface = o.typeface;
-    style = o.style;
-}
-
 // static
 FontFamily::FontFamily(std::vector<Font>&& fonts)
         : FontFamily(Variant::DEFAULT, std::move(fonts)) {}
@@ -72,6 +58,7 @@ FontFamily::FontFamily(Variant variant, std::vector<Font>&& fonts)
 
 FontFamily::FontFamily(uint32_t localeListId, Variant variant, std::vector<Font>&& fonts)
         : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
+    MINIKIN_ASSERT(!mFonts.empty(), "FontFamily must contain at least one font.");
     computeCoverage();
 }
 
@@ -105,9 +92,9 @@ static FontFakery computeFakery(FontStyle wanted, FontStyle actual) {
 }
 
 FakedFont FontFamily::getClosestMatch(FontStyle style) const {
-    const Font* bestFont = nullptr;
-    int bestMatch = 0;
-    for (size_t i = 0; i < mFonts.size(); i++) {
+    const Font* bestFont = &mFonts[0];
+    int bestMatch = computeMatch(bestFont->style, style);
+    for (size_t i = 1; i < mFonts.size(); i++) {
         const Font& font = mFonts[i];
         int match = computeMatch(font.style, style);
         if (i == 0 || match < bestMatch) {
@@ -115,10 +102,7 @@ FakedFont FontFamily::getClosestMatch(FontStyle style) const {
             bestMatch = match;
         }
     }
-    if (bestFont != nullptr) {
-        return FakedFont{bestFont->typeface.get(), computeFakery(style, bestFont->style)};
-    }
-    return FakedFont{nullptr, FontFakery()};
+    return FakedFont{bestFont->typeface.get(), computeFakery(style, bestFont->style)};
 }
 
 bool FontFamily::isColorEmojiFamily() const {

@@ -23,7 +23,7 @@
 
 #include "minikin/MinikinFont.h"
 
-#include "MinikinFontForTest.h"
+#include "FreeTypeMinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -37,12 +37,9 @@ public:
 };
 
 TEST_F(HbFontCacheTest, getHbFontLockedTest) {
-    std::shared_ptr<MinikinFontForTest> fontA(new MinikinFontForTest(kTestFontDir "Regular.ttf"));
-
-    std::shared_ptr<MinikinFontForTest> fontB(new MinikinFontForTest(kTestFontDir "Bold.ttf"));
-
-    std::shared_ptr<MinikinFontForTest> fontC(
-            new MinikinFontForTest(kTestFontDir "BoldItalic.ttf"));
+    auto fontA = std::make_shared<FreeTypeMinikinFontForTest>(kTestFontDir "Regular.ttf");
+    auto fontB = std::make_shared<FreeTypeMinikinFontForTest>(kTestFontDir "Bold.ttf");
+    auto fontC = std::make_shared<FreeTypeMinikinFontForTest>(kTestFontDir "BoldItalic.ttf");
 
     android::AutoMutex _l(gMinikinLock);
     // Never return NULL.
@@ -63,8 +60,7 @@ TEST_F(HbFontCacheTest, getHbFontLockedTest) {
 }
 
 TEST_F(HbFontCacheTest, purgeCacheTest) {
-    std::shared_ptr<MinikinFontForTest> minikinFont(
-            new MinikinFontForTest(kTestFontDir "Regular.ttf"));
+    auto minikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kTestFontDir "Regular.ttf");
 
     android::AutoMutex _l(gMinikinLock);
     hb_font_t* font = getHbFontLocked(minikinFont.get());

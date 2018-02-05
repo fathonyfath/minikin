@@ -24,8 +24,8 @@
 #include "minikin/FontFamily.h"
 #include "minikin/LocaleList.h"
 
+#include "FontTestUtils.h"
 #include "FreeTypeMinikinFontForTest.h"
-#include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -90,11 +90,12 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
 
             if (index == nullptr) {
                 std::shared_ptr<MinikinFont> minikinFont =
-                        std::make_shared<MinikinFontForTest>(fontPath);
+                        std::make_shared<FreeTypeMinikinFontForTest>(fontPath);
                 fonts.push_back(Font(minikinFont, FontStyle(weight, italic)));
             } else {
                 std::shared_ptr<MinikinFont> minikinFont =
-                        std::make_shared<MinikinFontForTest>(fontPath, atoi((const char*)index));
+                        std::make_shared<FreeTypeMinikinFontForTest>(fontPath,
+                                                                     atoi((const char*)index));
                 fonts.push_back(Font(minikinFont, FontStyle(weight, italic)));
             }
         }
@@ -118,9 +119,14 @@ std::shared_ptr<FontCollection> getFontCollection(const char* fontDir, const cha
 }
 
 std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath) {
+    return std::make_shared<FontCollection>(buildFontFamily(filePath));
+}
+
+std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
     auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
-    auto family = std::make_shared<FontFamily>(std::vector<Font>({Font(font, FontStyle())}));
-    return std::make_shared<FontCollection>(std::move(family));
+    std::vector<Font> fonts;
+    fonts.push_back(Font(font, FontStyle()));
+    return std::make_shared<FontFamily>(std::move(fonts));
 }
 
 }  // namespace minikin

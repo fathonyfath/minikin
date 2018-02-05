@@ -42,7 +42,6 @@ struct MinikinPaint {
               paintFlags(0),
               localeListId(0),
               familyVariant(FontFamily::Variant::DEFAULT),
-              hyphenEdit(),
               fontFeatureSettings(),
               font(font) {}
 
@@ -57,7 +56,6 @@ struct MinikinPaint {
     uint32_t localeListId;
     FontStyle fontStyle;
     FontFamily::Variant familyVariant;
-    HyphenEdit hyphenEdit;
     std::string fontFeatureSettings;
     std::shared_ptr<FontCollection> font;
 
@@ -114,9 +112,6 @@ struct MinikinExtent {
         line_gap = std::max(line_gap, e.line_gap);
     }
 };
-
-// Callback for freeing data
-typedef void (*MinikinDestroyFunc)(void* data);
 
 class MinikinFont {
 public:

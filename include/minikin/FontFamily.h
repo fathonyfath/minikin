@@ -53,9 +53,12 @@ typedef uint32_t AxisTag;
 
 struct Font {
     Font(const std::shared_ptr<MinikinFont>& typeface, FontStyle style);
-    Font(std::shared_ptr<MinikinFont>&& typeface, FontStyle style);
-    Font(Font&& o);
-    Font(const Font& o);
+
+    Font(Font&& o) = default;
+    Font& operator=(Font&& o) = default;
+    // prevent copy constructor and assign operator.
+    Font(const Font& o) = delete;
+    Font& operator=(const Font& o) = delete;
 
     std::shared_ptr<MinikinFont> typeface;
     FontStyle style;

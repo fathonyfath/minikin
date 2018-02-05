@@ -87,44 +87,15 @@ public:
 
     void dump() const;
 
-    void doLayout(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags,
-                  const MinikinPaint& paint);
-
-    inline void doLayout(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
-                         const MinikinPaint& paint) {
-        doLayout(str.data(), range.getStart(), range.getLength(), str.size(), bidiFlags, paint);
-    }
+    void doLayout(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
+                  const MinikinPaint& paint, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
 
     static void addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
                                   const MinikinPaint& paint, LayoutPieces* out);
 
-    static float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                             Bidi bidiFlags, const MinikinPaint& paint, StartHyphenEdit startHyphen,
+    static float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
+                             const MinikinPaint& paint, StartHyphenEdit startHyphen,
                              EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents);
-
-    static inline float measureText(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                                    Bidi bidiFlags, const MinikinPaint& paint,
-                                    float* advances, MinikinExtent* extents) {
-        return measureText(buf, start, count, bufSize, bidiFlags, paint,
-                           startHyphenEdit(paint.hyphenEdit), endHyphenEdit(paint.hyphenEdit),
-                           advances, extents);
-    }
-
-    static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
-                                    const MinikinPaint& paint, StartHyphenEdit startHyphen,
-                                    EndHyphenEdit endHyphen,
-                                    float* advances, MinikinExtent* extents) {
-        return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
-                           paint, startHyphen, endHyphen, advances, extents);
-    }
-
-    static inline float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
-                                    const MinikinPaint& paint,
-                                    float* advances, MinikinExtent* extents) {
-        return measureText(str.data(), range.getStart(), range.getLength(), str.length(), bidiFlags,
-                           paint, startHyphenEdit(paint.hyphenEdit),
-                           endHyphenEdit(paint.hyphenEdit), advances, extents);
-    }
 
     inline const std::vector<float>& advances() const { return mAdvances; }
 

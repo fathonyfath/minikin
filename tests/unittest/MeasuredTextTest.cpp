@@ -26,19 +26,21 @@
 namespace minikin {
 
 constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 for advance.
-constexpr const char* SYSTEM_FONT_PATH = "/system/fonts/";
-constexpr const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";
 
 TEST(MeasuredTextTest, RunTests) {
     constexpr uint32_t CHAR_COUNT = 6;
     constexpr float REPLACEMENT_WIDTH = 20.0f;
-    auto font = getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
+    auto font = buildFontCollection(kTestFontDir "Ascii.ttf");
 
     MeasuredTextBuilder builder;
 
-    builder.addStyleRun(0, 2, MinikinPaint(font), false /* is RTL */);
+    MinikinPaint paint1(font);
+    paint1.size = 10.0f;  // make 1em = 10px
+    builder.addStyleRun(0, 2, std::move(paint1), false /* is RTL */);
     builder.addReplacementRun(2, 4, REPLACEMENT_WIDTH, 0 /* locale list id */);
-    builder.addStyleRun(4, 6, MinikinPaint(font), false /* is RTL */);
+    MinikinPaint paint2(font);
+    paint2.size = 10.0f;  // make 1em = 10px
+    builder.addStyleRun(4, 6, std::move(paint2), false /* is RTL */);
 
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
@@ -57,7 +59,7 @@ TEST(MeasuredTextTest, RunTests) {
 TEST(MeasuredTextTest, buildLayoutTest) {
     std::vector<uint16_t> text = utf8ToUtf16("Hello, world.");
     Range range(0, text.size());
-    auto font = getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML);
+    auto font = buildFontCollection(kTestFontDir "Ascii.ttf");
     MinikinPaint paint(font);
     Bidi bidi = Bidi::FORCE_LTR;
 
@@ -72,7 +74,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         // If there is no pre-computed layouts, do not touch layout and return false.
         Layout layout;
         offsetMap.clear();
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, &layout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &layout));
         EXPECT_EQ(0U, layout.nGlyphs());
     }
     {
@@ -82,7 +85,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         inLayout.mAdvances.resize(text.size() + 1);
         offsetMap.clear();
         offsetMap[0] = inLayout;
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -93,7 +97,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap.clear();
         offsetMap[0] = inLayout;
         EXPECT_FALSE(mt->buildLayout(text, Range(range.getStart() + 1, range.getEnd()), paint, bidi,
-                                     0, &outLayout));
+                                     0, StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT,
+                                     &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -104,7 +109,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         inLayout.mAdvances.resize(text.size());
         offsetMap.clear();
         offsetMap[0] = inLayout;
-        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 1, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, paint, bidi, 1, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -116,7 +122,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap[0] = inLayout;
         MinikinPaint justifiedPaint(font);
         justifiedPaint.wordSpacing = 1.0;
-        EXPECT_FALSE(mt->buildLayout(text, range, justifiedPaint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, justifiedPaint, bidi, 0, StartHyphenEdit::NO_EDIT,
+                                     EndHyphenEdit::NO_EDIT, &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
     {
@@ -127,9 +134,9 @@ TEST(MeasuredTextTest, buildLayoutTest) {
         offsetMap.clear();
         offsetMap[0] = inLayout;
         MinikinPaint hyphenatedPaint(font);
-        hyphenatedPaint.hyphenEdit =
-                packHyphenEdit(StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN);
-        EXPECT_FALSE(mt->buildLayout(text, range, hyphenatedPaint, bidi, 0, &outLayout));
+        EXPECT_FALSE(mt->buildLayout(text, range, hyphenatedPaint, bidi, 0,
+                                     StartHyphenEdit::NO_EDIT, EndHyphenEdit::INSERT_HYPHEN,
+                                     &outLayout));
         EXPECT_EQ(0U, outLayout.nGlyphs());
     }
 

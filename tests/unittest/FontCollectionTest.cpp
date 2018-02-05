@@ -19,7 +19,6 @@
 #include <gtest/gtest.h>
 
 #include "FontTestUtils.h"
-#include "MinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -58,11 +57,7 @@ void expectVSGlyphs(const FontCollection* fc, uint32_t codepoint, const std::set
 }
 
 TEST(FontCollectionTest, hasVariationSelectorTest) {
-    std::shared_ptr<MinikinFont> font(new MinikinFontForTest(kVsTestFont));
-    std::shared_ptr<FontFamily> family(
-            new FontFamily(std::vector<Font>({Font(font, FontStyle())})));
-    std::vector<std::shared_ptr<FontFamily>> families({family});
-    std::shared_ptr<FontCollection> fc(new FontCollection(families));
+    std::shared_ptr<FontCollection> fc = buildFontCollection(kVsTestFont);
 
     EXPECT_FALSE(fc->hasVariationSelector(0x82A6, 0));
     expectVSGlyphs(fc.get(), 0x82A6,
@@ -131,17 +126,8 @@ TEST(FontCollectionTest, createWithVariations) {
     const char kMultiAxisFont[] = kTestFontDir "/MultiAxis.ttf";
     const char kNoAxisFont[] = kTestFontDir "/Regular.ttf";
 
-    std::shared_ptr<MinikinFont> multiAxisFont(new MinikinFontForTest(kMultiAxisFont));
-    std::shared_ptr<FontFamily> multiAxisFamily(
-            new FontFamily(std::vector<Font>({Font(multiAxisFont, FontStyle())})));
-    std::vector<std::shared_ptr<FontFamily>> multiAxisFamilies({multiAxisFamily});
-    std::shared_ptr<FontCollection> multiAxisFc(new FontCollection(multiAxisFamilies));
-
-    std::shared_ptr<MinikinFont> noAxisFont(new MinikinFontForTest(kNoAxisFont));
-    std::shared_ptr<FontFamily> noAxisFamily(
-            new FontFamily(std::vector<Font>({Font(noAxisFont, FontStyle())})));
-    std::vector<std::shared_ptr<FontFamily>> noAxisFamilies({noAxisFamily});
-    std::shared_ptr<FontCollection> noAxisFc(new FontCollection(noAxisFamilies));
+    std::shared_ptr<FontCollection> multiAxisFc = buildFontCollection(kMultiAxisFont);
+    std::shared_ptr<FontCollection> noAxisFc = buildFontCollection(kNoAxisFont);
 
     {
         // Do not ceate new instance if none of variations are specified.
