@@ -32,7 +32,6 @@ class HbFontCacheTest : public testing::Test {
 public:
     virtual void TearDown() {
         android::AutoMutex _l(gMinikinLock);
-        purgeHbFontCacheLocked();
     }
 };
 
@@ -57,28 +56,6 @@ TEST_F(HbFontCacheTest, getHbFontLockedTest) {
     // Different object must be returned if the passed minikinFont has different ID.
     EXPECT_NE(getHbFontLocked(fontA.get()), getHbFontLocked(fontB.get()));
     EXPECT_NE(getHbFontLocked(fontA.get()), getHbFontLocked(fontC.get()));
-}
-
-TEST_F(HbFontCacheTest, purgeCacheTest) {
-    auto minikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kTestFontDir "Regular.ttf");
-
-    android::AutoMutex _l(gMinikinLock);
-    hb_font_t* font = getHbFontLocked(minikinFont.get());
-    ASSERT_NE(nullptr, font);
-
-    // Set user data to identify the font object.
-    hb_user_data_key_t key;
-    void* data = (void*)0xdeadbeef;
-    hb_font_set_user_data(font, &key, data, NULL, false);
-    ASSERT_EQ(data, hb_font_get_user_data(font, &key));
-
-    purgeHbFontCacheLocked();
-
-    // By checking user data, confirm that the object after purge is different from previously
-    // created one. Do not compare the returned pointer here since memory allocator may assign
-    // same region for new object.
-    font = getHbFontLocked(minikinFont.get());
-    EXPECT_EQ(nullptr, hb_font_get_user_data(font, &key));
 }
 
 }  // namespace minikin

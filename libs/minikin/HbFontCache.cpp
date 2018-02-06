@@ -56,11 +56,6 @@ HbFontCache* getFontCacheLocked() {
     return cache;
 }
 
-void purgeHbFontCacheLocked() {
-    assertMinikinLocked();
-    getFontCacheLocked()->clear();
-}
-
 void purgeHbFontLocked(const MinikinFont* minikinFont) {
     assertMinikinLocked();
     const int32_t fontId = minikinFont->GetUniqueId();

@@ -1147,7 +1147,6 @@ void Layout::purgeCaches() {
     android::AutoMutex _l(gMinikinLock);
     LayoutCache& layoutCache = LayoutEngine::getInstance().layoutCache;
     layoutCache.clear();
-    purgeHbFontCacheLocked();
 }
 
 void Layout::dumpMinikinStats(int fd) {

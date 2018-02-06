@@ -22,7 +22,6 @@ struct hb_font_t;
 namespace minikin {
 class MinikinFont;
 
-void purgeHbFontCacheLocked();
 void purgeHbFontLocked(const MinikinFont* minikinFont);
 hb_font_t* getHbFontLocked(const MinikinFont* minikinFont);
 
