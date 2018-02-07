@@ -124,7 +124,7 @@ private:
     // The result of line breaking.
     std::vector<BreakPoint> mBreakPoints;
 
-    MINIKIN_PREVENT_COPY_ASSIGN_AND_MOVE(GreedyLineBreaker);
+    PREVENT_COPY_ASSIGN_AND_MOVE(GreedyLineBreaker);
 };
 
 void GreedyLineBreaker::breakLineAt(uint32_t offset, float lineWidth, float remainingNextLineWidth,

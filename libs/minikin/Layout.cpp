@@ -33,8 +33,8 @@
 #include <utils/Singleton.h>
 
 #include "minikin/Emoji.h"
-#include "minikin/HbUtils.h"
 
+#include "HbFontCache.h"
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -73,8 +73,18 @@ static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
 
 struct LayoutContext {
     LayoutContext(const MinikinPaint& paint) : paint(paint) {}
+
     const MinikinPaint& paint;
-    std::vector<HbFontUniquePtr> hbFonts;  // parallel to mFaces
+
+    std::vector<hb_font_t*> hbFonts;  // parallel to mFaces
+
+    void clearHbFonts() {
+        for (size_t i = 0; i < hbFonts.size(); i++) {
+            hb_font_set_funcs(hbFonts[i], nullptr, nullptr, nullptr);
+            hb_font_destroy(hbFonts[i]);
+        }
+        hbFonts.clear();
+    }
 };
 
 // Layout cache datatypes
@@ -117,6 +127,7 @@ public:
     void doLayout(Layout* layout, LayoutContext* ctx) const {
         layout->mAdvances.resize(mCount, 0);
         layout->mExtents.resize(mCount);
+        ctx->clearHbFonts();
         layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen);
     }
 
@@ -309,9 +320,10 @@ hb_font_funcs_t* getHbFontFuncs(bool forColorBitmapFont) {
     return *funcs;
 }
 
-static bool isColorBitmapFont(const HbFontUniquePtr& font) {
-    HbBlob cbdt(font, HB_TAG('C', 'B', 'D', 'T'));
-    return cbdt;
+static bool isColorBitmapFont(hb_font_t* font) {
+    hb_face_t* face = hb_font_get_face(font);
+    HbBlob cbdt(hb_face_reference_table(face, HB_TAG('C', 'B', 'D', 'T')));
+    return cbdt.size() > 0;
 }
 
 static float HBFixedToFloat(hb_position_t v) {
@@ -341,14 +353,11 @@ int Layout::findOrPushBackFace(const FakedFont& face, LayoutContext* ctx) {
     // Note: ctx == nullptr means we're copying from the cache, no need to create corresponding
     // hb_font object.
     if (ctx != nullptr) {
-        // We override some functions which are not thread safe.
-        // Create new hb_font_t from base font.
-        HbFontUniquePtr font(hb_font_create_sub_font(face.font->baseFont().get()));
-        hb_font_set_funcs(
-                font.get(), getHbFontFuncs(isColorBitmapFont(font)),
-                new SkiaArguments({face.font->typeface().get(), &ctx->paint, face.fakery}),
-                [](void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
-        ctx->hbFonts.push_back(std::move(font));
+        hb_font_t* font = getHbFontLocked(face.font);
+        hb_font_set_funcs(font, getHbFontFuncs(isColorBitmapFont(font)),
+                          new SkiaArguments({face.font, &ctx->paint, face.fakery}),
+                          [](void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
+        ctx->hbFonts.push_back(font);
     }
     return ix;
 }
@@ -588,6 +597,7 @@ void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bi
                           runInfo.mIsRtl, &ctx, range.getStart(), startHyphen, endHyphen, this,
                           nullptr, nullptr, nullptr);
     }
+    ctx.clearHbFonts();
 }
 
 // static
@@ -609,6 +619,8 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
                                      nullptr,  // extents. Not used.
                                      out);
     }
+
+    ctx.clearHbFonts();
 }
 
 float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
@@ -627,6 +639,8 @@ float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bid
                                      textBuf.size(), runInfo.mIsRtl, &ctx, 0, startHyphen,
                                      endHyphen, NULL, advancesForRun, extentsForRun, nullptr);
     }
+
+    ctx.clearHbFonts();
     return advance;
 }
 
@@ -768,13 +782,13 @@ static inline hb_codepoint_t determineHyphenChar(hb_codepoint_t preferredHyphen,
 }
 
 template <typename HyphenEdit>
-static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, const HbFontUniquePtr& font,
-                                       HyphenEdit hyphen, uint32_t cluster) {
+static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, hb_font_t* font, HyphenEdit hyphen,
+                                       uint32_t cluster) {
     const uint32_t* chars;
     size_t size;
     std::tie(chars, size) = getHyphenString(hyphen);
     for (size_t i = 0; i < size; i++) {
-        hb_buffer_add(buffer, determineHyphenChar(chars[i], font.get()), cluster);
+        hb_buffer_add(buffer, determineHyphenChar(chars[i], font), cluster);
     }
 }
 
@@ -783,7 +797,7 @@ static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, const HbFontUniquePt
 static inline uint32_t addToHbBuffer(hb_buffer_t* buffer, const uint16_t* buf, size_t start,
                                      size_t count, size_t bufSize, ssize_t scriptRunStart,
                                      ssize_t scriptRunEnd, StartHyphenEdit inStartHyphen,
-                                     EndHyphenEdit inEndHyphen, const HbFontUniquePtr& hbFont) {
+                                     EndHyphenEdit inEndHyphen, hb_font_t* hbFont) {
     // Only hyphenate the very first script run for starting hyphens.
     const StartHyphenEdit startHyphen =
             (scriptRunStart == 0) ? inStartHyphen : StartHyphenEdit::NO_EDIT;
@@ -907,15 +921,19 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
          isRtl ? --run_ix : ++run_ix) {
         FontCollection::Run& run = items[run_ix];
         const FakedFont& fakedFont = run.fakedFont;
+        if (fakedFont.font == NULL) {
+            ALOGE("no font for run starting u+%04x length %d", buf[run.start], run.end - run.start);
+            continue;
+        }
         const int font_ix = findOrPushBackFace(fakedFont, ctx);
-        const HbFontUniquePtr& hbFont = ctx->hbFonts[font_ix];
+        hb_font_t* hbFont = ctx->hbFonts[font_ix];
 
         MinikinExtent verticalExtent;
-        fakedFont.font->typeface()->GetFontExtent(&verticalExtent, ctx->paint, fakedFont.fakery);
+        fakedFont.font->GetFontExtent(&verticalExtent, ctx->paint, fakedFont.fakery);
         std::fill(&mExtents[run.start], &mExtents[run.end], verticalExtent);
 
-        hb_font_set_ppem(hbFont.get(), size * scaleX, size);
-        hb_font_set_scale(hbFont.get(), HBFloatToFixed(size * scaleX), HBFloatToFixed(size));
+        hb_font_set_ppem(hbFont, size * scaleX, size);
+        hb_font_set_scale(hbFont, HBFloatToFixed(size * scaleX), HBFloatToFixed(size));
 
         const bool is_color_bitmap_font = isColorBitmapFont(hbFont);
 
@@ -971,7 +989,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                     addToHbBuffer(buffer, buf, start, count, bufSize, scriptRunStart, scriptRunEnd,
                                   startHyphen, endHyphen, hbFont);
 
-            hb_shape(hbFont.get(), buffer, features.empty() ? NULL : &features[0], features.size());
+            hb_shape(hbFont, buffer, features.empty() ? NULL : &features[0], features.size());
             unsigned int numGlyphs;
             hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, &numGlyphs);
             hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buffer, NULL);
@@ -1008,8 +1026,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                 }
                 MinikinRect glyphBounds;
                 hb_glyph_extents_t extents = {};
-                if (is_color_bitmap_font &&
-                    hb_font_get_glyph_extents(hbFont.get(), glyph_ix, &extents)) {
+                if (is_color_bitmap_font && hb_font_get_glyph_extents(hbFont, glyph_ix, &extents)) {
                     // Note that it is technically possible for a TrueType font to have outline and
                     // embedded bitmap at the same time. We ignore modified bbox of hinted outline
                     // glyphs in that case.
@@ -1019,8 +1036,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                     glyphBounds.mBottom =
                             roundf(HBFixedToFloat(-extents.y_bearing - extents.height));
                 } else {
-                    fakedFont.font->typeface()->GetBounds(&glyphBounds, glyph_ix, ctx->paint,
-                                                          fakedFont.fakery);
+                    fakedFont.font->GetBounds(&glyphBounds, glyph_ix, ctx->paint, fakedFont.fakery);
                 }
                 glyphBounds.offset(xoff, yoff);
 
@@ -1088,7 +1104,7 @@ size_t Layout::nGlyphs() const {
 
 const MinikinFont* Layout::getFont(int i) const {
     const LayoutGlyph& glyph = mGlyphs[i];
-    return mFaces[glyph.font_ix].font->typeface().get();
+    return mFaces[glyph.font_ix].font;
 }
 
 FontFakery Layout::getFakery(int i) const {
