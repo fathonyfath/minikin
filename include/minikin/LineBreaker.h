@@ -115,7 +115,7 @@ public:
     }
 
 private:
-    MINIKIN_PREVENT_COPY_AND_ASSIGN(LineBreakResult);
+    PREVENT_COPY_AND_ASSIGN(LineBreakResult);
 };
 
 LineBreakResult breakIntoLines(const U16StringPiece& textBuffer, BreakStrategy strategy,

@@ -16,13 +16,13 @@
 #ifndef MINIKIN_MACROS_H
 #define MINIKIN_MACROS_H
 
-#define MINIKIN_PREVENT_COPY_AND_ASSIGN(Type) \
-    Type(const Type&) = delete;               \
+#define PREVENT_COPY_AND_ASSIGN(Type) \
+    Type(const Type&) = delete;       \
     Type& operator=(const Type&) = delete
 
-#define MINIKIN_PREVENT_COPY_ASSIGN_AND_MOVE(Type) \
-    Type(const Type&) = delete;                    \
-    Type& operator=(const Type&) = delete;         \
-    Type(Type&&) = delete;                         \
+#define PREVENT_COPY_ASSIGN_AND_MOVE(Type) \
+    Type(const Type&) = delete;            \
+    Type& operator=(const Type&) = delete; \
+    Type(Type&&) = delete;                 \
     Type& operator=(Type&&) = delete
 #endif  // MINIKIN_MACROS_H

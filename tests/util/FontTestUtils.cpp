@@ -88,16 +88,15 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
                 continue;
             }
 
-            FontStyle style(weight, italic);
             if (index == nullptr) {
                 std::shared_ptr<MinikinFont> minikinFont =
                         std::make_shared<FreeTypeMinikinFontForTest>(fontPath);
-                fonts.push_back(Font::Builder(minikinFont).setStyle(style).build());
+                fonts.push_back(Font(minikinFont, FontStyle(weight, italic)));
             } else {
                 std::shared_ptr<MinikinFont> minikinFont =
                         std::make_shared<FreeTypeMinikinFontForTest>(fontPath,
                                                                      atoi((const char*)index));
-                fonts.push_back(Font::Builder(minikinFont).setStyle(style).build());
+                fonts.push_back(Font(minikinFont, FontStyle(weight, italic)));
             }
         }
 
@@ -126,7 +125,7 @@ std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath)
 std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
     auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
     std::vector<Font> fonts;
-    fonts.push_back(Font::Builder(font).build());
+    fonts.push_back(Font(font, FontStyle()));
     return std::make_shared<FontFamily>(std::move(fonts));
 }
 
