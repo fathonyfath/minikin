@@ -24,6 +24,7 @@
 #define MINIKIN_WORD_BREAKER_H
 
 #include <list>
+#include <mutex>
 
 #include <unicode/brkiter.h>
 
@@ -76,7 +77,8 @@ protected:
     size_t getPoolSize() const { return mPool.size(); }
 
 private:
-    std::list<Slot> mPool;  // Guarded by gMinikinLock
+    std::list<Slot> mPool;  // Guarded by mMutex
+    std::mutex mMutex;
 };
 
 class WordBreaker {
