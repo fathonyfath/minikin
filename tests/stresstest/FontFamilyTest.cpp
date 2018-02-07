@@ -17,11 +17,11 @@
 #include "minikin/FontFamily.h"
 
 #include <gtest/gtest.h>
-#include <hb.h>
 
 #include "minikin/FontCollection.h"
 
 #include "FontTestUtils.h"
+#include "HbFontCache.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -37,7 +37,7 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
     std::shared_ptr<FontFamily> family = buildFontFamily(fontPath);
 
     android::AutoMutex _l(gMinikinLock);
-    hb_font_t* hbFont = family->getFont(0)->baseFont().get();
+    hb_font_t* hbFont = getHbFontLocked(family->getFont(0).get());
 
     for (uint32_t codePoint = 0; codePoint < MAX_UNICODE_CODE_POINT; ++codePoint) {
         uint32_t unusedGlyph;

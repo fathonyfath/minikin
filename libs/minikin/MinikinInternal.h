@@ -23,7 +23,6 @@
 #include <utils/Log.h>
 #include <utils/Mutex.h>
 
-#include "minikin/HbUtils.h"
 #include "minikin/MinikinFont.h"
 
 namespace minikin {
@@ -36,6 +35,8 @@ extern android::Mutex gMinikinLock;
 
 // Aborts if gMinikinLock is not acquired. Do nothing on the release build.
 void assertMinikinLocked();
+
+hb_blob_t* getFontTable(const MinikinFont* minikinFont, uint32_t tag);
 
 #ifdef ENABLE_ASSERTION
 #define MINIKIN_ASSERT(cond, ...) LOG_ALWAYS_FATAL_IF(!(cond), __VA_ARGS__)
@@ -64,24 +65,24 @@ uint16_t getVsIndex(uint32_t codePoint);
 // Note that this function returns false for Mongolian free variation selectors.
 bool isVariationSelector(uint32_t codePoint);
 
-// An RAII accessor for hb_blob_t
+// An RAII wrapper for hb_blob_t
 class HbBlob {
 public:
-    HbBlob(const HbFaceUniquePtr& face, uint32_t tag)
-            : mBlob(hb_face_reference_table(face.get(), tag)) {}
-    HbBlob(const HbFontUniquePtr& font, uint32_t tag)
-            : mBlob(hb_face_reference_table(hb_font_get_face(font.get()), tag)) {}
+    // Takes ownership of hb_blob_t object, caller is no longer
+    // responsible for calling hb_blob_destroy().
+    explicit HbBlob(hb_blob_t* blob) : mBlob(blob) {}
 
-    inline const uint8_t* get() const {
-        return reinterpret_cast<const uint8_t*>(hb_blob_get_data(mBlob.get(), nullptr));
+    ~HbBlob() { hb_blob_destroy(mBlob); }
+
+    const uint8_t* get() const {
+        const char* data = hb_blob_get_data(mBlob, nullptr);
+        return reinterpret_cast<const uint8_t*>(data);
     }
 
-    inline size_t size() const { return (size_t)hb_blob_get_length(mBlob.get()); }
-
-    inline operator bool() const { return size() > 0; }
+    size_t size() const { return (size_t)hb_blob_get_length(mBlob); }
 
 private:
-    HbBlobUniquePtr mBlob;
+    hb_blob_t* mBlob;
 };
 
 }  // namespace minikin

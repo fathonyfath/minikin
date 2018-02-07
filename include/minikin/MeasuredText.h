@@ -175,7 +175,7 @@ public:
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;
 
-    MINIKIN_PREVENT_COPY_AND_ASSIGN(MeasuredText);
+    PREVENT_COPY_AND_ASSIGN(MeasuredText);
 
 private:
     friend class MeasuredTextBuilder;
@@ -215,7 +215,7 @@ public:
                 new MeasuredText(textBuf, std::move(mRuns), computeHyphenation, computeLayout));
     }
 
-    MINIKIN_PREVENT_COPY_ASSIGN_AND_MOVE(MeasuredTextBuilder);
+    PREVENT_COPY_ASSIGN_AND_MOVE(MeasuredTextBuilder);
 
 private:
     std::vector<std::unique_ptr<Run>> mRuns;

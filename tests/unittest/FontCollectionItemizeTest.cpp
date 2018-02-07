@@ -91,7 +91,7 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
 // Utility function to obtain font path associated with run.
 const std::string& getFontPath(const FontCollection::Run& run) {
     EXPECT_NE(nullptr, run.fakedFont.font);
-    return ((FreeTypeMinikinFontForTest*)run.fakedFont.font->typeface().get())->fontPath();
+    return ((FreeTypeMinikinFontForTest*)run.fakedFont.font)->fontPath();
 }
 
 // Utility function to obtain LocaleList from string.
@@ -945,7 +945,7 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
         // Prepare first font which doesn't supports U+9AA8
         auto firstFamilyMinikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kNoGlyphFont);
         std::vector<Font> fonts;
-        fonts.push_back(Font::Builder(firstFamilyMinikinFont).build());
+        fonts.push_back(Font(firstFamilyMinikinFont, FontStyle()));
         auto firstFamily = std::make_shared<FontFamily>(
                 registerLocaleList("und"), FontFamily::Variant::DEFAULT, std::move(fonts));
         families.push_back(firstFamily);
@@ -958,7 +958,7 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
         for (size_t i = 0; i < testCase.fontLocales.size(); ++i) {
             auto minikinFont = std::make_shared<FreeTypeMinikinFontForTest>(kJAFont);
             std::vector<Font> fonts;
-            fonts.push_back(Font::Builder(minikinFont).build());
+            fonts.push_back(Font(minikinFont, FontStyle()));
             auto family =
                     std::make_shared<FontFamily>(registerLocaleList(testCase.fontLocales[i]),
                                                  FontFamily::Variant::DEFAULT, std::move(fonts));
@@ -974,10 +974,10 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
 
         // First family doesn't support U+9AA8 and others support it, so the first font should not
         // be selected.
-        EXPECT_NE(firstFamilyMinikinFont.get(), runs[0].fakedFont.font->typeface().get());
+        EXPECT_NE(firstFamilyMinikinFont.get(), runs[0].fakedFont.font);
 
         // Lookup used font family by MinikinFont*.
-        const int usedLocaleIndex = fontLocaleIdxMap[runs[0].fakedFont.font->typeface().get()];
+        const int usedLocaleIndex = fontLocaleIdxMap[runs[0].fakedFont.font];
         EXPECT_EQ(testCase.selectedFontIndex, usedLocaleIndex);
     }
 }
@@ -1545,10 +1545,10 @@ TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS) {
     // selected.
     std::vector<FontCollection::Run> runs;
     itemize(collection, "U+35A8 U+E0100", &runs);
-    EXPECT_EQ(familyA->getFont(0), runs[0].fakedFont.font);
+    EXPECT_EQ(familyA->getFont(0).get(), runs[0].fakedFont.font);
 
     itemize(reversedCollection, "U+35A8 U+E0100", &runs);
-    EXPECT_EQ(familyB->getFont(0), runs[0].fakedFont.font);
+    EXPECT_EQ(familyB->getFont(0).get(), runs[0].fakedFont.font);
 }
 
 // For b/29585939
@@ -1569,10 +1569,10 @@ TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     // The first font should be selected.
     std::vector<FontCollection::Run> runs;
     itemize(collection, "U+5380 U+E0100", &runs);
-    EXPECT_EQ(hasCmapFormat14Family->getFont(0), runs[0].fakedFont.font);
+    EXPECT_EQ(hasCmapFormat14Family->getFont(0).get(), runs[0].fakedFont.font);
 
     itemize(reversedCollection, "U+5380 U+E0100", &runs);
-    EXPECT_EQ(noCmapFormat14Family->getFont(0), runs[0].fakedFont.font);
+    EXPECT_EQ(noCmapFormat14Family->getFont(0).get(), runs[0].fakedFont.font);
 }
 
 }  // namespace minikin
