@@ -103,46 +103,35 @@ static std::vector<Locale> parseLocaleList(const std::string& input) {
     return result;
 }
 
-// static
-uint32_t LocaleListCache::getId(const std::string& locales) {
-    LocaleListCache* inst = LocaleListCache::getInstance();
-    std::unordered_map<std::string, uint32_t>::const_iterator it =
-            inst->mLocaleListLookupTable.find(locales);
-    if (it != inst->mLocaleListLookupTable.end()) {
+LocaleListCache::LocaleListCache() {
+    // Insert an empty locale list for mapping default locale list to kEmptyListId.
+    // The default locale list has only one Locale and it is the unsupported locale.
+    mLocaleLists.emplace_back();
+    mLocaleListLookupTable.insert(std::make_pair("", kEmptyListId));
+}
+
+uint32_t LocaleListCache::getIdInternal(const std::string& locales) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    const auto& it = mLocaleListLookupTable.find(locales);
+    if (it != mLocaleListLookupTable.end()) {
         return it->second;
     }
 
     // Given locale list is not in cache. Insert it and return newly assigned ID.
-    const uint32_t nextId = inst->mLocaleLists.size();
+    const uint32_t nextId = mLocaleLists.size();
     LocaleList fontLocales(parseLocaleList(locales));
     if (fontLocales.empty()) {
         return kEmptyListId;
     }
-    inst->mLocaleLists.push_back(std::move(fontLocales));
-    inst->mLocaleListLookupTable.insert(std::make_pair(locales, nextId));
+    mLocaleLists.push_back(std::move(fontLocales));
+    mLocaleListLookupTable.insert(std::make_pair(locales, nextId));
     return nextId;
 }
 
-// static
-const LocaleList& LocaleListCache::getById(uint32_t id) {
-    LocaleListCache* inst = LocaleListCache::getInstance();
-    MINIKIN_ASSERT(id < inst->mLocaleLists.size(), "Lookup by unknown locale list ID.");
-    return inst->mLocaleLists[id];
-}
-
-// static
-LocaleListCache* LocaleListCache::getInstance() {
-    assertMinikinLocked();
-    static LocaleListCache* instance = nullptr;
-    if (instance == nullptr) {
-        instance = new LocaleListCache();
-
-        // Insert an empty locale list for mapping default locale list to kEmptyListId.
-        // The default locale list has only one Locale and it is the unsupported locale.
-        instance->mLocaleLists.push_back(LocaleList());
-        instance->mLocaleListLookupTable.insert(std::make_pair("", kEmptyListId));
-    }
-    return instance;
+const LocaleList& LocaleListCache::getByIdInternal(uint32_t id) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    MINIKIN_ASSERT(id < mLocaleLists.size(), "Lookup by unknown locale list ID.");
+    return mLocaleLists[id];
 }
 
 }  // namespace minikin
