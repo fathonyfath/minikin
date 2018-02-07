@@ -33,15 +33,9 @@ struct HbFaceDeleter {
 struct HbFontDeleter {
     void operator()(hb_font_t* v) { hb_font_destroy(v); }
 };
-
-struct HbBufferDeleter {
-    void operator()(hb_buffer_t* v) { hb_buffer_destroy(v); }
-};
-
 using HbBlobUniquePtr = std::unique_ptr<hb_blob_t, HbBlobDeleter>;
 using HbFaceUniquePtr = std::unique_ptr<hb_face_t, HbFaceDeleter>;
 using HbFontUniquePtr = std::unique_ptr<hb_font_t, HbFontDeleter>;
-using HbBufferUniquePtr = std::unique_ptr<hb_buffer_t, HbBufferDeleter>;
 
 }  // namespace minikin
 

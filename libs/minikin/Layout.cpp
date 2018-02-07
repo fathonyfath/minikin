@@ -30,6 +30,7 @@
 #include <unicode/utf16.h>
 #include <utils/JenkinsHash.h>
 #include <utils/LruCache.h>
+#include <utils/Singleton.h>
 
 #include "minikin/Emoji.h"
 #include "minikin/HbUtils.h"
@@ -47,70 +48,6 @@ struct SkiaArguments {
     const MinikinPaint* paint;
     FontFakery fakery;
 };
-
-static hb_position_t harfbuzzGetGlyphHorizontalAdvance(hb_font_t* /* hbFont */, void* fontData,
-                                                       hb_codepoint_t glyph, void* /* userData */) {
-    SkiaArguments* args = reinterpret_cast<SkiaArguments*>(fontData);
-    float advance = args->font->GetHorizontalAdvance(glyph, *args->paint, args->fakery);
-    return 256 * advance + 0.5;
-}
-
-static hb_bool_t harfbuzzGetGlyphHorizontalOrigin(hb_font_t* /* hbFont */, void* /* fontData */,
-                                                  hb_codepoint_t /* glyph */,
-                                                  hb_position_t* /* x */, hb_position_t* /* y */,
-                                                  void* /* userData */) {
-    // Just return true, following the way that Harfbuzz-FreeType implementation does.
-    return true;
-}
-
-// TODO: Initialize in Zygote if it helps.
-hb_unicode_funcs_t* getUnicodeFunctions() {
-    static hb_unicode_funcs_t* unicodeFunctions = nullptr;
-    static std::once_flag once;
-    std::call_once(once, [&]() {
-        unicodeFunctions = hb_unicode_funcs_create(hb_icu_get_unicode_funcs());
-        /* Disable the function used for compatibility decomposition */
-        hb_unicode_funcs_set_decompose_compatibility_func(
-                unicodeFunctions,
-                [](hb_unicode_funcs_t*, hb_codepoint_t, hb_codepoint_t*, void*) -> unsigned int {
-                    return 0;
-                },
-                nullptr, nullptr);
-    });
-    return unicodeFunctions;
-}
-
-// TODO: Initialize in Zygote if it helps.
-hb_font_funcs_t* getFontFuncs() {
-    static hb_font_funcs_t* fontFuncs = nullptr;
-    static std::once_flag once;
-    std::call_once(once, [&]() {
-        fontFuncs = hb_font_funcs_create();
-        // Override the h_advance function since we can't use HarfBuzz's implemenation. It may
-        // return the wrong value if the font uses hinting aggressively.
-        hb_font_funcs_set_glyph_h_advance_func(fontFuncs, harfbuzzGetGlyphHorizontalAdvance, 0, 0);
-        hb_font_funcs_set_glyph_h_origin_func(fontFuncs, harfbuzzGetGlyphHorizontalOrigin, 0, 0);
-        hb_font_funcs_make_immutable(fontFuncs);
-    });
-    return fontFuncs;
-}
-
-// TODO: Initialize in Zygote if it helps.
-hb_font_funcs_t* getFontFuncsForEmoji() {
-    static hb_font_funcs_t* fontFuncs = nullptr;
-    static std::once_flag once;
-    std::call_once(once, [&]() {
-        fontFuncs = hb_font_funcs_create();
-        // Don't override the h_advance function since we use HarfBuzz's implementation for emoji
-        // for performance reasons.
-        // Note that it is technically possible for a TrueType font to have outline and embedded
-        // bitmap at the same time. We ignore modified advances of hinted outline glyphs in that
-        // case.
-        hb_font_funcs_set_glyph_h_origin_func(fontFuncs, harfbuzzGetGlyphHorizontalOrigin, 0, 0);
-        hb_font_funcs_make_immutable(fontFuncs);
-    });
-    return fontFuncs;
-}
 
 }  // namespace
 
@@ -236,11 +173,6 @@ public:
         dprintf(fd, "  Hit ratio: %d/%d (%f)\n", mCacheHitCount, mRequestCount, ratio);
     }
 
-    static LayoutCache& getInstance() {
-        static LayoutCache cache;
-        return cache;
-    }
-
 private:
     // callback for OnEntryRemoved
     void operator()(LayoutCacheKey& key, Layout*& value) {
@@ -258,6 +190,27 @@ private:
     // TODO: eviction based on memory footprint; for now, we just use a constant
     // number of strings
     static const size_t kMaxEntries = 5000;
+};
+
+static unsigned int disabledDecomposeCompatibility(hb_unicode_funcs_t*, hb_codepoint_t,
+                                                   hb_codepoint_t*, void*) {
+    return 0;
+}
+
+class LayoutEngine : public ::android::Singleton<LayoutEngine> {
+public:
+    LayoutEngine() {
+        unicodeFunctions = hb_unicode_funcs_create(hb_icu_get_unicode_funcs());
+        /* Disable the function used for compatibility decomposition */
+        hb_unicode_funcs_set_decompose_compatibility_func(
+                unicodeFunctions, disabledDecomposeCompatibility, NULL, NULL);
+        hbBuffer = hb_buffer_create();
+        hb_buffer_set_unicode_funcs(hbBuffer, unicodeFunctions);
+    }
+
+    hb_buffer_t* hbBuffer;
+    hb_unicode_funcs_t* unicodeFunctions;
+    LayoutCache layoutCache;
 };
 
 bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
@@ -314,6 +267,48 @@ void Layout::reset() {
     mAdvance = 0;
 }
 
+static hb_position_t harfbuzzGetGlyphHorizontalAdvance(hb_font_t* /* hbFont */, void* fontData,
+                                                       hb_codepoint_t glyph, void* /* userData */) {
+    SkiaArguments* args = reinterpret_cast<SkiaArguments*>(fontData);
+    float advance = args->font->GetHorizontalAdvance(glyph, *args->paint, args->fakery);
+    return 256 * advance + 0.5;
+}
+
+static hb_bool_t harfbuzzGetGlyphHorizontalOrigin(hb_font_t* /* hbFont */, void* /* fontData */,
+                                                  hb_codepoint_t /* glyph */,
+                                                  hb_position_t* /* x */, hb_position_t* /* y */,
+                                                  void* /* userData */) {
+    // Just return true, following the way that Harfbuzz-FreeType
+    // implementation does.
+    return true;
+}
+
+hb_font_funcs_t* getHbFontFuncs(bool forColorBitmapFont) {
+    assertMinikinLocked();
+
+    static hb_font_funcs_t* hbFuncs = nullptr;
+    static hb_font_funcs_t* hbFuncsForColorBitmap = nullptr;
+
+    hb_font_funcs_t** funcs = forColorBitmapFont ? &hbFuncs : &hbFuncsForColorBitmap;
+    if (*funcs == nullptr) {
+        *funcs = hb_font_funcs_create();
+        if (forColorBitmapFont) {
+            // Don't override the h_advance function since we use HarfBuzz's implementation for
+            // emoji for performance reasons.
+            // Note that it is technically possible for a TrueType font to have outline and embedded
+            // bitmap at the same time. We ignore modified advances of hinted outline glyphs in that
+            // case.
+        } else {
+            // Override the h_advance function since we can't use HarfBuzz's implemenation. It may
+            // return the wrong value if the font uses hinting aggressively.
+            hb_font_funcs_set_glyph_h_advance_func(*funcs, harfbuzzGetGlyphHorizontalAdvance, 0, 0);
+        }
+        hb_font_funcs_set_glyph_h_origin_func(*funcs, harfbuzzGetGlyphHorizontalOrigin, 0, 0);
+        hb_font_funcs_make_immutable(*funcs);
+    }
+    return *funcs;
+}
+
 static bool isColorBitmapFont(const HbFontUniquePtr& font) {
     HbBlob cbdt(font, HB_TAG('C', 'B', 'D', 'T'));
     return cbdt;
@@ -350,12 +345,20 @@ int Layout::findOrPushBackFace(const FakedFont& face, LayoutContext* ctx) {
         // Create new hb_font_t from base font.
         HbFontUniquePtr font(hb_font_create_sub_font(face.font->baseFont().get()));
         hb_font_set_funcs(
-                font.get(), isColorBitmapFont(font) ? getFontFuncsForEmoji() : getFontFuncs(),
+                font.get(), getHbFontFuncs(isColorBitmapFont(font)),
                 new SkiaArguments({face.font->typeface().get(), &ctx->paint, face.fakery}),
                 [](void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
         ctx->hbFonts.push_back(std::move(font));
     }
     return ix;
+}
+
+static hb_script_t codePointToScript(hb_codepoint_t codepoint) {
+    static hb_unicode_funcs_t* u = 0;
+    if (!u) {
+        u = LayoutEngine::getInstance().unicodeFunctions;
+    }
+    return hb_unicode_script(u, codepoint);
 }
 
 static hb_codepoint_t decodeUtf16(const uint16_t* chars, size_t len, ssize_t* iter) {
@@ -372,12 +375,12 @@ static hb_script_t getScriptRun(const uint16_t* chars, size_t len, ssize_t* iter
         return HB_SCRIPT_UNKNOWN;
     }
     uint32_t cp = decodeUtf16(chars, len, iter);
-    hb_script_t current_script = hb_unicode_script(getUnicodeFunctions(), cp);
+    hb_script_t current_script = codePointToScript(cp);
     for (;;) {
         if (size_t(*iter) == len) break;
         const ssize_t prev_iter = *iter;
         cp = decodeUtf16(chars, len, iter);
-        const hb_script_t script = hb_unicode_script(getUnicodeFunctions(), cp);
+        const hb_script_t script = codePointToScript(cp);
         if (script != current_script) {
             if (current_script == HB_SCRIPT_INHERITED || current_script == HB_SCRIPT_COMMON) {
                 current_script = script;
@@ -678,7 +681,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            bool isRtl, LayoutContext* ctx, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                            float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
-    LayoutCache& cache = LayoutCache::getInstance();
+    LayoutCache& cache = LayoutEngine::getInstance().layoutCache;
     LayoutCacheKey key(ctx->paint, buf, start, count, bufSize, isRtl, startHyphen, endHyphen);
 
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
@@ -765,23 +768,22 @@ static inline hb_codepoint_t determineHyphenChar(hb_codepoint_t preferredHyphen,
 }
 
 template <typename HyphenEdit>
-static inline void addHyphenToHbBuffer(const HbBufferUniquePtr& buffer, const HbFontUniquePtr& font,
+static inline void addHyphenToHbBuffer(hb_buffer_t* buffer, const HbFontUniquePtr& font,
                                        HyphenEdit hyphen, uint32_t cluster) {
     const uint32_t* chars;
     size_t size;
     std::tie(chars, size) = getHyphenString(hyphen);
     for (size_t i = 0; i < size; i++) {
-        hb_buffer_add(buffer.get(), determineHyphenChar(chars[i], font.get()), cluster);
+        hb_buffer_add(buffer, determineHyphenChar(chars[i], font.get()), cluster);
     }
 }
 
 // Returns the cluster value assigned to the first codepoint added to the buffer, which can be used
 // to translate cluster values returned by HarfBuzz to input indices.
-static inline uint32_t addToHbBuffer(const HbBufferUniquePtr& buffer, const uint16_t* buf,
-                                     size_t start, size_t count, size_t bufSize,
-                                     ssize_t scriptRunStart, ssize_t scriptRunEnd,
-                                     StartHyphenEdit inStartHyphen, EndHyphenEdit inEndHyphen,
-                                     const HbFontUniquePtr& hbFont) {
+static inline uint32_t addToHbBuffer(hb_buffer_t* buffer, const uint16_t* buf, size_t start,
+                                     size_t count, size_t bufSize, ssize_t scriptRunStart,
+                                     ssize_t scriptRunEnd, StartHyphenEdit inStartHyphen,
+                                     EndHyphenEdit inEndHyphen, const HbFontUniquePtr& hbFont) {
     // Only hyphenate the very first script run for starting hyphens.
     const StartHyphenEdit startHyphen =
             (scriptRunStart == 0) ? inStartHyphen : StartHyphenEdit::NO_EDIT;
@@ -842,10 +844,10 @@ static inline uint32_t addToHbBuffer(const HbBufferUniquePtr& buffer, const uint
         hbTextLength = hbItemOffset + hbItemLength;
     }
 
-    hb_buffer_add_utf16(buffer.get(), hbText, hbTextLength, hbItemOffset, hbItemLength);
+    hb_buffer_add_utf16(buffer, hbText, hbTextLength, hbItemOffset, hbItemLength);
 
     unsigned int numCodepoints;
-    hb_glyph_info_t* cpInfo = hb_buffer_get_glyph_infos(buffer.get(), &numCodepoints);
+    hb_glyph_info_t* cpInfo = hb_buffer_get_glyph_infos(buffer, &numCodepoints);
 
     // Add the hyphen at the end, if there's any.
     if (hasEndInsertion || hasEndReplacement) {
@@ -869,7 +871,7 @@ static inline uint32_t addToHbBuffer(const HbBufferUniquePtr& buffer, const uint
         addHyphenToHbBuffer(buffer, hbFont, endHyphen, hyphenCluster);
         // Since we have just added to the buffer, cpInfo no longer necessarily points to
         // the right place. Refresh it.
-        cpInfo = hb_buffer_get_glyph_infos(buffer.get(), nullptr /* we don't need the size */);
+        cpInfo = hb_buffer_get_glyph_infos(buffer, nullptr /* we don't need the size */);
     }
     return cpInfo[0].cluster;
 }
@@ -877,8 +879,7 @@ static inline uint32_t addToHbBuffer(const HbBufferUniquePtr& buffer, const uint
 void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                          bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen,
                          EndHyphenEdit endHyphen) {
-    HbBufferUniquePtr buffer(hb_buffer_create());
-    hb_buffer_set_unicode_funcs(buffer.get(), getUnicodeFunctions());
+    hb_buffer_t* buffer = LayoutEngine::getInstance().hbBuffer;
     std::vector<FontCollection::Run> items;
     ctx->paint.font->itemize(buf + start, count, ctx->paint, &items);
 
@@ -951,9 +952,9 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                 letterSpaceHalfRight = letterSpace - letterSpaceHalfLeft;
             }
 
-            hb_buffer_clear_contents(buffer.get());
-            hb_buffer_set_script(buffer.get(), script);
-            hb_buffer_set_direction(buffer.get(), isRtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
+            hb_buffer_clear_contents(buffer);
+            hb_buffer_set_script(buffer, script);
+            hb_buffer_set_direction(buffer, isRtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
             const LocaleList& localeList = LocaleListCache::getById(ctx->paint.localeListId);
             if (localeList.size() != 0) {
                 hb_language_t hbLanguage = localeList.getHbLanguage(0);
@@ -963,18 +964,17 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                         break;
                     }
                 }
-                hb_buffer_set_language(buffer.get(), hbLanguage);
+                hb_buffer_set_language(buffer, hbLanguage);
             }
 
             const uint32_t clusterStart =
                     addToHbBuffer(buffer, buf, start, count, bufSize, scriptRunStart, scriptRunEnd,
                                   startHyphen, endHyphen, hbFont);
 
-            hb_shape(hbFont.get(), buffer.get(), features.empty() ? NULL : &features[0],
-                     features.size());
+            hb_shape(hbFont.get(), buffer, features.empty() ? NULL : &features[0], features.size());
             unsigned int numGlyphs;
-            hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer.get(), &numGlyphs);
-            hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buffer.get(), NULL);
+            hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, &numGlyphs);
+            hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buffer, NULL);
 
             // At this point in the code, the cluster values in the info buffer correspond to the
             // input characters with some shift. The cluster value clusterStart corresponds to the
@@ -1129,12 +1129,19 @@ void Layout::getBounds(MinikinRect* bounds) const {
 
 void Layout::purgeCaches() {
     android::AutoMutex _l(gMinikinLock);
-    LayoutCache::getInstance().clear();
+    LayoutCache& layoutCache = LayoutEngine::getInstance().layoutCache;
+    layoutCache.clear();
 }
 
 void Layout::dumpMinikinStats(int fd) {
     android::AutoMutex _l(gMinikinLock);
-    LayoutCache::getInstance().dumpStats(fd);
+    LayoutEngine::getInstance().layoutCache.dumpStats(fd);
 }
 
 }  // namespace minikin
+
+// Unable to define the static data member outside of android.
+// TODO: introduce our own Singleton to drop android namespace.
+namespace android {
+ANDROID_SINGLETON_STATIC_INSTANCE(minikin::LayoutEngine);
+}  // namespace android
