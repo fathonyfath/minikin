@@ -18,6 +18,7 @@
 #define MINIKIN_HYPHENATOR_MAP_H
 
 #include <map>
+#include <mutex>
 
 #include "minikin/Hyphenator.h"
 
@@ -74,7 +75,9 @@ private:
     const Hyphenator* lookupBySubtagLocked(const Locale& locale, SubtagBits bits) const;
 
     const Hyphenator* mSoftHyphenOnlyHyphenator;
-    std::map<uint64_t, const Hyphenator*> mMap;  // Guarded by gMinikinLock.
+    std::map<uint64_t, const Hyphenator*> mMap;  // Guarded by mMutex.
+
+    std::mutex mMutex;
 };
 
 }  // namespace minikin
