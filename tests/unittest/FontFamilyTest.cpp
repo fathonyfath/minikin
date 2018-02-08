@@ -725,7 +725,7 @@ TEST_F(FontFamilyTest, closestMatch) {
         for (auto familyStyle : testCase.familyStyles) {
             std::shared_ptr<MinikinFont> dummyFont(new FreeTypeMinikinFontForTest(ROBOTO));
             dummyFonts.push_back(dummyFont);
-            fonts.push_back(Font(dummyFont, familyStyle));
+            fonts.push_back(Font::Builder(dummyFont).setStyle(familyStyle).build());
         }
 
         FontFamily family(std::move(fonts));
@@ -733,7 +733,7 @@ TEST_F(FontFamilyTest, closestMatch) {
 
         size_t idx = dummyFonts.size();
         for (size_t i = 0; i < dummyFonts.size(); i++) {
-            if (dummyFonts[i].get() == closest.font) {
+            if (dummyFonts[i].get() == closest.font->typeface().get()) {
                 idx = i;
                 break;
             }
