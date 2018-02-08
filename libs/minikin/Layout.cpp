@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -144,12 +145,12 @@ struct LayoutContext {
 
 class LayoutCacheKey {
 public:
-    LayoutCacheKey(const MinikinPaint& paint, const uint16_t* chars, size_t start, size_t count,
-                   size_t nchars, bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
-            : mChars(chars),
-              mNchars(nchars),
-              mStart(start),
-              mCount(count),
+    LayoutCacheKey(const U16StringPiece& text, const Range& range, const MinikinPaint& paint,
+                   bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
+            : mChars(text.data()),
+              mNchars(text.size()),
+              mStart(range.getStart()),
+              mCount(range.getLength()),
               mId(paint.font->getId()),
               mStyle(paint.fontStyle),
               mSize(paint.size),
@@ -214,20 +215,50 @@ public:
         mCache.setOnEntryRemovedListener(this);
     }
 
-    void clear() { mCache.clear(); }
+    void clear() {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mCache.clear();
+    }
 
-    Layout* get(LayoutCacheKey& key, LayoutContext* ctx) {
-        Layout* layout = mCache.get(key);
-        mRequestCount++;
-        if (layout == NULL) {
-            key.copyText();
-            layout = new Layout();
-            key.doLayout(layout, ctx);
-            mCache.put(key, layout);
-        } else {
-            mCacheHitCount++;
+    // Do not use any LayoutCache function in callback.
+    float getOrCreateAndAppend(const U16StringPiece& text, const Range& range, LayoutContext* ctx,
+                               bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                               Layout* outLayout,             // nullptr if not necessary
+                               float* outAdvances,            // nullptr if not necessary
+                               MinikinExtent* outExtents,     // nullptr if not necessary
+                               LayoutPieces* outLayoutPiece,  // nullptr if not necessary
+                               uint32_t outIndex,             // outputStarting index
+                               float wordSpacing) {           // additional wordSpacing
+        LayoutCacheKey key(text, range, ctx->paint, dir, startHyphen, endHyphen);
+        if (ctx->paint.skipCache()) {
+            Layout layoutForWord;
+            key.doLayout(&layoutForWord, ctx);
+            return appendTo(layoutForWord, outLayout, outAdvances, outExtents, outLayoutPiece,
+                            outIndex, wordSpacing);
         }
-        return layout;
+
+        mRequestCount++;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            Layout* layout = mCache.get(key);
+            if (layout != nullptr) {
+                mCacheHitCount++;
+                return appendTo(*layout, outLayout, outAdvances, outExtents, outLayoutPiece,
+                                outIndex, wordSpacing);
+            }
+        }
+        // Doing text layout takes long time, so releases the mutex during doing layout.
+        // Don't care even if we do the same layout in other thred.
+        key.copyText();
+        std::unique_ptr<Layout> layout = std::make_unique<Layout>();
+        key.doLayout(layout.get(), ctx);
+        float result = appendTo(*layout, outLayout, outAdvances, outExtents, outLayoutPiece,
+                                outIndex, wordSpacing);
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            mCache.put(key, layout.release());
+        }
+        return result;
     }
 
     void dumpStats(int fd) {
@@ -249,7 +280,26 @@ private:
         delete value;
     }
 
-    android::LruCache<LayoutCacheKey, Layout*> mCache;
+    // Returns advance of the layout.
+    float appendTo(const Layout& layoutForWord, Layout* outLayout, float* outAdvances,
+                   MinikinExtent* outExtents, LayoutPieces* outLayoutPiece, uint32_t outIndex,
+                   float wordSpacing) {
+        if (outLayout) {
+            outLayout->appendLayout(layoutForWord, outIndex, wordSpacing);
+        }
+        if (outAdvances) {
+            layoutForWord.getAdvances(outAdvances);
+        }
+        if (outExtents) {
+            layoutForWord.getExtents(outExtents);
+        }
+        if (outLayoutPiece) {
+            outLayoutPiece->offsetMap.insert(std::make_pair(outIndex, layoutForWord));
+        }
+        return layoutForWord.getAdvance();
+    }
+
+    android::LruCache<LayoutCacheKey, Layout*> mCache;  // Guarded by mCache.
 
     int32_t mRequestCount;
     int32_t mCacheHitCount;
@@ -259,6 +309,10 @@ private:
     // TODO: eviction based on memory footprint; for now, we just use a constant
     // number of strings
     static const size_t kMaxEntries = 5000;
+
+    // To avoid dead-locking, need to acquire gMinikinLock before acquiring mMutex.
+    // TODO: Remove gMinikinLock
+    std::mutex mMutex;
 };
 
 bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
@@ -679,44 +733,10 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            bool isRtl, LayoutContext* ctx, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                            float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
-    LayoutCache& cache = LayoutCache::getInstance();
-    LayoutCacheKey key(ctx->paint, buf, start, count, bufSize, isRtl, startHyphen, endHyphen);
-
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
-
-    float advance;
-    if (ctx->paint.skipCache()) {
-        Layout layoutForWord;
-        key.doLayout(&layoutForWord, ctx);
-        if (layout) {
-            layout->appendLayout(&layoutForWord, bufStart, wordSpacing);
-        }
-        if (advances) {
-            layoutForWord.getAdvances(advances);
-        }
-        if (extents) {
-            layoutForWord.getExtents(extents);
-        }
-        advance = layoutForWord.getAdvance();
-        if (lpOut != nullptr) {
-            lpOut->offsetMap.insert(std::make_pair(bufStart, layoutForWord));
-        }
-    } else {
-        Layout* layoutForWord = cache.get(key, ctx);
-        if (layout) {
-            layout->appendLayout(layoutForWord, bufStart, wordSpacing);
-        }
-        if (advances) {
-            layoutForWord->getAdvances(advances);
-        }
-        if (extents) {
-            layoutForWord->getExtents(extents);
-        }
-        advance = layoutForWord->getAdvance();
-        if (lpOut != nullptr) {
-            lpOut->offsetMap.insert(std::make_pair(bufStart, *layoutForWord));
-        }
-    }
+    float advance = LayoutCache::getInstance().getOrCreateAndAppend(
+            U16StringPiece(buf, bufSize), Range(start, start + count), ctx, isRtl, startHyphen,
+            endHyphen, layout, advances, extents, lpOut, bufStart, wordSpacing);
 
     if (wordSpacing != 0) {
         advance += wordSpacing;
@@ -1044,21 +1064,21 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
     mAdvance = x;
 }
 
-void Layout::appendLayout(Layout* src, size_t start, float extraAdvance) {
+void Layout::appendLayout(const Layout& src, size_t start, float extraAdvance) {
     int fontMapStack[16];
     int* fontMap;
-    if (src->mFaces.size() < sizeof(fontMapStack) / sizeof(fontMapStack[0])) {
+    if (src.mFaces.size() < sizeof(fontMapStack) / sizeof(fontMapStack[0])) {
         fontMap = fontMapStack;
     } else {
-        fontMap = new int[src->mFaces.size()];
+        fontMap = new int[src.mFaces.size()];
     }
-    for (size_t i = 0; i < src->mFaces.size(); i++) {
-        int font_ix = findOrPushBackFace(src->mFaces[i], nullptr);
+    for (size_t i = 0; i < src.mFaces.size(); i++) {
+        int font_ix = findOrPushBackFace(src.mFaces[i], nullptr);
         fontMap[i] = font_ix;
     }
     int x0 = mAdvance;
-    for (size_t i = 0; i < src->mGlyphs.size(); i++) {
-        LayoutGlyph& srcGlyph = src->mGlyphs[i];
+    for (size_t i = 0; i < src.mGlyphs.size(); i++) {
+        const LayoutGlyph& srcGlyph = src.mGlyphs[i];
         int font_ix = fontMap[srcGlyph.font_ix];
         unsigned int glyph_id = srcGlyph.glyph_id;
         float x = x0 + srcGlyph.x;
@@ -1066,17 +1086,17 @@ void Layout::appendLayout(Layout* src, size_t start, float extraAdvance) {
         LayoutGlyph glyph = {font_ix, glyph_id, x, y};
         mGlyphs.push_back(glyph);
     }
-    for (size_t i = 0; i < src->mAdvances.size(); i++) {
-        mAdvances[i + start] = src->mAdvances[i];
+    for (size_t i = 0; i < src.mAdvances.size(); i++) {
+        mAdvances[i + start] = src.mAdvances[i];
         if (i == 0) {
             mAdvances[start] += extraAdvance;
         }
-        mExtents[i + start] = src->mExtents[i];
+        mExtents[i + start] = src.mExtents[i];
     }
-    MinikinRect srcBounds(src->mBounds);
+    MinikinRect srcBounds(src.mBounds);
     srcBounds.offset(x0, 0);
     mBounds.join(srcBounds);
-    mAdvance += src->mAdvance + extraAdvance;
+    mAdvance += src.mAdvance + extraAdvance;
 
     if (fontMap != fontMapStack) {
         delete[] fontMap;
@@ -1116,11 +1136,11 @@ float Layout::getAdvance() const {
     return mAdvance;
 }
 
-void Layout::getAdvances(float* advances) {
+void Layout::getAdvances(float* advances) const {
     memcpy(advances, &mAdvances[0], mAdvances.size() * sizeof(float));
 }
 
-void Layout::getExtents(MinikinExtent* extents) {
+void Layout::getExtents(MinikinExtent* extents) const {
     memcpy(extents, &mExtents[0], mExtents.size() * sizeof(MinikinExtent));
 }
 
