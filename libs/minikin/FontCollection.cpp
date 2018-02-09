@@ -42,7 +42,7 @@ static inline T max(T a, T b) {
 const uint32_t EMOJI_STYLE_VS = 0xFE0F;
 const uint32_t TEXT_STYLE_VS = 0xFE0E;
 
-uint32_t FontCollection::sNextId = 0;
+static std::atomic<uint32_t> gNextCollectionId = {0};
 
 FontCollection::FontCollection(std::shared_ptr<FontFamily>&& typeface) : mMaxChar(0) {
     std::vector<std::shared_ptr<FontFamily>> typefaces;
@@ -55,8 +55,7 @@ FontCollection::FontCollection(const vector<std::shared_ptr<FontFamily>>& typefa
 }
 
 void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) {
-    android::AutoMutex _l(gMinikinLock);
-    mId = sNextId++;
+    mId = gNextCollectionId++;
     vector<uint32_t> lastChar;
     size_t nTypefaces = typefaces.size();
     const FontStyle defaultStyle;
@@ -349,9 +348,6 @@ bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
             return true;
         }
     }
-
-    // TODO: We can remove this lock by precomputing color emoji information.
-    android::AutoMutex _l(gMinikinLock);
 
     // Even if there is no cmap format 14 subtable entry for the given sequence, should return true
     // for <char, text presentation selector> case since we have special fallback rule for the

@@ -56,7 +56,6 @@ inline bool isLineEndSpace(uint16_t c) {
 }
 
 inline Locale getEffectiveLocale(uint32_t localeListId) {
-    android::AutoMutex _l(gMinikinLock);
     const LocaleList& localeList = LocaleListCache::getById(localeListId);
     return localeList.empty() ? Locale() : localeList[0];
 }

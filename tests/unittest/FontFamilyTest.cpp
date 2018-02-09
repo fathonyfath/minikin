@@ -28,13 +28,11 @@
 namespace minikin {
 
 static const LocaleList& createLocaleList(const std::string& input) {
-    android::AutoMutex _l(gMinikinLock);
     uint32_t localeListId = LocaleListCache::getId(input);
     return LocaleListCache::getById(localeListId);
 }
 
 static Locale createLocale(const std::string& input) {
-    android::AutoMutex _l(gMinikinLock);
     uint32_t localeListId = LocaleListCache::getId(input);
     return LocaleListCache::getById(localeListId)[0];
 }
@@ -626,8 +624,6 @@ TEST_F(FontFamilyTest, coverageTableSelectionTest) {
     std::shared_ptr<FontFamily> unicodeEnc1Font = buildFontFamily(kUnicodeEncoding1Font);
     std::shared_ptr<FontFamily> unicodeEnc3Font = buildFontFamily(kUnicodeEncoding3Font);
     std::shared_ptr<FontFamily> unicodeEnc4Font = buildFontFamily(kUnicodeEncoding4Font);
-
-    android::AutoMutex _l(gMinikinLock);
 
     EXPECT_TRUE(unicodeEnc1Font->hasGlyph(0x0061, 0));
     EXPECT_TRUE(unicodeEnc3Font->hasGlyph(0x0061, 0));

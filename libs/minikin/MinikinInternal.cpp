@@ -23,14 +23,6 @@
 
 namespace minikin {
 
-android::Mutex gMinikinLock;
-
-void assertMinikinLocked() {
-#ifdef ENABLE_RACE_DETECTION
-    LOG_ALWAYS_FATAL_IF(gMinikinLock.tryLock() == 0);
-#endif
-}
-
 inline static bool isBMPVariationSelector(uint32_t codePoint) {
     return VS1 <= codePoint && codePoint <= VS16;
 }

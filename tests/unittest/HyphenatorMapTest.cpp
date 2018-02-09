@@ -133,7 +133,6 @@ protected:
     const Locale& getLocale(const std::string& localeStr) {
         // In production, we reconstruct the LocaleList from the locale list ID.
         // So, do it here too.
-        android::AutoMutex _l(gMinikinLock);
         const uint32_t id = LocaleListCache::getId(localeStr);
         const LocaleList& locales = LocaleListCache::getById(id);
         MINIKIN_ASSERT(locales.size() == 1, "The input must be a single locale");

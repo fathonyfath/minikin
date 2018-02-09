@@ -310,8 +310,6 @@ private:
     // number of strings
     static const size_t kMaxEntries = 5000;
 
-    // To avoid dead-locking, need to acquire gMinikinLock before acquiring mMutex.
-    // TODO: Remove gMinikinLock
     std::mutex mMutex;
 };
 
@@ -626,8 +624,6 @@ BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSi
 void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
                       const MinikinPaint& paint, StartHyphenEdit startHyphen,
                       EndHyphenEdit endHyphen) {
-    android::AutoMutex _l(gMinikinLock);
-
     LayoutContext ctx(paint);
 
     const uint32_t count = range.getLength();
@@ -646,7 +642,6 @@ void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bi
 void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
                                const MinikinPaint& paint,
                                LayoutPieces* out) {
-    android::AutoMutex _l(gMinikinLock);
     LayoutContext ctx(paint);
 
     float advance = 0;
@@ -666,8 +661,6 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
 float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
                           const MinikinPaint& paint, StartHyphenEdit startHyphen,
                           EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents) {
-    android::AutoMutex _l(gMinikinLock);
-
     LayoutContext ctx(paint);
 
     float advance = 0;
@@ -1149,12 +1142,10 @@ void Layout::getBounds(MinikinRect* bounds) const {
 }
 
 void Layout::purgeCaches() {
-    android::AutoMutex _l(gMinikinLock);
     LayoutCache::getInstance().clear();
 }
 
 void Layout::dumpMinikinStats(int fd) {
-    android::AutoMutex _l(gMinikinLock);
     LayoutCache::getInstance().dumpStats(fd);
 }
 
