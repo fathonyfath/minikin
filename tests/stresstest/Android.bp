@@ -18,6 +18,7 @@ cc_test {
     name: "minikin_stress_tests",
 
     header_libs: ["libminikin-headers-for-tests"],
+    data: [":minikin-test-data"],
 
     static_libs: [
         "libminikin-tests-util",
