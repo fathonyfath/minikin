@@ -63,8 +63,6 @@ private:
     // A map from the string representation of the font locale list to the ID.
     std::unordered_map<std::string, uint32_t> mLocaleListLookupTable;
 
-    // To avoid dead-locking, need to acquire gMinikinLock before acquiring mMutex.
-    // TODO: Remove gMinikinLock
     std::mutex mMutex;
 };
 

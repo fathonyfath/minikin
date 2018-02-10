@@ -28,15 +28,6 @@
 
 namespace minikin {
 
-// All external Minikin interfaces are designed to be thread-safe.
-// Presently, that's implemented by through a global lock, and having
-// all external interfaces take that lock.
-
-extern android::Mutex gMinikinLock;
-
-// Aborts if gMinikinLock is not acquired. Do nothing on the release build.
-void assertMinikinLocked();
-
 #ifdef ENABLE_ASSERTION
 #define MINIKIN_ASSERT(cond, ...) LOG_ALWAYS_FATAL_IF(!(cond), __VA_ARGS__)
 #else

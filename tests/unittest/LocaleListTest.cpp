@@ -26,7 +26,6 @@ namespace minikin {
 namespace {
 
 const LocaleList& getLocaleList(const std::string& localeStr) {
-    android::AutoMutex _l(gMinikinLock);
     return LocaleListCache::getById(LocaleListCache::getId(localeStr));
 }
 

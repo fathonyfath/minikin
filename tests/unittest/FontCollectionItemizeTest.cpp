@@ -66,7 +66,6 @@ void itemize(const std::shared_ptr<FontCollection>& collection, const char* str,
     MinikinPaint paint(collection);
     paint.fontStyle = style;
     paint.localeListId = localeListId;
-    android::AutoMutex _l(gMinikinLock);
     collection->itemize(buf, len, paint, result);
 }
 
@@ -96,7 +95,6 @@ const std::string& getFontPath(const FontCollection::Run& run) {
 
 // Utility function to obtain LocaleList from string.
 const LocaleList& registerAndGetLocaleList(const std::string& locale_string) {
-    android::AutoMutex _l(gMinikinLock);
     return LocaleListCache::getById(LocaleListCache::getId(locale_string));
 }
 

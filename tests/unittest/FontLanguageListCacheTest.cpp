@@ -30,7 +30,6 @@ TEST(LocaleListCacheTest, getId) {
     EXPECT_NE(0UL, registerLocaleList("jp"));
     EXPECT_NE(0UL, registerLocaleList("en,zh-Hans"));
 
-    android::AutoMutex _l(gMinikinLock);
     EXPECT_EQ(0UL, LocaleListCache::getId(""));
 
     EXPECT_EQ(LocaleListCache::getId("en"), LocaleListCache::getId("en"));
@@ -44,7 +43,6 @@ TEST(LocaleListCacheTest, getId) {
 }
 
 TEST(LocaleListCacheTest, getById) {
-    android::AutoMutex _l(gMinikinLock);
     uint32_t enLangId = LocaleListCache::getId("en");
     uint32_t jpLangId = LocaleListCache::getId("jp");
     Locale english = LocaleListCache::getById(enLangId)[0];

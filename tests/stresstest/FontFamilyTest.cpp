@@ -36,7 +36,6 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
 
     std::shared_ptr<FontFamily> family = buildFontFamily(fontPath);
 
-    android::AutoMutex _l(gMinikinLock);
     hb_font_t* hbFont = family->getFont(0)->baseFont().get();
 
     for (uint32_t codePoint = 0; codePoint < MAX_UNICODE_CODE_POINT; ++codePoint) {
