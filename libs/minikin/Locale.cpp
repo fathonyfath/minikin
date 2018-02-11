@@ -31,7 +31,6 @@ namespace minikin {
 constexpr uint32_t FIVE_BITS = 0x1f;
 
 uint32_t registerLocaleList(const std::string& locales) {
-    android::AutoMutex _l(gMinikinLock);
     return LocaleListCache::getId(locales);
 }
 

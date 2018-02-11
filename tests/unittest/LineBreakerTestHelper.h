@@ -45,7 +45,6 @@ class ConstantRun : public Run {
 public:
     ConstantRun(const Range& range, const std::string& lang, float width)
             : Run(range), mPaint(nullptr /* font collection */), mWidth(width) {
-        android::AutoMutex _l(gMinikinLock);
         mLocaleListId = LocaleListCache::getId(lang);
     }
 

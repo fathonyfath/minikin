@@ -111,11 +111,11 @@ public:
 
     // Get advances, copying into caller-provided buffer. The size of this
     // buffer must match the length of the string (count arg to doLayout).
-    void getAdvances(float* advances);
+    void getAdvances(float* advances) const;
 
     // Get extents, copying into caller-provided buffer. The size of this buffer must match the
     // length of the string (count arg to doLayout).
-    void getExtents(MinikinExtent* extents);
+    void getExtents(MinikinExtent* extents) const;
 
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
@@ -137,6 +137,7 @@ public:
 
 private:
     friend class LayoutCacheKey;
+    friend class LayoutCache;
 
     // TODO: Remove friend class with decoupling building logic from Layout.
     friend class LayoutCompositer;
@@ -171,7 +172,7 @@ private:
                      LayoutContext* ctx, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
 
     // Append another layout (for example, cached value) into this one
-    void appendLayout(Layout* src, size_t start, float extraAdvance);
+    void appendLayout(const Layout& src, size_t start, float extraAdvance);
 
     std::vector<LayoutGlyph> mGlyphs;
 
@@ -207,8 +208,7 @@ public:
     }
 
     void append(const Layout& layout, uint32_t start, float extraAdvance) {
-        // TODO: remove const cast.
-        mLayout.appendLayout(const_cast<Layout*>(&layout), start, extraAdvance);
+        mLayout.appendLayout(layout, start, extraAdvance);
     }
 
     Layout build() { return std::move(mLayout); }

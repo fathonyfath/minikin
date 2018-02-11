@@ -45,7 +45,6 @@ cc_test {
         "FontCollectionItemizeTest.cpp",
         "FontFamilyTest.cpp",
         "FontLanguageListCacheTest.cpp",
-        "HbFontCacheTest.cpp",
         "HyphenatorMapTest.cpp",
         "HyphenatorTest.cpp",
         "GraphemeBreakTests.cpp",

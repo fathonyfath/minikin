@@ -28,13 +28,11 @@
 namespace minikin {
 
 static const LocaleList& createLocaleList(const std::string& input) {
-    android::AutoMutex _l(gMinikinLock);
     uint32_t localeListId = LocaleListCache::getId(input);
     return LocaleListCache::getById(localeListId);
 }
 
 static Locale createLocale(const std::string& input) {
-    android::AutoMutex _l(gMinikinLock);
     uint32_t localeListId = LocaleListCache::getId(input);
     return LocaleListCache::getById(localeListId)[0];
 }
@@ -627,8 +625,6 @@ TEST_F(FontFamilyTest, coverageTableSelectionTest) {
     std::shared_ptr<FontFamily> unicodeEnc3Font = buildFontFamily(kUnicodeEncoding3Font);
     std::shared_ptr<FontFamily> unicodeEnc4Font = buildFontFamily(kUnicodeEncoding4Font);
 
-    android::AutoMutex _l(gMinikinLock);
-
     EXPECT_TRUE(unicodeEnc1Font->hasGlyph(0x0061, 0));
     EXPECT_TRUE(unicodeEnc3Font->hasGlyph(0x0061, 0));
     EXPECT_TRUE(unicodeEnc4Font->hasGlyph(0x0061, 0));
@@ -725,7 +721,7 @@ TEST_F(FontFamilyTest, closestMatch) {
         for (auto familyStyle : testCase.familyStyles) {
             std::shared_ptr<MinikinFont> dummyFont(new FreeTypeMinikinFontForTest(ROBOTO));
             dummyFonts.push_back(dummyFont);
-            fonts.push_back(Font(dummyFont, familyStyle));
+            fonts.push_back(Font::Builder(dummyFont).setStyle(familyStyle).build());
         }
 
         FontFamily family(std::move(fonts));
@@ -733,7 +729,7 @@ TEST_F(FontFamilyTest, closestMatch) {
 
         size_t idx = dummyFonts.size();
         for (size_t i = 0; i < dummyFonts.size(); i++) {
-            if (dummyFonts[i].get() == closest.font) {
+            if (dummyFonts[i].get() == closest.font->typeface().get()) {
                 idx = i;
                 break;
             }

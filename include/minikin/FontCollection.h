@@ -91,9 +91,6 @@ private:
     static uint32_t calcVariantMatchingScore(FontFamily::Variant variant,
                                              const FontFamily& fontFamily);
 
-    // static for allocating unique id's
-    static uint32_t sNextId;
-
     // unique id for this font collection (suitable for cache key)
     uint32_t mId;
 

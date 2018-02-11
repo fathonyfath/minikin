@@ -47,7 +47,7 @@ HyphenatorMap::HyphenatorMap()
 
 void HyphenatorMap::addInternal(const std::string& localeStr, const Hyphenator* hyphenator) {
     const Locale locale(localeStr);
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     addInternalLocked(locale, hyphenator);
 }
 
@@ -58,14 +58,14 @@ void HyphenatorMap::addInternalLocked(const Locale& locale, const Hyphenator* hy
 }
 
 void HyphenatorMap::clearInternal() {
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     mMap.clear();
 }
 void HyphenatorMap::addAliasInternal(const std::string& fromLocaleStr,
                                      const std::string& toLocaleStr) {
     const Locale fromLocale(fromLocaleStr);
     const Locale toLocale(toLocaleStr);
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     auto it = mMap.find(toLocale.getIdentifier());
     if (it == mMap.end()) {
         ALOGE("Target Hyphenator not found.");
@@ -76,7 +76,7 @@ void HyphenatorMap::addAliasInternal(const std::string& fromLocaleStr,
 
 const Hyphenator* HyphenatorMap::lookupInternal(const Locale& locale) {
     const uint64_t id = locale.getIdentifier();
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     const Hyphenator* result = lookupByIdentifierLocked(id);
     if (result != nullptr) {
         return result;  // Found with exact match.

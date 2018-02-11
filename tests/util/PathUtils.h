@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_HBFONT_CACHE_H
-#define MINIKIN_HBFONT_CACHE_H
+#ifndef TEST_UTILS_PATH_UTILS_H
+#define TEST_UTILS_PATH_UTILS_H
 
-struct hb_font_t;
+#include <string>
 
 namespace minikin {
-class MinikinFont;
 
-void purgeHbFontLocked(const MinikinFont* minikinFont);
-hb_font_t* getHbFontLocked(const MinikinFont* minikinFont);
+std::string getTestFontPath(const std::string& fontFilePath);
 
 }  // namespace minikin
-#endif  // MINIKIN_HBFONT_CACHE_H
+
+#endif  // TEST_UTILS_PATH_UTILS_H

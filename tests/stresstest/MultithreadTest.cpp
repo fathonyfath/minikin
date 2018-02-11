@@ -28,11 +28,9 @@
 
 #include "FontTestUtils.h"
 #include "MinikinInternal.h"
+#include "PathUtils.h"
 
 namespace minikin {
-
-const char* SYSTEM_FONT_PATH = "/system/fonts/";
-const char* SYSTEM_FONT_XML = "/system/etc/fonts.xml";
 
 constexpr int LAYOUT_COUNT_PER_COLLECTION = 500;
 constexpr int COLLECTION_COUNT_PER_THREAD = 15;
@@ -69,7 +67,8 @@ static void thread_main(int tid) {
     std::mt19937 mt(tid);
 
     for (int i = 0; i < COLLECTION_COUNT_PER_THREAD; ++i) {
-        MinikinPaint paint(getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
+        MinikinPaint paint(buildFontCollection(getTestFontPath("Ascii.ttf")));
+        paint.size = 10.0f;  // Make 1em = 10px
 
         for (int j = 0; j < LAYOUT_COUNT_PER_COLLECTION; ++j) {
             // Generates 10 of 3-letter words so that the word sometimes hit the cache.
@@ -80,7 +79,7 @@ static void thread_main(int tid) {
             std::vector<float> advances(text.size());
             layout.getAdvances(advances.data());
             for (size_t k = 0; k < advances.size(); ++k) {
-                // MinikinFontForTest always returns 10.0f for horizontal advance.
+                // All characters in Ascii.ttf has 1.0em horizontal advance.
                 LOG_ALWAYS_FATAL_IF(advances[k] != 10.0f, "Memory corruption detected.");
             }
         }

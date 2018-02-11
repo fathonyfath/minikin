@@ -36,7 +36,6 @@ cc_library {
                 "FontUtils.cpp",
                 "GraphemeBreak.cpp",
                 "GreedyLineBreaker.cpp",
-                "HbFontCache.cpp",
                 "HyphenatorMap.cpp",
                 "Layout.cpp",
                 "LayoutUtils.cpp",
@@ -46,7 +45,6 @@ cc_library {
                 "LocaleListCache.cpp",
                 "MeasuredText.cpp",
                 "Measurement.cpp",
-                "MinikinFont.cpp",
                 "MinikinInternal.cpp",
                 "OptimalLineBreaker.cpp",
                 "SparseBitSet.cpp",
@@ -77,8 +75,8 @@ cc_library {
     ],
     product_variables: {
         debuggable: {
-            // Enable race detection and assertion on eng and userdebug build.
-            cppflags: ["-DENABLE_RACE_DETECTION", "-DENABLE_ASSERTION"],
+            // Enable assertion on eng and userdebug build.
+            cppflags: ["-DENABLE_ASSERTION"],
         },
     },
     shared_libs: [

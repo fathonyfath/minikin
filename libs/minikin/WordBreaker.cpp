@@ -43,7 +43,7 @@ static icu::BreakIterator* createNewIterator(const Locale& locale) {
 
 ICULineBreakerPool::Slot ICULineBreakerPoolImpl::acquire(const Locale& locale) {
     const uint64_t id = locale.getIdentifier();
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     for (auto i = mPool.begin(); i != mPool.end(); i++) {
         if (i->localeId == id) {
             Slot slot = std::move(*i);
@@ -60,7 +60,7 @@ void ICULineBreakerPoolImpl::release(ICULineBreakerPool::Slot&& slot) {
     if (slot.breaker.get() == nullptr) {
         return;  // Already released slot. Do nothing.
     }
-    android::AutoMutex _l(gMinikinLock);
+    std::lock_guard<std::mutex> lock(mMutex);
     if (mPool.size() >= MAX_POOL_SIZE) {
         // Pool is full. Move to local variable, so that the given slot will be released when the
         // variable leaves the scope.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
-#include "minikin/MinikinFont.h"
+#include "PathUtils.h"
 
-#include "HbFontCache.h"
-#include "MinikinInternal.h"
+#include <cutils/log.h>
+#include <libgen.h>
+#include <unistd.h>
 
 namespace minikin {
 
-MinikinFont::~MinikinFont() {
-    android::AutoMutex _l(gMinikinLock);
-    purgeHbFontLocked(this);
+const char* SELF_EXE_PATH = "/proc/self/exe";
+
+std::string getTestFontPath(const std::string& fontFilePath) {
+    char buf[PATH_MAX] = {};
+    LOG_ALWAYS_FATAL_IF(readlink(SELF_EXE_PATH, buf, PATH_MAX) == -1, "readlink failed.");
+    const char* dir = dirname(buf);
+    LOG_ALWAYS_FATAL_IF(dir == nullptr, "dirname failed.");
+    return std::string(dir) + "/data/" + fontFilePath;
 }
 
 }  // namespace minikin
