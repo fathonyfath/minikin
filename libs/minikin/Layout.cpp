@@ -34,6 +34,7 @@
 
 #include "minikin/Emoji.h"
 #include "minikin/HbUtils.h"
+#include "minikin/Macros.h"
 
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
@@ -262,6 +263,7 @@ public:
     }
 
     void dumpStats(int fd) {
+        std::lock_guard<std::mutex> lock(mMutex);
         dprintf(fd, "\nLayout Cache Info:\n");
         dprintf(fd, "  Usage: %zd/%zd entries\n", mCache.size(), kMaxEntries);
         float ratio = (mRequestCount == 0) ? 0 : mCacheHitCount / (float)mRequestCount;
@@ -299,7 +301,7 @@ private:
         return layoutForWord.getAdvance();
     }
 
-    android::LruCache<LayoutCacheKey, Layout*> mCache;  // Guarded by mCache.
+    android::LruCache<LayoutCacheKey, Layout*> mCache GUARDED_BY(mMutex);
 
     int32_t mRequestCount;
     int32_t mCacheHitCount;

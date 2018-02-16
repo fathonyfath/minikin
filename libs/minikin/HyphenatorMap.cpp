@@ -48,11 +48,6 @@ HyphenatorMap::HyphenatorMap()
 void HyphenatorMap::addInternal(const std::string& localeStr, const Hyphenator* hyphenator) {
     const Locale locale(localeStr);
     std::lock_guard<std::mutex> lock(mMutex);
-    addInternalLocked(locale, hyphenator);
-}
-
-void HyphenatorMap::addInternalLocked(const Locale& locale, const Hyphenator* hyphenator) {
-    // Add given locale first.
     // Overwrite even if there is already a fallback entry.
     mMap[locale.getIdentifier()] = hyphenator;
 }
@@ -71,39 +66,40 @@ void HyphenatorMap::addAliasInternal(const std::string& fromLocaleStr,
         ALOGE("Target Hyphenator not found.");
         return;
     }
-    addInternalLocked(fromLocale, it->second);
+    // Overwrite even if there is already a fallback entry.
+    mMap[fromLocale.getIdentifier()] = it->second;
 }
 
 const Hyphenator* HyphenatorMap::lookupInternal(const Locale& locale) {
     const uint64_t id = locale.getIdentifier();
     std::lock_guard<std::mutex> lock(mMutex);
-    const Hyphenator* result = lookupByIdentifierLocked(id);
+    const Hyphenator* result = lookupByIdentifier(id);
     if (result != nullptr) {
         return result;  // Found with exact match.
     }
 
     // First, try with dropping emoji extensions.
-    result = lookupBySubtagLocked(locale, LANGUAGE | REGION | SCRIPT | VARIANT);
+    result = lookupBySubtag(locale, LANGUAGE | REGION | SCRIPT | VARIANT);
     if (result != nullptr) {
         goto insert_result_and_return;
     }
     // If not found, try with dropping script.
-    result = lookupBySubtagLocked(locale, LANGUAGE | REGION | VARIANT);
+    result = lookupBySubtag(locale, LANGUAGE | REGION | VARIANT);
     if (result != nullptr) {
         goto insert_result_and_return;
     }
     // If not found, try with dropping script and region code.
-    result = lookupBySubtagLocked(locale, LANGUAGE | VARIANT);
+    result = lookupBySubtag(locale, LANGUAGE | VARIANT);
     if (result != nullptr) {
         goto insert_result_and_return;
     }
     // If not found, try only with language code.
-    result = lookupBySubtagLocked(locale, LANGUAGE);
+    result = lookupBySubtag(locale, LANGUAGE);
     if (result != nullptr) {
         goto insert_result_and_return;
     }
     // Still not found, try only with script.
-    result = lookupBySubtagLocked(locale, SCRIPT);
+    result = lookupBySubtag(locale, SCRIPT);
     if (result != nullptr) {
         goto insert_result_and_return;
     }
@@ -116,17 +112,17 @@ insert_result_and_return:
     return result;
 }
 
-const Hyphenator* HyphenatorMap::lookupByIdentifierLocked(uint64_t id) const {
+const Hyphenator* HyphenatorMap::lookupByIdentifier(uint64_t id) const {
     auto it = mMap.find(id);
     return it == mMap.end() ? nullptr : it->second;
 }
 
-const Hyphenator* HyphenatorMap::lookupBySubtagLocked(const Locale& locale, SubtagBits bits) const {
+const Hyphenator* HyphenatorMap::lookupBySubtag(const Locale& locale, SubtagBits bits) const {
     const Locale partialLocale = locale.getPartialLocale(bits);
     if (!partialLocale.isSupported() || partialLocale == locale) {
         return nullptr;  // Skip the partial locale result in the same locale or not supported.
     }
-    return lookupByIdentifierLocked(partialLocale.getIdentifier());
+    return lookupByIdentifier(partialLocale.getIdentifier());
 }
 
 }  // namespace minikin

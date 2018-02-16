@@ -72,6 +72,7 @@ cc_library {
         "-Werror",
         "-Wall",
         "-Wextra",
+        "-Wthread-safety",
     ],
     product_variables: {
         debuggable: {

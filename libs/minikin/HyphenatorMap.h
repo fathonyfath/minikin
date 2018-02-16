@@ -21,6 +21,7 @@
 #include <mutex>
 
 #include "minikin/Hyphenator.h"
+#include "minikin/Macros.h"
 
 #include "Locale.h"
 
@@ -70,12 +71,12 @@ private:
 
     void clearInternal();
 
-    void addInternalLocked(const Locale& locale, const Hyphenator* hyphenator);
-    const Hyphenator* lookupByIdentifierLocked(uint64_t id) const;
-    const Hyphenator* lookupBySubtagLocked(const Locale& locale, SubtagBits bits) const;
+    const Hyphenator* lookupByIdentifier(uint64_t id) const EXCLUSIVE_LOCKS_REQUIRED(mMutex);
+    const Hyphenator* lookupBySubtag(const Locale& locale, SubtagBits bits) const
+            EXCLUSIVE_LOCKS_REQUIRED(mMutex);
 
     const Hyphenator* mSoftHyphenOnlyHyphenator;
-    std::map<uint64_t, const Hyphenator*> mMap;  // Guarded by mMutex.
+    std::map<uint64_t, const Hyphenator*> mMap GUARDED_BY(mMutex);
 
     std::mutex mMutex;
 };
