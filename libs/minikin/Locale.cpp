@@ -209,13 +209,13 @@ Locale::Locale(const StringPiece& input) : Locale() {
     mEmojiStyle = resolveEmojiStyle(input.data(), input.length());
 
 finalize:
-    if (mEmojiStyle == EMSTYLE_EMPTY) {
+    if (mEmojiStyle == EmojiStyle::EMPTY) {
         mEmojiStyle = scriptToEmojiStyle(mScript);
     }
 }
 
 // static
-Locale::EmojiStyle Locale::resolveEmojiStyle(const char* buf, size_t length) {
+EmojiStyle Locale::resolveEmojiStyle(const char* buf, size_t length) {
     // First, lookup emoji subtag.
     // 10 is the length of "-u-em-text", which is the shortest emoji subtag,
     // unnecessary comparison can be avoided if total length is smaller than 10.
@@ -227,25 +227,25 @@ Locale::EmojiStyle Locale::resolveEmojiStyle(const char* buf, size_t length) {
             pos += strlen(kPrefix);
             const size_t remainingLength = length - (pos - buf);
             if (isEmojiSubtag(pos, remainingLength, "emoji", 5)) {
-                return EMSTYLE_EMOJI;
+                return EmojiStyle::EMOJI;
             } else if (isEmojiSubtag(pos, remainingLength, "text", 4)) {
-                return EMSTYLE_TEXT;
+                return EmojiStyle::TEXT;
             } else if (isEmojiSubtag(pos, remainingLength, "default", 7)) {
-                return EMSTYLE_DEFAULT;
+                return EmojiStyle::DEFAULT;
             }
         }
     }
-    return EMSTYLE_EMPTY;
+    return EmojiStyle::EMPTY;
 }
 
-Locale::EmojiStyle Locale::scriptToEmojiStyle(uint32_t script) {
+EmojiStyle Locale::scriptToEmojiStyle(uint32_t script) {
     // If no emoji subtag was provided, resolve the emoji style from script code.
     if (script == packScript('Z', 's', 'y', 'e')) {
-        return EMSTYLE_EMOJI;
+        return EmojiStyle::EMOJI;
     } else if (script == packScript('Z', 's', 'y', 'm')) {
-        return EMSTYLE_TEXT;
+        return EmojiStyle::TEXT;
     }
-    return EMSTYLE_EMPTY;
+    return EmojiStyle::EMPTY;
 }
 
 // static
@@ -379,7 +379,7 @@ int Locale::calcScoreFor(const LocaleList& supported) const {
     bool scriptMatch = false;
 
     for (size_t i = 0; i < supported.size(); ++i) {
-        if (mEmojiStyle != EMSTYLE_EMPTY && mEmojiStyle == supported[i].mEmojiStyle) {
+        if (mEmojiStyle != EmojiStyle::EMPTY && mEmojiStyle == supported[i].mEmojiStyle) {
             subtagMatch = true;
             if (mLanguage == supported[i].mLanguage) {
                 return 4;
@@ -417,23 +417,20 @@ static hb_language_t buildHbLanguage(const Locale& locale) {
 }
 
 LocaleList::LocaleList(std::vector<Locale>&& locales) : mLocales(std::move(locales)) {
-    if (mLocales.empty()) {
-        return;
-    }
-
-    const Locale& firstLocale = mLocales[0];
-
     mIsAllTheSameLocale = true;
-    mUnionOfSubScriptBits = firstLocale.mSubScriptBits;
+    mUnionOfSubScriptBits = 0u;
     mHbLangs.reserve(mLocales.size());
-    mHbLangs.push_back(buildHbLanguage(firstLocale));
-    for (size_t i = 1; i < mLocales.size(); ++i) {
-        const Locale& locale = mLocales[i];
+    mEmojiStyle = EmojiStyle::EMPTY;
+    const auto firstLanguage = mLocales.empty() ? NO_LANGUAGE : mLocales[0].mLanguage;
+    for (const Locale& locale : mLocales) {
         mUnionOfSubScriptBits |= locale.mSubScriptBits;
-        if (mIsAllTheSameLocale && firstLocale.mLanguage != locale.mLanguage) {
+        if (mIsAllTheSameLocale && firstLanguage != locale.mLanguage) {
             mIsAllTheSameLocale = false;
         }
         mHbLangs.push_back(buildHbLanguage(locale));
+        if (mEmojiStyle == EmojiStyle::EMPTY) {
+            mEmojiStyle = locale.getEmojiStyle();
+        }
     }
 }
 
