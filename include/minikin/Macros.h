@@ -25,4 +25,42 @@
     Type& operator=(const Type&) = delete;         \
     Type(Type&&) = delete;                         \
     Type& operator=(Type&&) = delete
+
+// Following thread annotations are partially copied from Abseil thread_annotations.h file.
+// https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h
+
+#if defined(__clang__)
+#define THREAD_ANNOTATION_ATTRIBUTE__(x) __attribute__((x))
+#else
+#define THREAD_ANNOTATION_ATTRIBUTE__(x)  // no-op
+#endif
+
+// GUARDED_BY()
+//
+// Documents if a shared field or global variable needs to be protected by a
+// mutex. GUARDED_BY() allows the user to specify a particular mutex that
+// should be held when accessing the annotated variable.
+//
+// Example:
+//
+//   Mutex mu;
+//   int p1 GUARDED_BY(mu);
+#define GUARDED_BY(x) THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
+
+// EXCLUSIVE_LOCKS_REQUIRED()
+//
+// Documents a function that expects a mutex to be held prior to entry.
+// The mutex is expected to be held both on entry to, and exit from, the
+// function.
+//
+// Example:
+//
+//   Mutex mu1, mu2;
+//   int a GUARDED_BY(mu1);
+//   int b GUARDED_BY(mu2);
+//
+//   void foo() EXCLUSIVE_LOCKS_REQUIRED(mu1, mu2) { ... };
+#define EXCLUSIVE_LOCKS_REQUIRED(...) \
+    THREAD_ANNOTATION_ATTRIBUTE__(exclusive_locks_required(__VA_ARGS__))
+
 #endif  // MINIKIN_MACROS_H

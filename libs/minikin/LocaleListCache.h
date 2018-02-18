@@ -20,6 +20,8 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "minikin/Macros.h"
+
 #include "Locale.h"
 
 namespace minikin {
@@ -58,10 +60,10 @@ private:
         return instance;
     }
 
-    std::vector<LocaleList> mLocaleLists;
+    std::vector<LocaleList> mLocaleLists GUARDED_BY(mMutex);
 
     // A map from the string representation of the font locale list to the ID.
-    std::unordered_map<std::string, uint32_t> mLocaleListLookupTable;
+    std::unordered_map<std::string, uint32_t> mLocaleListLookupTable GUARDED_BY(mMutex);
 
     std::mutex mMutex;
 };

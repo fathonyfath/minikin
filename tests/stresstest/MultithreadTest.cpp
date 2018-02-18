@@ -25,6 +25,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/FontCollection.h"
+#include "minikin/Macros.h"
 
 #include "FontTestUtils.h"
 #include "MinikinInternal.h"
@@ -38,7 +39,7 @@ constexpr int NUM_THREADS = 10;
 
 std::mutex gMutex;
 std::condition_variable gCv;
-bool gReady = false;
+bool gReady GUARDED_BY(gMutex) = false;
 
 static std::vector<uint16_t> generateTestText(std::mt19937* mt, int lettersInWord,
                                               int wordsInText) {
