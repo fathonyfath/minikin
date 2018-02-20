@@ -42,8 +42,8 @@ static void BM_FontCollection_construct(benchmark::State& state) {
 BENCHMARK(BM_FontCollection_construct);
 
 static void BM_FontCollection_hasVariationSelector(benchmark::State& state) {
-    std::shared_ptr<FontCollection> collection(
-            getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
+    auto collection =
+            std::make_shared<FontCollection>(getFontFamilies(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
 
     uint32_t baseCp = state.range(0);
     uint32_t vsCp = state.range(1);
@@ -79,8 +79,8 @@ struct ItemizeTestCases {
 };
 
 static void BM_FontCollection_itemize(benchmark::State& state) {
-    std::shared_ptr<FontCollection> collection(
-            getFontCollection(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
+    auto collection =
+            std::make_shared<FontCollection>(getFontFamilies(SYSTEM_FONT_PATH, SYSTEM_FONT_XML));
 
     size_t testIndex = state.range(0);
     state.SetLabel("Itemize: " + ITEMIZE_TEST_CASES[testIndex].labelText);

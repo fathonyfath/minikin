@@ -45,8 +45,9 @@ std::string xmlTrim(const std::string& in) {
 
 }  // namespace
 
-std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, const char* fontXml) {
-    xmlDoc* doc = xmlReadFile(fontXml, NULL, 0);
+std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const std::string& fontDir,
+                                                         const std::string& xmlPath) {
+    xmlDoc* doc = xmlReadFile(xmlPath.c_str(), NULL, 0);
     xmlNode* familySet = xmlDocGetRootElement(doc);
 
     std::vector<std::shared_ptr<FontFamily>> families;
@@ -115,16 +116,12 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const char* fontDir, co
     return families;
 }
 
-std::shared_ptr<FontCollection> getFontCollection(const char* fontDir, const char* fontXml) {
-    return std::make_shared<FontCollection>(getFontFamilies(fontDir, fontXml));
-}
-
 std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath) {
     return std::make_shared<FontCollection>(buildFontFamily(filePath));
 }
 
 std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
-    auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
+    auto font = std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(filePath));
     std::vector<Font> fonts;
     fonts.push_back(Font::Builder(font).build());
     return std::make_shared<FontFamily>(std::move(fonts));
