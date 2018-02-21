@@ -1573,4 +1573,56 @@ TEST(FontCollectionItemizeTest, itemizeShouldKeepOrderForVS2) {
     EXPECT_EQ(noCmapFormat14Family->getFont(0), runs[0].fakedFont.font);
 }
 
+TEST(FontCollectionItemizeTest, colorEmojiSelectionTest) {
+    auto dummyFamily = buildFontFamily(kNoGlyphFont);
+    auto textEmojiFamily = buildFontFamily(kTextEmojiFont, "ja-JP");
+    auto colorEmojiFamily = buildFontFamily(kColorEmojiFont, "und-Zsye");
+
+    std::vector<std::shared_ptr<FontFamily>> families = {dummyFamily, textEmojiFamily,
+                                                         colorEmojiFamily};
+    auto collection = std::make_shared<FontCollection>(families);
+    std::vector<FontCollection::Run> runs;
+    // Both textEmojiFamily and colorEmojiFamily supports U+203C and U+23E9.
+    // U+203C is text default emoji, and U+23E9 is color default emoji.
+    itemize(collection, "U+203C", "en-US,en-Zsym", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "en-US,en-Zsym", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "en-US,en-Zsye", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "en-US,en-Zsye", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-Zsym-JP", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-Zsym-JP", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-Zsye-JP", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-Zsye-JP", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-JP-u-em-text", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-JP-u-em-text", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-JP-u-em-emoji", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-JP-u-em-emoji", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-JP,und-Zsym", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-JP,und-Zsym", &runs);
+    EXPECT_EQ(textEmojiFamily->getFont(0), runs[0].fakedFont.font);
+
+    itemize(collection, "U+203C", "ja-JP,und-Zsye", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+    itemize(collection, "U+23E9", "ja-JP,und-Zsye", &runs);
+    EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+}
+
 }  // namespace minikin

@@ -55,18 +55,19 @@ inline constexpr SubtagBits operator|(SubtagBits l, SubtagBits r) {
     return static_cast<SubtagBits>(static_cast<uint8_t>(l) | static_cast<uint8_t>(r));
 }
 
+// Enum for emoji style.
+enum class EmojiStyle : uint8_t {
+    EMPTY = 0,    // No emoji style is specified.
+    DEFAULT = 1,  // Default emoji style is specified.
+    EMOJI = 2,    // Emoji (color) emoji style is specified.
+    TEXT = 3,     // Text (black/white) emoji style is specified.
+};
+
 // Locale is a compact representation of a BCP 47 language tag.
 // It does not capture all possible information, only what directly affects text layout:
 // font rendering, hyphenation, word breaking, etc.
 struct Locale {
 public:
-    enum EmojiStyle : uint8_t {
-        EMSTYLE_EMPTY = 0,
-        EMSTYLE_DEFAULT = 1,
-        EMSTYLE_EMOJI = 2,
-        EMSTYLE_TEXT = 3,
-    };
-
     enum class Variant : uint16_t {  // Up to 12 bits
         NO_VARIANT = 0x0000,
         GERMAN_1901_ORTHOGRAPHY = 0x0001,
@@ -80,7 +81,7 @@ public:
               mRegion(NO_REGION),
               mSubScriptBits(0ul),
               mVariant(Variant::NO_VARIANT),
-              mEmojiStyle(EMSTYLE_EMPTY) {}
+              mEmojiStyle(EmojiStyle::EMPTY) {}
 
     // Parse from string
     Locale(const StringPiece& buf);
@@ -97,7 +98,7 @@ public:
     inline bool hasScript() const { return mScript != NO_SCRIPT; }
     inline bool hasRegion() const { return mRegion != NO_REGION; }
     inline bool hasVariant() const { return mVariant != Variant::NO_VARIANT; }
-    inline bool hasEmojiStyle() const { return mEmojiStyle != EMSTYLE_EMPTY; }
+    inline bool hasEmojiStyle() const { return mEmojiStyle != EmojiStyle::EMPTY; }
 
     inline bool isSupported() const {
         return hasLanguage() || hasScript() || hasRegion() || hasVariant() || hasEmojiStyle();
@@ -171,7 +172,10 @@ private:
 class LocaleList {
 public:
     explicit LocaleList(std::vector<Locale>&& locales);
-    LocaleList() : mUnionOfSubScriptBits(0), mIsAllTheSameLocale(false) {}
+    LocaleList()
+            : mUnionOfSubScriptBits(0),
+              mIsAllTheSameLocale(false),
+              mEmojiStyle(EmojiStyle::EMPTY) {}
     LocaleList(LocaleList&&) = default;
 
     size_t size() const { return mLocales.size(); }
@@ -179,6 +183,10 @@ public:
     const Locale& operator[](size_t n) const { return mLocales[n]; }
 
     hb_language_t getHbLanguage(size_t n) const { return mHbLangs[n]; }
+
+    // Returns an effective emoji style of this locale list.
+    // The effective means the first non empty emoji style in the list.
+    EmojiStyle getEmojiStyle() const { return mEmojiStyle; }
 
 private:
     friend struct Locale;  // for calcScoreFor
@@ -189,6 +197,7 @@ private:
     std::vector<hb_language_t> mHbLangs;
     uint8_t mUnionOfSubScriptBits;
     bool mIsAllTheSameLocale;
+    EmojiStyle mEmojiStyle;
 
     uint8_t getUnionOfSubScriptBits() const { return mUnionOfSubScriptBits; }
     bool isAllTheSameLocale() const { return mIsAllTheSameLocale; }

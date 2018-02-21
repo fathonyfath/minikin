@@ -145,7 +145,7 @@ public:
     size_t getNumFonts() const { return mFonts.size(); }
     const Font* getFont(size_t index) const { return &mFonts[index]; }
     FontStyle getStyle(size_t index) const { return mFonts[index].style(); }
-    bool isColorEmojiFamily() const;
+    bool isColorEmojiFamily() const { return mIsColorEmoji; }
     const std::unordered_set<AxisTag>& supportedAxes() const { return mSupportedAxes; }
 
     // Get Unicode coverage.
@@ -170,6 +170,7 @@ private:
     Variant mVariant;
     std::vector<Font> mFonts;
     std::unordered_set<AxisTag> mSupportedAxes;
+    bool mIsColorEmoji;
 
     SparseBitSet mCoverage;
     std::vector<std::unique_ptr<SparseBitSet>> mCmapFmt14Coverage;

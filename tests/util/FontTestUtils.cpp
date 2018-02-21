@@ -26,6 +26,7 @@
 
 #include "FontTestUtils.h"
 #include "FreeTypeMinikinFontForTest.h"
+#include "LocaleListCache.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -128,6 +129,14 @@ std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
     std::vector<Font> fonts;
     fonts.push_back(Font::Builder(font).build());
     return std::make_shared<FontFamily>(std::move(fonts));
+}
+
+std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath, const std::string& lang) {
+    auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
+    std::vector<Font> fonts;
+    fonts.push_back(Font::Builder(font).build());
+    return std::make_shared<FontFamily>(LocaleListCache::getId(lang), FontFamily::Variant::DEFAULT,
+                                        std::move(fonts));
 }
 
 }  // namespace minikin

@@ -47,5 +47,10 @@ std::shared_ptr<FontCollection> buildFontCollection(const std::string& filePath)
  */
 std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath);
 
+/**
+ * Build new FontFamily from single file with locale.
+ */
+std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath, const std::string& lang);
+
 }  // namespace minikin
 #endif  // MINIKIN_FONT_TEST_UTILS_H

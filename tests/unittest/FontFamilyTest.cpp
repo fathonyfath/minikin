@@ -327,14 +327,14 @@ TEST(LocaleListTest, identifierTest) {
 
 TEST(LocaleListTest, undEmojiTests) {
     Locale emoji = createLocale("und-Zsye");
-    EXPECT_EQ(Locale::EMSTYLE_EMOJI, emoji.getEmojiStyle());
+    EXPECT_EQ(EmojiStyle::EMOJI, emoji.getEmojiStyle());
 
     Locale und = createLocale("und");
-    EXPECT_EQ(Locale::EMSTYLE_EMPTY, und.getEmojiStyle());
+    EXPECT_EQ(EmojiStyle::EMPTY, und.getEmojiStyle());
     EXPECT_FALSE(emoji == und);
 
     Locale undExample = createLocale("und-example");
-    EXPECT_EQ(Locale::EMSTYLE_EMPTY, undExample.getEmojiStyle());
+    EXPECT_EQ(EmojiStyle::EMPTY, undExample.getEmojiStyle());
     EXPECT_FALSE(emoji == undExample);
 }
 
@@ -361,7 +361,7 @@ TEST(LocaleListTest, subtagEmojiTest) {
     for (auto subtagEmojiString : subtagEmojiStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmojiString + "\"");
         Locale subtagEmoji = createLocale(subtagEmojiString);
-        EXPECT_EQ(Locale::EMSTYLE_EMOJI, subtagEmoji.getEmojiStyle());
+        EXPECT_EQ(EmojiStyle::EMOJI, subtagEmoji.getEmojiStyle());
     }
 }
 
@@ -388,7 +388,7 @@ TEST(LocaleListTest, subtagTextTest) {
     for (auto subtagTextString : subtagTextStrings) {
         SCOPED_TRACE("Test for \"" + subtagTextString + "\"");
         Locale subtagText = createLocale(subtagTextString);
-        EXPECT_EQ(Locale::EMSTYLE_TEXT, subtagText.getEmojiStyle());
+        EXPECT_EQ(EmojiStyle::TEXT, subtagText.getEmojiStyle());
     }
 }
 
@@ -416,7 +416,7 @@ TEST(LocaleListTest, subtagDefaultTest) {
     for (auto subtagDefaultString : subtagDefaultStrings) {
         SCOPED_TRACE("Test for \"" + subtagDefaultString + "\"");
         Locale subtagDefault = createLocale(subtagDefaultString);
-        EXPECT_EQ(Locale::EMSTYLE_DEFAULT, subtagDefault.getEmojiStyle());
+        EXPECT_EQ(EmojiStyle::DEFAULT, subtagDefault.getEmojiStyle());
     }
 }
 
@@ -435,7 +435,7 @@ TEST(LocaleListTest, subtagEmptyTest) {
     for (auto subtagEmptyString : subtagEmptyStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmptyString + "\"");
         Locale subtagEmpty = createLocale(subtagEmptyString);
-        EXPECT_EQ(Locale::EMSTYLE_EMPTY, subtagEmpty.getEmojiStyle());
+        EXPECT_EQ(EmojiStyle::EMPTY, subtagEmpty.getEmojiStyle());
     }
 }
 
