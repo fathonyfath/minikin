@@ -49,7 +49,7 @@ protected:
 
     virtual ~LayoutTest() {}
 
-    virtual void SetUp() override { mCollection = buildFontCollection(kTestFontDir "Ascii.ttf"); }
+    virtual void SetUp() override { mCollection = buildFontCollection("Ascii.ttf"); }
 
     virtual void TearDown() override {}
 
@@ -492,7 +492,7 @@ TEST_F(LayoutTest, measuredTextTest) {
     // U+005F (_): 0em
     // U+FFFD (invalid surrogate will be replaced to this): 7em
     // U+10331 (\uD800\uDF31): 10em
-    auto fc = buildFontCollection(kTestFontDir "/LayoutTestFont.ttf");
+    auto fc = buildFontCollection("LayoutTestFont.ttf");
     {
         MinikinPaint paint(fc);
         std::vector<uint16_t> text = utf8ToUtf16("I");

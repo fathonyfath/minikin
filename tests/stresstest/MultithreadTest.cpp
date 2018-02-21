@@ -68,7 +68,7 @@ static void thread_main(int tid) {
     std::mt19937 mt(tid);
 
     for (int i = 0; i < COLLECTION_COUNT_PER_THREAD; ++i) {
-        MinikinPaint paint(buildFontCollection(getTestFontPath("Ascii.ttf")));
+        MinikinPaint paint(buildFontCollection("Ascii.ttf"));
         paint.size = 10.0f;  // Make 1em = 10px
 
         for (int j = 0; j < LAYOUT_COUNT_PER_COLLECTION; ++j) {

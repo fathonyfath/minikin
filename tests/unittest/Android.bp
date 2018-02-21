@@ -67,13 +67,4 @@ cc_test {
         "-Wall",
         "-Wextra",
     ],
-
-    multilib: {
-        lib32: {
-            cppflags: ["-DkTestFontDir=\"/data/nativetest/minikin_tests/data/\""],
-        },
-        lib64: {
-            cppflags: ["-DkTestFontDir=\"/data/nativetest64/minikin_tests/data/\""],
-        },
-    },
 }

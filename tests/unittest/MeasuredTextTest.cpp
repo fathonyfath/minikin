@@ -30,7 +30,7 @@ constexpr float CHAR_WIDTH = 10.0;  // Mock implementation always returns 10.0 f
 TEST(MeasuredTextTest, RunTests) {
     constexpr uint32_t CHAR_COUNT = 6;
     constexpr float REPLACEMENT_WIDTH = 20.0f;
-    auto font = buildFontCollection(kTestFontDir "Ascii.ttf");
+    auto font = buildFontCollection("Ascii.ttf");
 
     MeasuredTextBuilder builder;
 
@@ -59,7 +59,7 @@ TEST(MeasuredTextTest, RunTests) {
 TEST(MeasuredTextTest, buildLayoutTest) {
     std::vector<uint16_t> text = utf8ToUtf16("Hello, world.");
     Range range(0, text.size());
-    auto font = buildFontCollection(kTestFontDir "Ascii.ttf");
+    auto font = buildFontCollection("Ascii.ttf");
     MinikinPaint paint(font);
     Bidi bidi = Bidi::FORCE_LTR;
 
