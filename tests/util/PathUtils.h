@@ -21,7 +21,15 @@
 
 namespace minikin {
 
-std::string getTestFontPath(const std::string& fontFilePath);
+std::string getDirname(const std::string& path);
+std::string getBasename(const std::string& path);
+
+// Returns test data directory.
+std::string getTestDataDir();
+
+inline std::string getTestFontPath(const std::string& fontFilePath) {
+    return getTestDataDir() + fontFilePath;
+}
 
 }  // namespace minikin
 

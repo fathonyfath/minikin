@@ -111,7 +111,11 @@ FontFamily::FontFamily(Variant variant, std::vector<Font>&& fonts)
         : FontFamily(LocaleListCache::kEmptyListId, variant, std::move(fonts)) {}
 
 FontFamily::FontFamily(uint32_t localeListId, Variant variant, std::vector<Font>&& fonts)
-        : mLocaleListId(localeListId), mVariant(variant), mFonts(std::move(fonts)) {
+        : mLocaleListId(localeListId),
+          mVariant(variant),
+          mFonts(std::move(fonts)),
+          mIsColorEmoji(LocaleListCache::getById(localeListId).getEmojiStyle() ==
+                        EmojiStyle::EMOJI) {
     MINIKIN_ASSERT(!mFonts.empty(), "FontFamily must contain at least one font.");
     computeCoverage();
 }
@@ -148,16 +152,6 @@ FakedFont FontFamily::getClosestMatch(FontStyle style) const {
         }
     }
     return FakedFont{bestFont, computeFakery(style, bestFont->style())};
-}
-
-bool FontFamily::isColorEmojiFamily() const {
-    const LocaleList& localeList = LocaleListCache::getById(mLocaleListId);
-    for (size_t i = 0; i < localeList.size(); ++i) {
-        if (localeList[i].getEmojiStyle() == Locale::EMSTYLE_EMOJI) {
-            return true;
-        }
-    }
-    return false;
 }
 
 void FontFamily::computeCoverage() {

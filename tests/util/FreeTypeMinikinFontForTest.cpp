@@ -61,7 +61,7 @@ void loadGlyphOrDie(uint32_t glyphId, float size, FT_Face face) {
 FreeTypeMinikinFontForTest::FreeTypeMinikinFontForTest(const std::string& font_path, int index)
         : MinikinFont(uniqueId++), mFontPath(font_path), mFontIndex(index) {
     int fd = open(font_path.c_str(), O_RDONLY);
-    LOG_ALWAYS_FATAL_IF(fd == -1);
+    LOG_ALWAYS_FATAL_IF(fd == -1, "Open failed: %s", font_path.c_str());
     struct stat st = {};
     LOG_ALWAYS_FATAL_IF(fstat(fd, &st) != 0);
     mFontSize = st.st_size;

@@ -22,6 +22,7 @@
 #include "minikin/FontCollection.h"
 
 #include "FontTestUtils.h"
+#include "FreeTypeMinikinFontForTest.h"
 #include "MinikinInternal.h"
 
 namespace minikin {
@@ -34,7 +35,10 @@ TEST_P(FontFamilyHarfBuzzCompatibilityTest, CoverageTest) {
     const std::string& fontPath = GetParam().first;
     int ttcIndex = GetParam().second;
 
-    std::shared_ptr<FontFamily> family = buildFontFamily(fontPath);
+    auto font = std::make_shared<FreeTypeMinikinFontForTest>(fontPath);
+    std::vector<Font> fonts;
+    fonts.push_back(Font::Builder(font).build());
+    std::shared_ptr<FontFamily> family = std::make_shared<FontFamily>(std::move(fonts));
 
     hb_font_t* hbFont = family->getFont(0)->baseFont().get();
 
