@@ -129,7 +129,7 @@ std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
 }
 
 std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath, const std::string& lang) {
-    auto font = std::make_shared<FreeTypeMinikinFontForTest>(filePath);
+    auto font = std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(filePath));
     std::vector<Font> fonts;
     fonts.push_back(Font::Builder(font).build());
     return std::make_shared<FontFamily>(LocaleListCache::getId(lang), FontFamily::Variant::DEFAULT,
