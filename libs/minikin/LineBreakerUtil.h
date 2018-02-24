@@ -55,6 +55,11 @@ inline bool isLineEndSpace(uint16_t c) {
            || c == 0x3000;
 }
 
+// Returns true if the character needs to be excluded for the line spacing.
+inline bool isLineSpaceExcludeChar(uint16_t c) {
+    return c == CHAR_LINE_FEED || c == CHAR_CARRIAGE_RETURN;
+}
+
 inline Locale getEffectiveLocale(uint32_t localeListId) {
     const LocaleList& localeList = LocaleListCache::getById(localeListId);
     return localeList.empty() ? Locale() : localeList[0];

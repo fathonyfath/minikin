@@ -169,25 +169,6 @@ TEST(FontCollectionItemizeTest, itemize_latin) {
     EXPECT_FALSE(runs[0].fakedFont.fakery.isFakeItalic());
 }
 
-TEST(FontCollectionItemizeTest, itemize_newline) {
-    // The regular font does not support \n in its cmap table, but the Arabic font does.
-    // It should not matter, and \n should be ignored.
-    auto collection = buildFontCollectionFromXml(kItemizeFontXml);
-    std::vector<FontCollection::Run> runs;
-
-    itemize(collection, "'a' U+000A", &runs);
-    ASSERT_EQ(1U, runs.size());
-    EXPECT_EQ(0, runs[0].start);
-    EXPECT_EQ(2, runs[0].end);
-    EXPECT_EQ(kLatinFont, getFontName(runs[0]));
-
-    itemize(collection, "U+000A", &runs);
-    ASSERT_EQ(1U, runs.size());
-    EXPECT_EQ(0, runs[0].start);
-    EXPECT_EQ(1, runs[0].end);
-    EXPECT_EQ(kLatinFont, getFontName(runs[0]));
-}
-
 TEST(FontCollectionItemizeTest, itemize_combining) {
     // The regular font and the Cherokee font both support U+0301 (COMBINING ACUTE ACCENT). Since
     // it's a combining mark, it should come from whatever font the base character comes from.
