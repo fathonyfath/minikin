@@ -270,9 +270,9 @@ class LineBreakOptimizer {
 public:
     LineBreakOptimizer() {}
 
-    LineBreakResult computeBreaks(const OptimizeContext& context, const MeasuredText& measuredText,
-                                  const LineWidth& lineWidth, BreakStrategy strategy,
-                                  bool justified);
+    LineBreakResult computeBreaks(const OptimizeContext& context, const U16StringPiece& textBuf,
+                                  const MeasuredText& measuredText, const LineWidth& lineWidth,
+                                  BreakStrategy strategy, bool justified);
 
 private:
     // Data used to compute optimal line breaks
@@ -281,28 +281,32 @@ private:
         uint32_t prev;        // index to previous break
         uint32_t lineNumber;  // the computed line number of the candidate
     };
-    LineBreakResult finishBreaksOptimal(const MeasuredText& measured,
+    LineBreakResult finishBreaksOptimal(const U16StringPiece& textBuf, const MeasuredText& measured,
                                         const std::vector<OptimalBreaksData>& breaksData,
                                         const std::vector<Candidate>& candidates);
 
-    MinikinExtent computeMaxExtent(const MeasuredText& measured, uint32_t start,
-                                   uint32_t end) const;
+    MinikinExtent computeMaxExtent(const U16StringPiece& textBuf, const MeasuredText& measured,
+                                   uint32_t start, uint32_t end) const;
 };
 
 // Find the needed extent between the start and end ranges. start is inclusive and end is exclusive.
 // Both are indices of the source string.
-MinikinExtent LineBreakOptimizer::computeMaxExtent(const MeasuredText& measured, uint32_t start,
+MinikinExtent LineBreakOptimizer::computeMaxExtent(const U16StringPiece& textBuf,
+                                                   const MeasuredText& measured, uint32_t start,
                                                    uint32_t end) const {
     MinikinExtent res = {0.0, 0.0, 0.0};
     for (uint32_t j = start; j < end; j++) {
-        res.extendBy(measured.extents[j]);
+        if (!isLineSpaceExcludeChar(textBuf[j])) {
+            res.extendBy(measured.extents[j]);
+        }
     }
     return res;
 }
 
 // Follow "prev" links in candidates array, and copy to result arrays.
 LineBreakResult LineBreakOptimizer::finishBreaksOptimal(
-        const MeasuredText& measured, const std::vector<OptimalBreaksData>& breaksData,
+        const U16StringPiece& textBuf, const MeasuredText& measured,
+        const std::vector<OptimalBreaksData>& breaksData,
         const std::vector<Candidate>& candidates) {
     LineBreakResult result;
     const uint32_t nCand = candidates.size();
@@ -314,7 +318,7 @@ LineBreakResult LineBreakOptimizer::finishBreaksOptimal(
 
         result.breakPoints.push_back(cand.offset);
         result.widths.push_back(cand.postBreak - prev.preBreak);
-        MinikinExtent extent = computeMaxExtent(measured, prev.offset, cand.offset);
+        MinikinExtent extent = computeMaxExtent(textBuf, measured, prev.offset, cand.offset);
         result.ascents.push_back(extent.ascent);
         result.descents.push_back(extent.descent);
 
@@ -327,6 +331,7 @@ LineBreakResult LineBreakOptimizer::finishBreaksOptimal(
 }
 
 LineBreakResult LineBreakOptimizer::computeBreaks(const OptimizeContext& context,
+                                                  const U16StringPiece& textBuf,
                                                   const MeasuredText& measured,
                                                   const LineWidth& lineWidth,
                                                   BreakStrategy strategy, bool justified) {
@@ -407,7 +412,7 @@ LineBreakResult LineBreakOptimizer::computeBreaks(const OptimizeContext& context
                               bestPrev,                                            // prev
                               breaksData[bestPrev].lineNumber + 1});               // lineNumber
     }
-    return finishBreaksOptimal(measured, breaksData, candidates);
+    return finishBreaksOptimal(textBuf, measured, breaksData, candidates);
 }
 
 }  // namespace
@@ -421,7 +426,7 @@ LineBreakResult breakLineOptimal(const U16StringPiece& textBuf, const MeasuredTe
     const OptimizeContext context =
             populateCandidates(textBuf, measured, lineWidth, frequency, justified);
     LineBreakOptimizer optimizer;
-    return optimizer.computeBreaks(context, measured, lineWidth, strategy, justified);
+    return optimizer.computeBreaks(context, textBuf, measured, lineWidth, strategy, justified);
 }
 
 }  // namespace minikin

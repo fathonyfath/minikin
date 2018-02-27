@@ -22,6 +22,8 @@
 namespace minikin {
 
 // Code point order
+constexpr uint32_t CHAR_LINE_FEED = 0x000A;
+constexpr uint32_t CHAR_CARRIAGE_RETURN = 0x000D;
 constexpr uint32_t CHAR_TAB = 0x0009;
 constexpr uint32_t CHAR_HYPHEN_MINUS = 0x002D;
 constexpr uint32_t CHAR_NBSP = 0x00A0;

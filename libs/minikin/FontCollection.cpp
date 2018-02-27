@@ -299,9 +299,7 @@ const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(
 // properly by Minikin or HarfBuzz even if the font does not explicitly support them and it's
 // usually meaningless to switch to a different font to display them.
 static bool doesNotNeedFontSupport(uint32_t c) {
-    return c == 0x000A                      // LINE FEED
-           || c == 0x000D                   // CARRIAGE RETURN
-           || c == 0x00AD                   // SOFT HYPHEN
+    return c == 0x00AD                      // SOFT HYPHEN
            || c == 0x034F                   // COMBINING GRAPHEME JOINER
            || c == 0x061C                   // ARABIC LETTER MARK
            || (0x200C <= c && c <= 0x200F)  // ZERO WIDTH NON-JOINER..RIGHT-TO-LEFT MARK
