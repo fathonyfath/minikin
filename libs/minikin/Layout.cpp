@@ -117,12 +117,6 @@ hb_font_funcs_t* getFontFuncsForEmoji() {
 
 }  // namespace
 
-struct LayoutContext {
-    LayoutContext(const MinikinPaint& paint) : paint(paint) {}
-    const MinikinPaint& paint;
-    std::vector<HbFontUniquePtr> hbFonts;  // parallel to mFaces
-};
-
 // Layout cache datatypes
 
 class LayoutCacheKey {
@@ -160,11 +154,11 @@ public:
         mChars = NULL;
     }
 
-    void doLayout(Layout* layout, LayoutContext* ctx) const {
+    void doLayout(Layout* layout, const MinikinPaint& paint) const {
         layout->mAdvances.resize(mCount, 0);
         layout->mExtents.resize(mCount);
-        ctx->hbFonts.clear();
-        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, ctx, mStartHyphen, mEndHyphen);
+        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, paint, mStartHyphen,
+                            mEndHyphen);
     }
 
 private:
@@ -203,18 +197,19 @@ public:
     }
 
     // Do not use any LayoutCache function in callback.
-    float getOrCreateAndAppend(const U16StringPiece& text, const Range& range, LayoutContext* ctx,
-                               bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+    float getOrCreateAndAppend(const U16StringPiece& text, const Range& range,
+                               const MinikinPaint& paint, bool dir, StartHyphenEdit startHyphen,
+                               EndHyphenEdit endHyphen,
                                Layout* outLayout,             // nullptr if not necessary
                                float* outAdvances,            // nullptr if not necessary
                                MinikinExtent* outExtents,     // nullptr if not necessary
                                LayoutPieces* outLayoutPiece,  // nullptr if not necessary
                                uint32_t outIndex,             // outputStarting index
                                float wordSpacing) {           // additional wordSpacing
-        LayoutCacheKey key(text, range, ctx->paint, dir, startHyphen, endHyphen);
-        if (ctx->paint.skipCache()) {
+        LayoutCacheKey key(text, range, paint, dir, startHyphen, endHyphen);
+        if (paint.skipCache()) {
             Layout layoutForWord;
-            key.doLayout(&layoutForWord, ctx);
+            key.doLayout(&layoutForWord, paint);
             return appendTo(layoutForWord, outLayout, outAdvances, outExtents, outLayoutPiece,
                             outIndex, wordSpacing);
         }
@@ -233,7 +228,7 @@ public:
         // Don't care even if we do the same layout in other thred.
         key.copyText();
         std::unique_ptr<Layout> layout = std::make_unique<Layout>();
-        key.doLayout(layout.get(), ctx);
+        key.doLayout(layout.get(), paint);
         float result = appendTo(*layout, outLayout, outAdvances, outExtents, outLayoutPiece,
                                 outIndex, wordSpacing);
         {
@@ -370,27 +365,17 @@ void Layout::dump() const {
     }
 }
 
-int Layout::findOrPushBackFace(const FakedFont& face, LayoutContext* ctx) {
-    unsigned int ix;
-    for (ix = 0; ix < mFaces.size(); ix++) {
+uint8_t Layout::findOrPushBackFace(const FakedFont& face) {
+    MINIKIN_ASSERT(mFaces.size() < MAX_FAMILY_COUNT, "mFaces must not exceeds %d",
+                   MAX_FAMILY_COUNT);
+    uint8_t ix = 0;
+    for (; ix < mFaces.size(); ix++) {
         if (mFaces[ix].font == face.font) {
             return ix;
         }
     }
-
+    ix = mFaces.size();
     mFaces.push_back(face);
-    // Note: ctx == nullptr means we're copying from the cache, no need to create corresponding
-    // hb_font object.
-    if (ctx != nullptr) {
-        // We override some functions which are not thread safe.
-        // Create new hb_font_t from base font.
-        HbFontUniquePtr font(hb_font_create_sub_font(face.font->baseFont().get()));
-        hb_font_set_funcs(
-                font.get(), isColorBitmapFont(font) ? getFontFuncsForEmoji() : getFontFuncs(),
-                new SkiaArguments({face.font->typeface().get(), &ctx->paint, face.fakery}),
-                [](void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
-        ctx->hbFonts.push_back(std::move(font));
-    }
     return ix;
 }
 
@@ -449,15 +434,13 @@ static bool isScriptOkForLetterspacing(hb_script_t script) {
 void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
                       const MinikinPaint& paint, StartHyphenEdit startHyphen,
                       EndHyphenEdit endHyphen) {
-    LayoutContext ctx(paint);
-
     const uint32_t count = range.getLength();
     reset();
     mAdvances.resize(count, 0);
     mExtents.resize(count);
 
     for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
-        doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx, range.getStart(),
+        doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, range.getStart(),
                           startHyphen, endHyphen, this, nullptr, nullptr, nullptr);
     }
 }
@@ -466,11 +449,9 @@ void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bi
 void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
                                const MinikinPaint& paint,
                                LayoutPieces* out) {
-    LayoutContext ctx(paint);
-
     float advance = 0;
     for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlag)) {
-        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx,
+        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint,
                                      0,                         // Destination start. Not used.
                                      StartHyphenEdit::NO_EDIT,  // Hyphen edit, not used.
                                      EndHyphenEdit::NO_EDIT,    // Hyphen edit, not used.
@@ -484,23 +465,22 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
 float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
                           const MinikinPaint& paint, StartHyphenEdit startHyphen,
                           EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents) {
-    LayoutContext ctx(paint);
-
     float advance = 0;
     for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
         const size_t offset = range.toRangeOffset(runInfo.range.getStart());
         float* advancesForRun = advances ? advances + offset : nullptr;
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
-        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx, 0, startHyphen,
+        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, 0, startHyphen,
                                      endHyphen, NULL, advancesForRun, extentsForRun, nullptr);
     }
     return advance;
 }
 
 float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
-                                LayoutContext* ctx, size_t dstStart, StartHyphenEdit startHyphen,
-                                EndHyphenEdit endHyphen, Layout* layout, float* advances,
-                                MinikinExtent* extents, LayoutPieces* lpOut) {
+                                const MinikinPaint& paint, size_t dstStart,
+                                StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                                Layout* layout, float* advances, MinikinExtent* extents,
+                                LayoutPieces* lpOut) {
     if (!range.isValid()) {
         return 0.0f;  // ICU failed to retrieve the bidi run?
     }
@@ -519,7 +499,7 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
             const uint32_t wordcount = std::min(end, wordend) - iter;
             const uint32_t offset = iter - start;
             advance += doLayoutWord(buf + wordstart, iter - wordstart, wordcount,
-                                    wordend - wordstart, isRtl, ctx, iter - dstStart,
+                                    wordend - wordstart, isRtl, paint, iter - dstStart,
                                     // Only apply hyphen to the first or last word in the string.
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     wordend >= end ? endHyphen : EndHyphenEdit::NO_EDIT, layout,
@@ -536,7 +516,7 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
             uint32_t bufStart = std::max(start, wordstart);
             const uint32_t offset = bufStart - start;
             advance += doLayoutWord(buf + wordstart, bufStart - wordstart, iter - bufStart,
-                                    wordend - wordstart, isRtl, ctx, bufStart - dstStart,
+                                    wordend - wordstart, isRtl, paint, bufStart - dstStart,
                                     // Only apply hyphen to the first (rightmost) or last (leftmost)
                                     // word in the string.
                                     wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
@@ -550,12 +530,12 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
 }
 
 float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                           bool isRtl, LayoutContext* ctx, size_t bufStart,
+                           bool isRtl, const MinikinPaint& paint, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                            float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
-    float wordSpacing = count == 1 && isWordSpace(buf[start]) ? ctx->paint.wordSpacing : 0;
+    float wordSpacing = count == 1 && isWordSpace(buf[start]) ? paint.wordSpacing : 0;
     float advance = LayoutCache::getInstance().getOrCreateAndAppend(
-            U16StringPiece(buf, bufSize), Range(start, start + count), ctx, isRtl, startHyphen,
+            U16StringPiece(buf, bufSize), Range(start, start + count), paint, isRtl, startHyphen,
             endHyphen, layout, advances, extents, lpOut, bufStart, wordSpacing);
 
     if (wordSpacing != 0) {
@@ -716,12 +696,12 @@ static inline uint32_t addToHbBuffer(const HbBufferUniquePtr& buffer, const uint
 }
 
 void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                         bool isRtl, LayoutContext* ctx, StartHyphenEdit startHyphen,
+                         bool isRtl, const MinikinPaint& paint, StartHyphenEdit startHyphen,
                          EndHyphenEdit endHyphen) {
     HbBufferUniquePtr buffer(hb_buffer_create());
     hb_buffer_set_unicode_funcs(buffer.get(), getUnicodeFunctions());
     std::vector<FontCollection::Run> items;
-    ctx->paint.font->itemize(buf + start, count, ctx->paint, &items);
+    paint.font->itemize(buf + start, count, paint, &items);
 
     std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing
@@ -729,16 +709,17 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
     // "When the effective spacing between two characters is not zero (due to
     // either justification or a non-zero value of letter-spacing), user agents
     // should not apply optional ligatures."
-    if (fabs(ctx->paint.letterSpacing) > 0.03) {
+    if (fabs(paint.letterSpacing) > 0.03) {
         static const hb_feature_t no_liga = {HB_TAG('l', 'i', 'g', 'a'), 0, 0, ~0u};
         static const hb_feature_t no_clig = {HB_TAG('c', 'l', 'i', 'g'), 0, 0, ~0u};
         features.push_back(no_liga);
         features.push_back(no_clig);
     }
-    addFeatures(ctx->paint.fontFeatureSettings, &features);
+    addFeatures(paint.fontFeatureSettings, &features);
 
-    double size = ctx->paint.size;
-    double scaleX = ctx->paint.scaleX;
+    std::vector<HbFontUniquePtr> hbFonts;
+    double size = paint.size;
+    double scaleX = paint.scaleX;
 
     float x = mAdvance;
     float y = 0;
@@ -747,11 +728,20 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
          isRtl ? --run_ix : ++run_ix) {
         FontCollection::Run& run = items[run_ix];
         const FakedFont& fakedFont = run.fakedFont;
-        const int font_ix = findOrPushBackFace(fakedFont, ctx);
-        const HbFontUniquePtr& hbFont = ctx->hbFonts[font_ix];
+        const uint8_t font_ix = findOrPushBackFace(fakedFont);
+        if (hbFonts.size() == font_ix) {  // findOrPushBackFace push backed the new face.
+            // We override some functions which are not thread safe.
+            HbFontUniquePtr font(hb_font_create_sub_font(fakedFont.font->baseFont().get()));
+            hb_font_set_funcs(
+                    font.get(), isColorBitmapFont(font) ? getFontFuncsForEmoji() : getFontFuncs(),
+                    new SkiaArguments({fakedFont.font->typeface().get(), &paint, fakedFont.fakery}),
+                    [](void* data) { delete reinterpret_cast<SkiaArguments*>(data); });
+            hbFonts.push_back(std::move(font));
+        }
+        const HbFontUniquePtr& hbFont = hbFonts[font_ix];
 
         MinikinExtent verticalExtent;
-        fakedFont.font->typeface()->GetFontExtent(&verticalExtent, ctx->paint, fakedFont.fakery);
+        fakedFont.font->typeface()->GetFontExtent(&verticalExtent, paint, fakedFont.fakery);
         std::fill(&mExtents[run.start], &mExtents[run.end], verticalExtent);
 
         hb_font_set_ppem(hbFont.get(), size * scaleX, size);
@@ -781,9 +771,9 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             double letterSpaceHalfLeft = 0.0;
             double letterSpaceHalfRight = 0.0;
 
-            if (ctx->paint.letterSpacing != 0.0 && isScriptOkForLetterspacing(script)) {
-                letterSpace = ctx->paint.letterSpacing * size * scaleX;
-                if ((ctx->paint.paintFlags & LinearTextFlag) == 0) {
+            if (paint.letterSpacing != 0.0 && isScriptOkForLetterspacing(script)) {
+                letterSpace = paint.letterSpacing * size * scaleX;
+                if ((paint.paintFlags & LinearTextFlag) == 0) {
                     letterSpace = round(letterSpace);
                     letterSpaceHalfLeft = floor(letterSpace * 0.5);
                 } else {
@@ -795,7 +785,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
             hb_buffer_clear_contents(buffer.get());
             hb_buffer_set_script(buffer.get(), script);
             hb_buffer_set_direction(buffer.get(), isRtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-            const LocaleList& localeList = LocaleListCache::getById(ctx->paint.localeListId);
+            const LocaleList& localeList = LocaleListCache::getById(paint.localeListId);
             if (localeList.size() != 0) {
                 hb_language_t hbLanguage = localeList.getHbLanguage(0);
                 for (size_t i = 0; i < localeList.size(); ++i) {
@@ -840,11 +830,11 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                 hb_codepoint_t glyph_ix = info[i].codepoint;
                 float xoff = HBFixedToFloat(positions[i].x_offset);
                 float yoff = -HBFixedToFloat(positions[i].y_offset);
-                xoff += yoff * ctx->paint.skewX;
+                xoff += yoff * paint.skewX;
                 LayoutGlyph glyph = {font_ix, glyph_ix, x + xoff, y + yoff};
                 mGlyphs.push_back(glyph);
                 float xAdvance = HBFixedToFloat(positions[i].x_advance);
-                if ((ctx->paint.paintFlags & LinearTextFlag) == 0) {
+                if ((paint.paintFlags & LinearTextFlag) == 0) {
                     xAdvance = roundf(xAdvance);
                 }
                 MinikinRect glyphBounds;
@@ -860,7 +850,7 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                     glyphBounds.mBottom =
                             roundf(HBFixedToFloat(-extents.y_bearing - extents.height));
                 } else {
-                    fakedFont.font->typeface()->GetBounds(&glyphBounds, glyph_ix, ctx->paint,
+                    fakedFont.font->typeface()->GetBounds(&glyphBounds, glyph_ix, paint,
                                                           fakedFont.fakery);
                 }
                 glyphBounds.offset(xoff, yoff);
@@ -893,7 +883,7 @@ void Layout::appendLayout(const Layout& src, size_t start, float extraAdvance) {
         fontMap = new int[src.mFaces.size()];
     }
     for (size_t i = 0; i < src.mFaces.size(); i++) {
-        int font_ix = findOrPushBackFace(src.mFaces[i], nullptr);
+        uint8_t font_ix = findOrPushBackFace(src.mFaces[i]);
         fontMap[i] = font_ix;
     }
     int x0 = mAdvance;
