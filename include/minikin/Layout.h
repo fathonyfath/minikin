@@ -45,9 +45,6 @@ struct LayoutGlyph {
     float y;
 };
 
-// Internal state used during layout operation
-struct LayoutContext;
-
 // Must be the same value with Paint.java
 enum class Bidi : uint8_t {
     LTR = 0b0000,          // Must be same with Paint.BIDI_LTR
@@ -146,8 +143,7 @@ private:
     FRIEND_TEST(MeasuredTextTest, buildLayoutTest);
 
     // Find a face in the mFaces vector. If not found, push back the entry to mFaces.
-    // If ctx is provided, push back hb_font_t to LayoutContext::hbFonts as well.
-    int findOrPushBackFace(const FakedFont& face, LayoutContext* ctx);
+    uint8_t findOrPushBackFace(const FakedFont& face);
 
     // Clears layout, ready to be used again
     void reset();
@@ -155,21 +151,22 @@ private:
     // Lay out a single bidi run
     // When layout is not null, layout info will be stored in the object.
     // When advances is not null, measurement results will be stored in the array.
-    static float doLayoutRunCached(const uint16_t* buf, size_t runStart, size_t runLength,
-                                   size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
+    static float doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
+                                   const MinikinPaint& paint, size_t dstStart,
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                    Layout* layout, float* advances, MinikinExtent* extents,
                                    LayoutPieces* lpOut);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                              bool isRtl, LayoutContext* ctx, size_t bufStart,
+                              bool isRtl, const MinikinPaint& paint, size_t bufStart,
                               StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                               float* advances, MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
-                     LayoutContext* ctx, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
+                     const MinikinPaint& paint, StartHyphenEdit startHyphen,
+                     EndHyphenEdit endHyphen);
 
     // Append another layout (for example, cached value) into this one
     void appendLayout(const Layout& src, size_t start, float extraAdvance);

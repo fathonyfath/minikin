@@ -77,7 +77,8 @@ void FontCollection::init(const vector<std::shared_ptr<FontFamily>>& typefaces) 
     }
     nTypefaces = mFamilies.size();
     MINIKIN_ASSERT(nTypefaces > 0, "Font collection must have at least one valid typeface");
-    MINIKIN_ASSERT(nTypefaces <= 254, "Font collection may only have up to 254 font families.");
+    MINIKIN_ASSERT(nTypefaces <= MAX_FAMILY_COUNT,
+                   "Font collection may only have up to %d font families.", MAX_FAMILY_COUNT);
     size_t nPages = (mMaxChar + kPageMask) >> kLogCharsPerPage;
     // TODO: Use variation selector map for mRanges construction.
     // A font can have a glyph for a base code point and variation selector pair but no glyph for

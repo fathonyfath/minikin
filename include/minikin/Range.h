@@ -30,6 +30,7 @@ public:
 
     // start must be smaller than or equal to end otherwise the behavior is undefined.
     Range(uint32_t start, uint32_t end) : mStart(start), mEnd(end) {}
+    Range() : Range(NOWHERE, NOWHERE) {}
 
     Range(const Range&) = default;
     Range& operator=(const Range&) = default;
@@ -78,6 +79,10 @@ public:
     static Range merge(const Range& left, const Range& right) {
         return Range({std::min(left.mStart, right.mStart), std::max(left.mEnd, right.mEnd)});
     }
+
+    inline bool operator==(const Range& o) const { return mStart == o.mStart && mEnd == o.mEnd; }
+
+    inline bool operator!=(const Range& o) const { return !(*this == o); }
 
 private:
     // Helper class for "for (uint32_t i : range)" style for-loop.

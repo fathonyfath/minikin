@@ -26,6 +26,9 @@
 
 namespace minikin {
 
+// The maximum number of font families.
+constexpr uint32_t MAX_FAMILY_COUNT = 254;
+
 class FontCollection {
 public:
     explicit FontCollection(const std::vector<std::shared_ptr<FontFamily>>& typefaces);

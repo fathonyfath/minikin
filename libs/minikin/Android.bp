@@ -29,6 +29,7 @@ cc_library {
     target: {
         android: {
             srcs: [
+                "BidiUtils.cpp",
                 "CmapCoverage.cpp",
                 "Emoji.cpp",
                 "FontCollection.cpp",
