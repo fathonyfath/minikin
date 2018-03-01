@@ -36,6 +36,7 @@
 #include "minikin/HbUtils.h"
 #include "minikin/Macros.h"
 
+#include "BidiUtils.h"
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -115,26 +116,6 @@ hb_font_funcs_t* getFontFuncsForEmoji() {
 }
 
 }  // namespace
-
-static inline UBiDiLevel bidiToUBidiLevel(Bidi bidi) {
-    switch (bidi) {
-        case Bidi::LTR:
-            return 0x00;
-        case Bidi::RTL:
-            return 0x01;
-        case Bidi::DEFAULT_LTR:
-            return UBIDI_DEFAULT_LTR;
-        case Bidi::DEFAULT_RTL:
-            return UBIDI_DEFAULT_RTL;
-        case Bidi::FORCE_LTR:
-        case Bidi::FORCE_RTL:
-            MINIKIN_NOT_REACHED("FORCE_LTR/FORCE_RTL can not be converted to UBiDiLevel.");
-            return 0x00;
-        default:
-            MINIKIN_NOT_REACHED("Unknown Bidi value.");
-            return 0x00;
-    }
-}
 
 struct LayoutContext {
     LayoutContext(const MinikinPaint& paint) : paint(paint) {}
@@ -465,164 +446,6 @@ static bool isScriptOkForLetterspacing(hb_script_t script) {
              script == HB_SCRIPT_TIRHUTA || script == HB_SCRIPT_OGHAM);
 }
 
-class BidiText {
-public:
-    class Iter {
-    public:
-        struct RunInfo {
-            int32_t mRunStart;
-            int32_t mRunLength;
-            bool mIsRtl;
-        };
-
-        Iter(UBiDi* bidi, size_t start, size_t end, size_t runIndex, size_t runCount, bool isRtl);
-
-        bool operator!=(const Iter& other) const {
-            return mIsEnd != other.mIsEnd || mNextRunIndex != other.mNextRunIndex ||
-                   mBidi != other.mBidi;
-        }
-
-        const RunInfo& operator*() const { return mRunInfo; }
-
-        const Iter& operator++() {
-            updateRunInfo();
-            return *this;
-        }
-
-    private:
-        UBiDi* const mBidi;
-        bool mIsEnd;
-        size_t mNextRunIndex;
-        const size_t mRunCount;
-        const int32_t mStart;
-        const int32_t mEnd;
-        RunInfo mRunInfo;
-
-        void updateRunInfo();
-    };
-
-    BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags);
-    BidiText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags)
-            : BidiText(textBuf.data(), range.getStart(), range.getLength(), textBuf.size(),
-                       bidiFlags){};
-
-    ~BidiText() {
-        if (mBidi) {
-            ubidi_close(mBidi);
-        }
-    }
-
-    Iter begin() const { return Iter(mBidi, mStart, mEnd, 0, mRunCount, mIsRtl); }
-
-    Iter end() const { return Iter(mBidi, mStart, mEnd, mRunCount, mRunCount, mIsRtl); }
-
-private:
-    const size_t mStart;
-    const size_t mEnd;
-    const size_t mBufSize;
-    UBiDi* mBidi;
-    size_t mRunCount;
-    bool mIsRtl;
-
-    BidiText(const BidiText&) = delete;
-    void operator=(const BidiText&) = delete;
-};
-
-BidiText::Iter::Iter(UBiDi* bidi, size_t start, size_t end, size_t runIndex, size_t runCount,
-                     bool isRtl)
-        : mBidi(bidi),
-          mIsEnd(runIndex == runCount),
-          mNextRunIndex(runIndex),
-          mRunCount(runCount),
-          mStart(start),
-          mEnd(end),
-          mRunInfo() {
-    if (mRunCount == 1) {
-        mRunInfo.mRunStart = start;
-        mRunInfo.mRunLength = end - start;
-        mRunInfo.mIsRtl = isRtl;
-        mNextRunIndex = mRunCount;
-        return;
-    }
-    updateRunInfo();
-}
-
-void BidiText::Iter::updateRunInfo() {
-    if (mNextRunIndex == mRunCount) {
-        // All runs have been iterated.
-        mIsEnd = true;
-        return;
-    }
-    int32_t startRun = -1;
-    int32_t lengthRun = -1;
-    const UBiDiDirection runDir = ubidi_getVisualRun(mBidi, mNextRunIndex, &startRun, &lengthRun);
-    mNextRunIndex++;
-    if (startRun == -1 || lengthRun == -1) {
-        ALOGE("invalid visual run");
-        // skip the invalid run.
-        updateRunInfo();
-        return;
-    }
-    const int32_t runEnd = std::min(startRun + lengthRun, mEnd);
-    mRunInfo.mRunStart = std::max(startRun, mStart);
-    mRunInfo.mRunLength = runEnd - mRunInfo.mRunStart;
-    if (mRunInfo.mRunLength <= 0) {
-        // skip the empty run.
-        updateRunInfo();
-        return;
-    }
-    mRunInfo.mIsRtl = (runDir == UBIDI_RTL);
-}
-
-BidiText::BidiText(const uint16_t* buf, size_t start, size_t count, size_t bufSize, Bidi bidiFlags)
-        : mStart(start),
-          mEnd(start + count),
-          mBufSize(bufSize),
-          mBidi(NULL),
-          mRunCount(1),
-          mIsRtl(isRtl(bidiFlags)) {
-    if (isOverride(bidiFlags)) {
-        // force single run.
-        return;
-    }
-    mBidi = ubidi_open();
-    if (!mBidi) {
-        ALOGE("error creating bidi object");
-        return;
-    }
-    UErrorCode status = U_ZERO_ERROR;
-    // Set callbacks to override bidi classes of new emoji
-    ubidi_setClassCallback(mBidi, emojiBidiOverride, nullptr, nullptr, nullptr, &status);
-    if (!U_SUCCESS(status)) {
-        ALOGE("error setting bidi callback function, status = %d", status);
-        return;
-    }
-
-    const UBiDiLevel bidiReq = bidiToUBidiLevel(bidiFlags);
-
-    ubidi_setPara(mBidi, reinterpret_cast<const UChar*>(buf), mBufSize, bidiReq, NULL, &status);
-    if (!U_SUCCESS(status)) {
-        ALOGE("error calling ubidi_setPara, status = %d", status);
-        return;
-    }
-    // RTL paragraphs get an odd level, while LTR paragraphs get an even level,
-    const bool paraIsRTL = ubidi_getParaLevel(mBidi) & 0x01;
-    const ssize_t rc = ubidi_countRuns(mBidi, &status);
-    if (!U_SUCCESS(status) || rc < 0) {
-        ALOGW("error counting bidi runs, status = %d", status);
-    }
-    if (!U_SUCCESS(status) || rc <= 0) {
-        mIsRtl = paraIsRTL;
-        return;
-    }
-    if (rc == 1) {
-        const UBiDiDirection runDir = ubidi_getVisualRun(mBidi, 0, nullptr, nullptr);
-        mIsRtl = (runDir == UBIDI_RTL);
-        return;
-    }
-    mRunCount = rc;
-}
-
 void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
                       const MinikinPaint& paint, StartHyphenEdit startHyphen,
                       EndHyphenEdit endHyphen) {
@@ -633,10 +456,9 @@ void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bi
     mAdvances.resize(count, 0);
     mExtents.resize(count);
 
-    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
-        doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength, textBuf.size(),
-                          runInfo.mIsRtl, &ctx, range.getStart(), startHyphen, endHyphen, this,
-                          nullptr, nullptr, nullptr);
+    for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
+        doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx, range.getStart(),
+                          startHyphen, endHyphen, this, nullptr, nullptr, nullptr);
     }
 }
 
@@ -647,15 +469,14 @@ void Layout::addToLayoutPieces(const U16StringPiece& textBuf, const Range& range
     LayoutContext ctx(paint);
 
     float advance = 0;
-    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlag)) {
-        advance += doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength,
-                                     textBuf.size(), runInfo.mIsRtl, &ctx,
+    for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlag)) {
+        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx,
                                      0,                         // Destination start. Not used.
                                      StartHyphenEdit::NO_EDIT,  // Hyphen edit, not used.
                                      EndHyphenEdit::NO_EDIT,    // Hyphen edit, not used.
-                                     nullptr,  // output layout. Not used
-                                     nullptr,  // advances. Not used
-                                     nullptr,  // extents. Not used.
+                                     nullptr,                   // output layout. Not used
+                                     nullptr,                   // advances. Not used
+                                     nullptr,                   // extents. Not used.
                                      out);
     }
 }
@@ -666,50 +487,54 @@ float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bid
     LayoutContext ctx(paint);
 
     float advance = 0;
-    for (const BidiText::Iter::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
-        const size_t offset = range.toRangeOffset(runInfo.mRunStart);
+    for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
+        const size_t offset = range.toRangeOffset(runInfo.range.getStart());
         float* advancesForRun = advances ? advances + offset : nullptr;
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
-        advance += doLayoutRunCached(textBuf.data(), runInfo.mRunStart, runInfo.mRunLength,
-                                     textBuf.size(), runInfo.mIsRtl, &ctx, 0, startHyphen,
+        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, &ctx, 0, startHyphen,
                                      endHyphen, NULL, advancesForRun, extentsForRun, nullptr);
     }
     return advance;
 }
 
-float Layout::doLayoutRunCached(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
-                                bool isRtl, LayoutContext* ctx, size_t dstStart,
-                                StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                Layout* layout, float* advances, MinikinExtent* extents,
-                                LayoutPieces* lpOut) {
+float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
+                                LayoutContext* ctx, size_t dstStart, StartHyphenEdit startHyphen,
+                                EndHyphenEdit endHyphen, Layout* layout, float* advances,
+                                MinikinExtent* extents, LayoutPieces* lpOut) {
+    if (!range.isValid()) {
+        return 0.0f;  // ICU failed to retrieve the bidi run?
+    }
+    const uint16_t* buf = textBuf.data();
+    const uint32_t bufSize = textBuf.size();
+    const uint32_t start = range.getStart();
+    const uint32_t end = range.getEnd();
     float advance = 0;
     if (!isRtl) {
         // left to right
-        size_t wordstart =
+        uint32_t wordstart =
                 start == bufSize ? start : getPrevWordBreakForCache(buf, start + 1, bufSize);
-        size_t wordend;
-        for (size_t iter = start; iter < start + count; iter = wordend) {
+        uint32_t wordend;
+        for (size_t iter = start; iter < end; iter = wordend) {
             wordend = getNextWordBreakForCache(buf, iter, bufSize);
-            const size_t wordcount = std::min(start + count, wordend) - iter;
-            const size_t offset = iter - start;
+            const uint32_t wordcount = std::min(end, wordend) - iter;
+            const uint32_t offset = iter - start;
             advance += doLayoutWord(buf + wordstart, iter - wordstart, wordcount,
                                     wordend - wordstart, isRtl, ctx, iter - dstStart,
                                     // Only apply hyphen to the first or last word in the string.
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
-                                    wordend >= start + count ? endHyphen : EndHyphenEdit::NO_EDIT,
-                                    layout, advances ? advances + offset : nullptr,
+                                    wordend >= end ? endHyphen : EndHyphenEdit::NO_EDIT, layout,
+                                    advances ? advances + offset : nullptr,
                                     extents ? extents + offset : nullptr, lpOut);
             wordstart = wordend;
         }
     } else {
         // right to left
-        size_t wordstart;
-        size_t end = start + count;
-        size_t wordend = end == 0 ? 0 : getNextWordBreakForCache(buf, end - 1, bufSize);
+        uint32_t wordstart;
+        uint32_t wordend = end == 0 ? 0 : getNextWordBreakForCache(buf, end - 1, bufSize);
         for (size_t iter = end; iter > start; iter = wordstart) {
             wordstart = getPrevWordBreakForCache(buf, iter, bufSize);
-            size_t bufStart = std::max(start, wordstart);
-            const size_t offset = bufStart - start;
+            uint32_t bufStart = std::max(start, wordstart);
+            const uint32_t offset = bufStart - start;
             advance += doLayoutWord(buf + wordstart, bufStart - wordstart, iter - bufStart,
                                     wordend - wordstart, isRtl, ctx, bufStart - dstStart,
                                     // Only apply hyphen to the first (rightmost) or last (leftmost)

@@ -155,11 +155,10 @@ private:
     // Lay out a single bidi run
     // When layout is not null, layout info will be stored in the object.
     // When advances is not null, measurement results will be stored in the array.
-    static float doLayoutRunCached(const uint16_t* buf, size_t runStart, size_t runLength,
-                                   size_t bufSize, bool isRtl, LayoutContext* ctx, size_t dstStart,
-                                   StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                   Layout* layout, float* advances, MinikinExtent* extents,
-                                   LayoutPieces* lpOut);
+    static float doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
+                                   LayoutContext* ctx, size_t dstStart, StartHyphenEdit startHyphen,
+                                   EndHyphenEdit endHyphen, Layout* layout, float* advances,
+                                   MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
