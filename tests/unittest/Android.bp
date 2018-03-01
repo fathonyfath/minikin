@@ -50,6 +50,7 @@ cc_test {
         "HyphenatorTest.cpp",
         "GraphemeBreakTests.cpp",
         "GreedyLineBreakerTest.cpp",
+        "LayoutCacheTest.cpp",
         "LayoutTest.cpp",
         "LayoutUtilsTest.cpp",
         "LocaleListTest.cpp",

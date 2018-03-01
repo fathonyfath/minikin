@@ -37,6 +37,7 @@
 #include "minikin/Macros.h"
 
 #include "BidiUtils.h"
+#include "LayoutCache.h"
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -116,214 +117,6 @@ hb_font_funcs_t* getFontFuncsForEmoji() {
 }
 
 }  // namespace
-
-// Layout cache datatypes
-
-class LayoutCacheKey {
-public:
-    LayoutCacheKey(const U16StringPiece& text, const Range& range, const MinikinPaint& paint,
-                   bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen)
-            : mChars(text.data()),
-              mNchars(text.size()),
-              mStart(range.getStart()),
-              mCount(range.getLength()),
-              mId(paint.font->getId()),
-              mStyle(paint.fontStyle),
-              mSize(paint.size),
-              mScaleX(paint.scaleX),
-              mSkewX(paint.skewX),
-              mLetterSpacing(paint.letterSpacing),
-              mPaintFlags(paint.paintFlags),
-              mLocaleListId(paint.localeListId),
-              mFamilyVariant(paint.familyVariant),
-              mStartHyphen(startHyphen),
-              mEndHyphen(endHyphen),
-              mIsRtl(dir),
-              mHash(computeHash()) {}
-    bool operator==(const LayoutCacheKey& other) const;
-
-    android::hash_t hash() const { return mHash; }
-
-    void copyText() {
-        uint16_t* charsCopy = new uint16_t[mNchars];
-        memcpy(charsCopy, mChars, mNchars * sizeof(uint16_t));
-        mChars = charsCopy;
-    }
-    void freeText() {
-        delete[] mChars;
-        mChars = NULL;
-    }
-
-    void doLayout(Layout* layout, const MinikinPaint& paint) const {
-        layout->mAdvances.resize(mCount, 0);
-        layout->mExtents.resize(mCount);
-        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, paint, mStartHyphen,
-                            mEndHyphen);
-    }
-
-private:
-    const uint16_t* mChars;
-    size_t mNchars;
-    size_t mStart;
-    size_t mCount;
-    uint32_t mId;  // for the font collection
-    FontStyle mStyle;
-    float mSize;
-    float mScaleX;
-    float mSkewX;
-    float mLetterSpacing;
-    int32_t mPaintFlags;
-    uint32_t mLocaleListId;
-    FontFamily::Variant mFamilyVariant;
-    StartHyphenEdit mStartHyphen;
-    EndHyphenEdit mEndHyphen;
-    bool mIsRtl;
-    // Note: any fields added to MinikinPaint must also be reflected here.
-    // TODO: language matching (possibly integrate into style)
-    android::hash_t mHash;
-
-    android::hash_t computeHash() const;
-};
-
-class LayoutCache : private android::OnEntryRemoved<LayoutCacheKey, Layout*> {
-public:
-    LayoutCache() : mCache(kMaxEntries), mRequestCount(0), mCacheHitCount(0) {
-        mCache.setOnEntryRemovedListener(this);
-    }
-
-    void clear() {
-        std::lock_guard<std::mutex> lock(mMutex);
-        mCache.clear();
-    }
-
-    // Do not use any LayoutCache function in callback.
-    float getOrCreateAndAppend(const U16StringPiece& text, const Range& range,
-                               const MinikinPaint& paint, bool dir, StartHyphenEdit startHyphen,
-                               EndHyphenEdit endHyphen,
-                               Layout* outLayout,             // nullptr if not necessary
-                               float* outAdvances,            // nullptr if not necessary
-                               MinikinExtent* outExtents,     // nullptr if not necessary
-                               LayoutPieces* outLayoutPiece,  // nullptr if not necessary
-                               uint32_t outIndex,             // outputStarting index
-                               float wordSpacing) {           // additional wordSpacing
-        LayoutCacheKey key(text, range, paint, dir, startHyphen, endHyphen);
-        if (paint.skipCache()) {
-            Layout layoutForWord;
-            key.doLayout(&layoutForWord, paint);
-            return appendTo(layoutForWord, outLayout, outAdvances, outExtents, outLayoutPiece,
-                            outIndex, wordSpacing);
-        }
-
-        mRequestCount++;
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            Layout* layout = mCache.get(key);
-            if (layout != nullptr) {
-                mCacheHitCount++;
-                return appendTo(*layout, outLayout, outAdvances, outExtents, outLayoutPiece,
-                                outIndex, wordSpacing);
-            }
-        }
-        // Doing text layout takes long time, so releases the mutex during doing layout.
-        // Don't care even if we do the same layout in other thred.
-        key.copyText();
-        std::unique_ptr<Layout> layout = std::make_unique<Layout>();
-        key.doLayout(layout.get(), paint);
-        float result = appendTo(*layout, outLayout, outAdvances, outExtents, outLayoutPiece,
-                                outIndex, wordSpacing);
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            mCache.put(key, layout.release());
-        }
-        return result;
-    }
-
-    void dumpStats(int fd) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        dprintf(fd, "\nLayout Cache Info:\n");
-        dprintf(fd, "  Usage: %zd/%zd entries\n", mCache.size(), kMaxEntries);
-        float ratio = (mRequestCount == 0) ? 0 : mCacheHitCount / (float)mRequestCount;
-        dprintf(fd, "  Hit ratio: %d/%d (%f)\n", mCacheHitCount, mRequestCount, ratio);
-    }
-
-    static LayoutCache& getInstance() {
-        static LayoutCache cache;
-        return cache;
-    }
-
-private:
-    // callback for OnEntryRemoved
-    void operator()(LayoutCacheKey& key, Layout*& value) {
-        key.freeText();
-        delete value;
-    }
-
-    // Returns advance of the layout.
-    float appendTo(const Layout& layoutForWord, Layout* outLayout, float* outAdvances,
-                   MinikinExtent* outExtents, LayoutPieces* outLayoutPiece, uint32_t outIndex,
-                   float wordSpacing) {
-        if (outLayout) {
-            outLayout->appendLayout(layoutForWord, outIndex, wordSpacing);
-        }
-        if (outAdvances) {
-            layoutForWord.getAdvances(outAdvances);
-        }
-        if (outExtents) {
-            layoutForWord.getExtents(outExtents);
-        }
-        if (outLayoutPiece) {
-            outLayoutPiece->offsetMap.insert(std::make_pair(outIndex, layoutForWord));
-        }
-        return layoutForWord.getAdvance();
-    }
-
-    android::LruCache<LayoutCacheKey, Layout*> mCache GUARDED_BY(mMutex);
-
-    int32_t mRequestCount;
-    int32_t mCacheHitCount;
-
-    // static const size_t kMaxEntries = LruCache<LayoutCacheKey, Layout*>::kUnlimitedCapacity;
-
-    // TODO: eviction based on memory footprint; for now, we just use a constant
-    // number of strings
-    static const size_t kMaxEntries = 5000;
-
-    std::mutex mMutex;
-};
-
-bool LayoutCacheKey::operator==(const LayoutCacheKey& other) const {
-    return mId == other.mId && mStart == other.mStart && mCount == other.mCount &&
-           mStyle == other.mStyle && mSize == other.mSize && mScaleX == other.mScaleX &&
-           mSkewX == other.mSkewX && mLetterSpacing == other.mLetterSpacing &&
-           mPaintFlags == other.mPaintFlags && mLocaleListId == other.mLocaleListId &&
-           mFamilyVariant == other.mFamilyVariant && mStartHyphen == other.mStartHyphen &&
-           mEndHyphen == other.mEndHyphen && mIsRtl == other.mIsRtl && mNchars == other.mNchars &&
-           !memcmp(mChars, other.mChars, mNchars * sizeof(uint16_t));
-}
-
-android::hash_t LayoutCacheKey::computeHash() const {
-    uint32_t hash = android::JenkinsHashMix(0, mId);
-    hash = android::JenkinsHashMix(hash, mStart);
-    hash = android::JenkinsHashMix(hash, mCount);
-    hash = android::JenkinsHashMix(hash, android::hash_type(mStyle.identifier()));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mSize));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mScaleX));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mSkewX));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mLocaleListId));
-    hash = android::JenkinsHashMix(hash, android::hash_type(static_cast<uint8_t>(mFamilyVariant)));
-    hash = android::JenkinsHashMix(
-            hash,
-            android::hash_type(static_cast<uint8_t>(packHyphenEdit(mStartHyphen, mEndHyphen))));
-    hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
-    hash = android::JenkinsHashMixShorts(hash, mChars, mNchars);
-    return android::JenkinsHashWhiten(hash);
-}
-
-android::hash_t hash_type(const LayoutCacheKey& key) {
-    return key.hash();
-}
 
 void MinikinRect::join(const MinikinRect& r) {
     if (isEmpty()) {
@@ -529,22 +322,67 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
     return advance;
 }
 
+class LayoutAppendFunctor {
+public:
+    LayoutAppendFunctor(Layout* layout, float* advances, MinikinExtent* extents,
+                        LayoutPieces* pieces, float* totalAdvance, uint32_t outOffset,
+                        float wordSpacing)
+            : mLayout(layout),
+              mAdvances(advances),
+              mExtents(extents),
+              mPieces(pieces),
+              mTotalAdvance(totalAdvance),
+              mOutOffset(outOffset),
+              mWordSpacing(wordSpacing) {}
+
+    void operator()(const Layout& layout) {
+        if (mLayout) {
+            mLayout->appendLayout(layout, mOutOffset, mWordSpacing);
+        }
+        if (mAdvances) {
+            layout.getAdvances(mAdvances);
+        }
+        if (mTotalAdvance) {
+            *mTotalAdvance = layout.getAdvance();
+        }
+        if (mExtents) {
+            layout.getExtents(mExtents);
+        }
+        if (mPieces) {
+            mPieces->offsetMap.insert(std::make_pair(mOutOffset, layout));
+        }
+    }
+
+private:
+    Layout* mLayout;
+    float* mAdvances;
+    MinikinExtent* mExtents;
+    LayoutPieces* mPieces;
+    float* mTotalAdvance;
+    const uint32_t mOutOffset;
+    const float mWordSpacing;
+};
+
 float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                            bool isRtl, const MinikinPaint& paint, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
                            float* advances, MinikinExtent* extents, LayoutPieces* lpOut) {
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? paint.wordSpacing : 0;
-    float advance = LayoutCache::getInstance().getOrCreateAndAppend(
-            U16StringPiece(buf, bufSize), Range(start, start + count), paint, isRtl, startHyphen,
-            endHyphen, layout, advances, extents, lpOut, bufStart, wordSpacing);
+    float totalAdvance;
+
+    LayoutAppendFunctor f(layout, advances, extents, lpOut, &totalAdvance, bufStart, wordSpacing);
+
+    LayoutCache::getInstance().getOrCreate(U16StringPiece(buf, bufSize),
+                                           Range(start, start + count), paint, isRtl, startHyphen,
+                                           endHyphen, f);
 
     if (wordSpacing != 0) {
-        advance += wordSpacing;
+        totalAdvance += wordSpacing;
         if (advances) {
             advances[0] += wordSpacing;
         }
     }
-    return advance;
+    return totalAdvance;
 }
 
 static void addFeatures(const std::string& str, std::vector<hb_feature_t>* features) {
