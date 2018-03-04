@@ -132,6 +132,9 @@ public:
                sizeof(float /* mAdvance */) + sizeof(MinikinRect /* mBounds */);
     }
 
+    // Append another layout (for example, cached value) into this one
+    void appendLayout(const Layout& src, size_t start, float extraAdvance);
+
 private:
     friend class LayoutCacheKey;
     friend class LayoutCache;
@@ -167,9 +170,6 @@ private:
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
                      const MinikinPaint& paint, StartHyphenEdit startHyphen,
                      EndHyphenEdit endHyphen);
-
-    // Append another layout (for example, cached value) into this one
-    void appendLayout(const Layout& src, size_t start, float extraAdvance);
 
     std::vector<LayoutGlyph> mGlyphs;
 
