@@ -17,6 +17,8 @@
 #ifndef MINIKIN_ANDROID_LINE_BREAKER_HELPERS_H
 #define MINIKIN_ANDROID_LINE_BREAKER_HELPERS_H
 
+#include <algorithm>
+
 #include "minikin/LineBreaker.h"
 
 namespace minikin {
@@ -37,7 +39,7 @@ public:
 
     float getAt(size_t lineNo) const override {
         const float width = ((ssize_t)lineNo < (ssize_t)mFirstLineCount) ? mFirstWidth : mRestWidth;
-        return width - get(mIndents, lineNo);
+        return std::max(0.0f, width - get(mIndents, lineNo));
     }
 
     float getMin() const override {
