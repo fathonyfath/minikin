@@ -44,8 +44,8 @@ public:
     virtual uint32_t getLocaleListId() const = 0;
 
     // Fills the each character's advances, extents and overhangs.
-    virtual void getMetrics(const U16StringPiece& text, float* advances,
-                            MinikinExtent* extents) const = 0;
+    virtual void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
+                            LayoutPieces* piece) const = 0;
 
     // Following two methods are only called when the implementation returns true for
     // canHyphenate method.
@@ -54,13 +54,12 @@ public:
     // Returns null if canHyphenate has not returned true.
     virtual const MinikinPaint* getPaint() const { return nullptr; }
 
-    virtual void addToLayoutPieces(const U16StringPiece&, LayoutPieces*) const {}
-
     // Measures the hyphenation piece and fills each character's advances and overhangs.
     virtual float measureHyphenPiece(const U16StringPiece& /* text */,
                                      const Range& /* hyphenPieceRange */,
                                      StartHyphenEdit /* startHyphen */,
-                                     EndHyphenEdit /* endHyphen */, float* /* advances */) const {
+                                     EndHyphenEdit /* endHyphen */, float* /* advances */,
+                                     LayoutPieces* /* pieces */) const {
         return 0.0;
     }
 
@@ -79,26 +78,21 @@ public:
     uint32_t getLocaleListId() const override { return mPaint.localeListId; }
     bool isRtl() const override { return mIsRtl; }
 
-    void getMetrics(const U16StringPiece& text, float* advances,
-                    MinikinExtent* extents) const override {
+    void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
+                    LayoutPieces* pieces) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
         Layout::measureText(text, mRange, bidiFlag, mPaint, StartHyphenEdit::NO_EDIT,
-                            EndHyphenEdit::NO_EDIT, advances, extents);
+                            EndHyphenEdit::NO_EDIT, advances, extents, pieces);
     }
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
 
-    virtual void addToLayoutPieces(const U16StringPiece& textBuf, LayoutPieces* out) const {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::addToLayoutPieces(textBuf, mRange, bidiFlag, mPaint, out);
-    }
-
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
-                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                             float* advances) const override {
+                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, float* advances,
+                             LayoutPieces* pieces) const override {
         Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
         return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen, advances,
-                                   nullptr /* extent */);
+                                   nullptr /* extent */, pieces);
     }
 
 private:
@@ -116,7 +110,7 @@ public:
     uint32_t getLocaleListId() const { return mLocaleListId; }
 
     void getMetrics(const U16StringPiece& /* unused */, float* advances,
-                    MinikinExtent* /* unused */) const override {
+                    MinikinExtent* /* unused */, LayoutPieces* /* pieces */) const override {
         advances[0] = mWidth;
         // TODO: Get the extents information from the caller.
     }
@@ -168,9 +162,9 @@ public:
                sizeof(HyphenBreak) * hyphenBreaks.size() + layoutPieces.getMemoryUsage();
     }
 
-    bool buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                     Bidi bidiFlag, int mtOffset, StartHyphenEdit startHyphen,
-                     EndHyphenEdit endHyphen, Layout* layout);
+    void buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
+                     Bidi bidiFlag, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                     Layout* layout);
 
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;

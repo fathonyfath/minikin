@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <gtest/gtest_prod.h>
+#include <utils/JenkinsHash.h>
 
 #include "minikin/FontCollection.h"
 #include "minikin/Range.h"
@@ -87,12 +88,15 @@ public:
     void doLayout(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                   const MinikinPaint& paint, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
 
-    static void addToLayoutPieces(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlag,
-                                  const MinikinPaint& paint, LayoutPieces* out);
+    void doLayoutWithPrecomputedPieces(const U16StringPiece& str, const Range& range,
+                                       Bidi bidiFlags, const MinikinPaint& paint,
+                                       StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                                       const LayoutPieces& pieces);
 
     static float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                              const MinikinPaint& paint, StartHyphenEdit startHyphen,
-                             EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents);
+                             EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents,
+                             LayoutPieces* pieces);
 
     inline const std::vector<float>& advances() const { return mAdvances; }
 
@@ -139,11 +143,7 @@ private:
     friend class LayoutCacheKey;
     friend class LayoutCache;
 
-    // TODO: Remove friend class with decoupling building logic from Layout.
-    friend class LayoutCompositer;
-
-    // TODO: Remove friend test by doing text layout in unit test.
-    FRIEND_TEST(MeasuredTextTest, buildLayoutTest);
+    FRIEND_TEST(LayoutTest, doLayoutWithPrecomputedPiecesTest);
 
     // Find a face in the mFaces vector. If not found, push back the entry to mFaces.
     uint8_t findOrPushBackFace(const FakedFont& face);
@@ -157,14 +157,15 @@ private:
     static float doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
                                    const MinikinPaint& paint, size_t dstStart,
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                   Layout* layout, float* advances, MinikinExtent* extents,
-                                   LayoutPieces* lpOut);
+                                   const LayoutPieces* lpIn, Layout* layout, float* advances,
+                                   MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                               bool isRtl, const MinikinPaint& paint, size_t bufStart,
-                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
-                              float* advances, MinikinExtent* extents, LayoutPieces* lpOut);
+                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                              const LayoutPieces* lpIn, Layout* layout, float* advances,
+                              MinikinExtent* extents, LayoutPieces* lpOut);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,
@@ -184,34 +185,70 @@ private:
 };
 
 struct LayoutPieces {
-    // TODO: Sorted vector of pairs may be faster?
-    std::unordered_map<uint32_t, Layout> offsetMap;  // start offset to layout index map.
+    struct Key {
+        Key(const U16StringPiece& textBuf, const Range& range, HyphenEdit edit)
+                : text(textBuf.data()), length(textBuf.length()), range(range), hyphenEdit(edit) {}
+
+        void makePersistent() {
+            uint16_t* copied = new uint16_t[length];
+            std::copy(text, text + length, copied);
+            text = copied;
+        }
+
+        inline bool operator==(const Key& o) const {
+            return length == o.length && hyphenEdit == o.hyphenEdit && range == o.range &&
+                   (text == o.text || memcmp(text, o.text, sizeof(uint16_t) * length) == 0);
+        }
+
+        const uint16_t* text;
+        const uint32_t length;
+        Range range;
+        HyphenEdit hyphenEdit;
+    };
+
+    struct KeyHasher {
+        std::size_t operator()(const Key& key) const {
+            uint32_t hash = android::JenkinsHashMix(0, static_cast<uint8_t>(key.hyphenEdit));
+            hash = android::JenkinsHashMix(hash, key.range.getStart());
+            hash = android::JenkinsHashMix(hash, key.range.getEnd());
+            hash = android::JenkinsHashMixShorts(hash, key.text, key.length);
+            return android::JenkinsHashWhiten(hash);
+        }
+    };
+
+    LayoutPieces() {}
+
+    ~LayoutPieces() {
+        for (const auto it : offsetMap) {
+            delete[] it.first.text;
+        }
+    }
+
+    std::unordered_map<Key, Layout, KeyHasher> offsetMap;
+
+    void insert(const U16StringPiece& textBuf, const Range& range, HyphenEdit edit,
+                const Layout& layout) {
+        Key key(textBuf, range, edit);
+        key.makePersistent();
+        offsetMap.insert(std::make_pair(key, layout));
+    }
+
+    const Layout* get(const U16StringPiece& textBuf, const Range& range, HyphenEdit edit) const {
+        auto it = offsetMap.find(Key(textBuf, range, edit));
+        if (it == offsetMap.end()) {
+            return nullptr;
+        }
+        return &it->second;
+    }
 
     uint32_t getMemoryUsage() const {
         uint32_t result = 0;
         for (const auto& i : offsetMap) {
+            result += sizeof(Key) + sizeof(uint16_t) * i.first.length;
             result += i.second.getMemoryUsage();
         }
         return result;
     }
-};
-
-class LayoutCompositer {
-public:
-    LayoutCompositer(uint32_t size) {
-        mLayout.reset();
-        mLayout.mAdvances.resize(size, 0);
-        mLayout.mExtents.resize(size);
-    }
-
-    void append(const Layout& layout, uint32_t start, float extraAdvance) {
-        mLayout.appendLayout(layout, start, extraAdvance);
-    }
-
-    Layout build() { return std::move(mLayout); }
-
-private:
-    Layout mLayout;
 };
 
 }  // namespace minikin

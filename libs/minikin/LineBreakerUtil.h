@@ -72,7 +72,8 @@ inline void populateHyphenationPoints(
         const Hyphenator& hyphenator,         // A hyphenator to be used for hyphenation.
         const Range& contextRange,            // A context range for measuring hyphenated piece.
         const Range& hyphenationTargetRange,  // An actual range for the hyphenation target.
-        std::vector<HyphenBreak>* out) {      // An output to be appended.
+        std::vector<HyphenBreak>* out,        // An output to be appended.
+        LayoutPieces* pieces) {               // An output of layout pieces. Maybe null.
     if (!run.getRange().contains(contextRange) || !contextRange.contains(hyphenationTargetRange)) {
         return;
     }
@@ -89,11 +90,11 @@ inline void populateHyphenationPoints(
         const float first = run.measureHyphenPiece(
                 textBuf /* text */, hyphenPart.first /* hyphenated piece range */,
                 StartHyphenEdit::NO_EDIT /* start hyphen edit */,
-                editForThisLine(hyph) /* end hyphen edit */, nullptr /* advances */);
+                editForThisLine(hyph) /* end hyphen edit */, nullptr /* advances */, pieces);
         const float second = run.measureHyphenPiece(
                 textBuf /* text */, hyphenPart.second /* hyphenated piece range */,
                 editForNextLine(hyph) /* start hyphen edit */,
-                EndHyphenEdit::NO_EDIT /* end hyphen edit */, nullptr /* advances */);
+                EndHyphenEdit::NO_EDIT /* end hyphen edit */, nullptr /* advances */, pieces);
 
         out->emplace_back(i, hyph, first, second);
     }

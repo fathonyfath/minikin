@@ -43,6 +43,25 @@ static void resetAdvances(float* advances, size_t length) {
     }
 }
 
+static Layout doLayout(const std::string& text, const MinikinPaint& paint) {
+    Layout layout;
+    auto utf16 = utf8ToUtf16(text);
+    Range range(0, utf16.size());
+    layout.doLayout(utf16, range, Bidi::FORCE_LTR, paint, StartHyphenEdit::NO_EDIT,
+                    EndHyphenEdit::NO_EDIT);
+    return layout;
+}
+
+static Layout doLayoutWithPrecomputedPieces(const std::string& text, const MinikinPaint& paint,
+                                            const LayoutPieces& pieces) {
+    Layout layout;
+    auto utf16 = utf8ToUtf16(text);
+    Range range(0, utf16.size());
+    layout.doLayoutWithPrecomputedPieces(utf16, range, Bidi::FORCE_LTR, paint,
+                                         StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, pieces);
+    return layout;
+}
+
 class LayoutTest : public testing::Test {
 protected:
     LayoutTest() : mCollection(nullptr) {}
@@ -498,8 +517,9 @@ TEST_F(LayoutTest, measuredTextTest) {
         std::vector<uint16_t> text = utf8ToUtf16("I");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
-        EXPECT_EQ(1.0f, Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                            EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
+        EXPECT_EQ(1.0f,
+                  Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
         ASSERT_EQ(1u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
     }
@@ -508,8 +528,9 @@ TEST_F(LayoutTest, measuredTextTest) {
         std::vector<uint16_t> text = utf8ToUtf16("IV");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
-        EXPECT_EQ(6.0f, Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                            EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
+        EXPECT_EQ(6.0f,
+                  Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
         ASSERT_EQ(2u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);
@@ -521,11 +542,65 @@ TEST_F(LayoutTest, measuredTextTest) {
         Range range(0, text.size());
         EXPECT_EQ(16.0f,
                   Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
+                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
         ASSERT_EQ(3u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);
         EXPECT_EQ(10.0f, advances[2]);
+    }
+}
+
+TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
+    float MARKER1 = 1e+16;
+    float MARKER2 = 1e+17;
+    auto fc = buildFontCollection("LayoutTestFont.ttf");
+    {
+        LayoutPieces pieces;
+
+        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+
+        Layout outLayout = doLayoutWithPrecomputedPieces("I", MinikinPaint(fc), pieces);
+        EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
+    }
+    {
+        LayoutPieces pieces;
+
+        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        inLayout.mAdvances[0] = MARKER1;
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+
+        Layout outLayout = doLayoutWithPrecomputedPieces("II", MinikinPaint(fc), pieces);
+        // The layout pieces are used in word units. Should not be used "I" for "II".
+        EXPECT_NE(MARKER1, outLayout.mAdvances[0]);
+        EXPECT_NE(MARKER1, outLayout.mAdvances[1]);
+    }
+    {
+        LayoutPieces pieces;
+
+        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        inLayout.mAdvances[0] = MARKER1;
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+
+        Layout outLayout = doLayoutWithPrecomputedPieces("I I", MinikinPaint(fc), pieces);
+        EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
+        EXPECT_EQ(MARKER1, outLayout.mAdvances[2]);
+    }
+    {
+        LayoutPieces pieces;
+
+        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+
+        inLayout = doLayout("V", MinikinPaint(fc));
+        inLayout.mAdvances[0] = MARKER2;  // Modify the advance to make sure this layout is used.
+        pieces.insert(utf8ToUtf16("V"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+
+        Layout outLayout = doLayoutWithPrecomputedPieces("I V", MinikinPaint(fc), pieces);
+        EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
+        EXPECT_EQ(MARKER2, outLayout.mAdvances[2]);
     }
 }
 
