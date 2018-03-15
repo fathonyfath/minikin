@@ -52,14 +52,16 @@ public:
     virtual bool canHyphenate() const override { return true; }
     virtual uint32_t getLocaleListId() const { return mLocaleListId; }
 
-    virtual void getMetrics(const U16StringPiece&, float* advances, MinikinExtent*) const {
+    virtual void getMetrics(const U16StringPiece&, float* advances, MinikinExtent*,
+                            LayoutPieces*) const {
         std::fill(advances, advances + mRange.getLength(), mWidth);
     }
 
     virtual const MinikinPaint* getPaint() const { return &mPaint; }
 
     virtual float measureHyphenPiece(const U16StringPiece&, const Range& range,
-                                     StartHyphenEdit start, EndHyphenEdit end, float*) const {
+                                     StartHyphenEdit start, EndHyphenEdit end, float*,
+                                     LayoutPieces*) const {
         uint32_t extraCharForHyphen = 0;
         if (isInsertion(start)) {
             extraCharForHyphen++;
