@@ -195,7 +195,7 @@ bool GreedyLineBreaker::tryLineBreakWithHyphenation(const Range& range, WordBrea
 
         const float width = targetRun->measureHyphenPiece(mTextBuf, contextRange.split(i).first,
                                                           mStartHyphenEdit, editForThisLine(hyph),
-                                                          nullptr /* advances */);
+                                                          nullptr /* advances */, nullptr);
 
         if (width <= mLineWidthLimit) {
             // There are still space, remember current offset and look up next hyphenation point.
@@ -214,7 +214,7 @@ bool GreedyLineBreaker::tryLineBreakWithHyphenation(const Range& range, WordBrea
             const StartHyphenEdit nextLineStartHyphenEdit = editForNextLine(hyph);
             const float remainingCharWidths = targetRun->measureHyphenPiece(
                     mTextBuf, contextRange.split(prevOffset).second, nextLineStartHyphenEdit,
-                    EndHyphenEdit::NO_EDIT, nullptr /* advances */);
+                    EndHyphenEdit::NO_EDIT, nullptr /* advances */, nullptr);
             breakLineAt(prevOffset, prevWidth,
                         remainingCharWidths - (mSumOfCharWidths - mLineWidth), remainingCharWidths,
                         editForThisLine(hyph), nextLineStartHyphenEdit);
@@ -243,7 +243,7 @@ bool GreedyLineBreaker::tryLineBreakWithHyphenation(const Range& range, WordBrea
         const StartHyphenEdit nextLineStartHyphenEdit = editForNextLine(hyph);
         const float remainingCharWidths = targetRun->measureHyphenPiece(
                 mTextBuf, contextRange.split(prevOffset).second, nextLineStartHyphenEdit,
-                EndHyphenEdit::NO_EDIT, nullptr /* advances */);
+                EndHyphenEdit::NO_EDIT, nullptr /* advances */, nullptr);
 
         breakLineAt(prevOffset, prevWidth, remainingCharWidths - (mSumOfCharWidths - mLineWidth),
                     remainingCharWidths, editForThisLine(hyph), nextLineStartHyphenEdit);
