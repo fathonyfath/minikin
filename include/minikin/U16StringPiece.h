@@ -54,7 +54,7 @@ public:
 
 private:
     const uint16_t* mData;
-    const uint32_t mLength;
+    uint32_t mLength;
 };
 
 }  // namespace minikin

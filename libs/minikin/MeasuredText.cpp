@@ -19,6 +19,7 @@
 
 #include "minikin/Layout.h"
 
+#include "LayoutUtils.h"
 #include "LineBreakerUtil.h"
 
 namespace minikin {
@@ -28,15 +29,12 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
     if (textBuf.size() == 0) {
         return;
     }
+    LayoutPieces* piecesOut = computeLayout ? &layoutPieces : nullptr;
     CharProcessor proc(textBuf);
     for (const auto& run : runs) {
         const Range& range = run->getRange();
         const uint32_t runOffset = range.getStart();
-        run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset);
-
-        if (computeLayout) {
-            run->addToLayoutPieces(textBuf, &layoutPieces);
-        }
+        run->getMetrics(textBuf, widths.data() + runOffset, extents.data() + runOffset, piecesOut);
 
         if (!computeHyphenation || !run->canHyphenate()) {
             continue;
@@ -52,42 +50,17 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
             }
 
             populateHyphenationPoints(textBuf, *run, *proc.hyphenator, proc.contextRange(),
-                                      proc.wordRange(), &hyphenBreaks);
+                                      proc.wordRange(), &hyphenBreaks, piecesOut);
         }
     }
 }
 
-bool MeasuredText::buildLayout(const U16StringPiece& /*textBuf*/, const Range& range,
-                               const MinikinPaint& paint, Bidi /*bidiFlag*/, int mtOffset,
+void MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range,
+                               const MinikinPaint& paint, Bidi bidiFlags,
                                StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                Layout* layout) {
-    if (paint.wordSpacing != 0.0f || startHyphen != StartHyphenEdit::NO_EDIT ||
-        endHyphen != EndHyphenEdit::NO_EDIT) {
-        // TODO: Use layout result as much as possible even if justified lines and hyphenated lines.
-        return false;
-    }
-
-    uint32_t start = range.getStart() + mtOffset;
-    const uint32_t end = range.getEnd() + mtOffset;
-    LayoutCompositer compositer(range.getLength());
-    while (start < end) {
-        auto ite = layoutPieces.offsetMap.find(start);
-        if (ite == layoutPieces.offsetMap.end()) {
-            // The layout result not found, possibly due to hyphenation or desperate breaks.
-            // TODO: Do layout here only for necessary piece and keep composing final layout.
-            return false;
-        }
-        if (start + ite->second.advances().size() > end) {
-            // The width of the layout piece exceeds the end of line, possibly due to hyphenation
-            // or desperate breaks.
-            // TODO: Do layout here only for necessary piece and keep composing final layout.
-            return false;
-        }
-        compositer.append(ite->second, start - mtOffset, 0);
-        start += ite->second.advances().size();
-    }
-    *layout = std::move(compositer.build());
-    return true;
+    layout->doLayoutWithPrecomputedPieces(textBuf, range, bidiFlags, paint, startHyphen, endHyphen,
+                                          layoutPieces);
 }
 
 }  // namespace minikin
