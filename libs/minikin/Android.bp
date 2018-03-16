@@ -63,8 +63,7 @@ cc_library {
             sanitize: {
                 misc_undefined: [
                     "signed-integer-overflow",
-                    // b/26432628.
-                    //"unsigned-integer-overflow",
+                    "unsigned-integer-overflow",
                 ],
             },
         },
