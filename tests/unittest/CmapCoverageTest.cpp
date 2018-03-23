@@ -490,6 +490,31 @@ TEST(CmapCoverageTest, brokenFormat4Table) {
         EXPECT_EQ(0U, coverage.length());
         EXPECT_TRUE(vsTables.empty());
     }
+    {
+        SCOPED_TRACE("Reversed end code points");
+        std::vector<uint8_t> table =
+                buildCmapFormat4Table(std::vector<uint16_t>({'b', 'b', 'a', 'a'}));
+        CmapBuilder builder(1);
+        builder.appendTable(0, 0, table);
+        std::vector<uint8_t> cmap = builder.build();
+
+        SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
+        EXPECT_EQ(0U, coverage.length());
+        EXPECT_TRUE(vsTables.empty());
+    }
+}
+
+TEST(CmapCoverageTest, duplicatedCmap4EntryTest) {
+    std::vector<std::unique_ptr<SparseBitSet>> vsTables;
+    std::vector<uint8_t> table = buildCmapFormat4Table(std::vector<uint16_t>({'a', 'b', 'b', 'b'}));
+    CmapBuilder builder(1);
+    builder.appendTable(0, 0, table);
+    std::vector<uint8_t> cmap = builder.build();
+
+    SparseBitSet coverage = CmapCoverage::getCoverage(cmap.data(), cmap.size(), &vsTables);
+    EXPECT_TRUE(coverage.get('a'));
+    EXPECT_TRUE(coverage.get('b'));
+    EXPECT_TRUE(vsTables.empty());
 }
 
 TEST(CmapCoverageTest, brokenFormat12Table) {
