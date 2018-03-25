@@ -61,6 +61,22 @@ static bool addRange(std::vector<uint32_t>& coverage, uint32_t start, uint32_t e
     }
 }
 
+// Returns true if the range is appended. Otherwise returns false as an error.
+static bool addRangeCmap4(std::vector<uint32_t>& coverage, uint32_t start, uint32_t end) {
+    if (!coverage.empty() && coverage.back() > end) {
+        // Reject unordered end code points.
+        return false;
+    }
+    if (coverage.empty() || coverage.back() < start) {
+        coverage.push_back(start);
+        coverage.push_back(end);
+        return true;
+    } else {
+        coverage.back() = end;
+        return true;
+    }
+}
+
 // Returns Range from given ranges vector. Returns invalidRange if i is out of range.
 static inline Range getRange(const std::vector<uint32_t>& r, size_t i) {
     return i + 1 < r.size() ? Range({r[i], r[i + 1]}) : Range::invalidRange();
@@ -157,13 +173,13 @@ static bool getCoverageFormat4(std::vector<uint32_t>& coverage, const uint8_t* d
         if (rangeOffset == 0) {
             uint32_t delta = readU16(data, kHeaderSize + 2 * (2 * segCount + i));
             if (((end + delta) & 0xffff) > end - start) {
-                if (!addRange(coverage, start, end + 1)) {
+                if (!addRangeCmap4(coverage, start, end + 1)) {
                     return false;
                 }
             } else {
                 for (uint32_t j = start; j < end + 1; j++) {
                     if (((j + delta) & 0xffff) != 0) {
-                        if (!addRange(coverage, j, j + 1)) {
+                        if (!addRangeCmap4(coverage, j, j + 1)) {
                             return false;
                         }
                     }
@@ -179,7 +195,7 @@ static bool getCoverageFormat4(std::vector<uint32_t>& coverage, const uint8_t* d
                 }
                 uint32_t glyphId = readU16(data, actualRangeOffset);
                 if (glyphId != 0) {
-                    if (!addRange(coverage, j, j + 1)) {
+                    if (!addRangeCmap4(coverage, j, j + 1)) {
                         return false;
                     }
                 }
