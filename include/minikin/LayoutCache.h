@@ -24,8 +24,6 @@
 #include <utils/JenkinsHash.h>
 #include <utils/LruCache.h>
 
-#include "LocaleListCache.h"
-
 namespace minikin {
 
 // Layout cache datatypes
@@ -80,6 +78,8 @@ public:
         layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, paint, mStartHyphen,
                             mEndHyphen);
     }
+
+    uint32_t getMemoryUsage() const { return sizeof(LayoutCacheKey) + sizeof(uint16_t) * mNchars; }
 
 private:
     const uint16_t* mChars;

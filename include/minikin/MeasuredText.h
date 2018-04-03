@@ -22,6 +22,7 @@
 
 #include "minikin/FontCollection.h"
 #include "minikin/Layout.h"
+#include "minikin/LayoutPieces.h"
 #include "minikin/Macros.h"
 #include "minikin/MinikinFont.h"
 #include "minikin/Range.h"
@@ -46,6 +47,9 @@ public:
     // Fills the each character's advances, extents and overhangs.
     virtual void getMetrics(const U16StringPiece& text, float* advances, MinikinExtent* extents,
                             LayoutPieces* piece) const = 0;
+
+    virtual std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
+                                                    const LayoutPieces& pieces) const = 0;
 
     // Following two methods are only called when the implementation returns true for
     // canHyphenate method.
@@ -85,6 +89,12 @@ public:
                             EndHyphenEdit::NO_EDIT, advances, extents, pieces);
     }
 
+    std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
+                                            const LayoutPieces& pieces) const override {
+        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+        return Layout::getBoundsWithPrecomputedPieces(text, range, bidiFlag, mPaint, pieces);
+    }
+
     const MinikinPaint* getPaint() const override { return &mPaint; }
 
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
@@ -113,6 +123,13 @@ public:
                     MinikinExtent* /* unused */, LayoutPieces* /* pieces */) const override {
         advances[0] = mWidth;
         // TODO: Get the extents information from the caller.
+    }
+
+    std::pair<float, MinikinRect> getBounds(const U16StringPiece& /* text */,
+                                            const Range& /* range */,
+                                            const LayoutPieces& /* pieces */) const override {
+        // Bounding Box is not used in replacement run.
+        return std::make_pair(mWidth, MinikinRect());
     }
 
 private:
@@ -165,6 +182,7 @@ public:
     void buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
                      Bidi bidiFlag, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                      Layout* layout);
+    MinikinRect getBounds(const U16StringPiece& textBuf, const Range& range);
 
     MeasuredText(MeasuredText&&) = default;
     MeasuredText& operator=(MeasuredText&&) = default;

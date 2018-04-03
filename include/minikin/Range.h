@@ -73,6 +73,9 @@ public:
         return left.isValid() && right.isValid() && left.mStart < right.mEnd &&
                right.mStart < left.mEnd;
     }
+    inline static Range intersection(const Range& left, const Range& right) {
+        return Range(std::max(left.mStart, right.mStart), std::min(left.mEnd, right.mEnd));
+    }
 
     // Returns merged range. This method assumes left and right are not invalid ranges and they have
     // an intersection.

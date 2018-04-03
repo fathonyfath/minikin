@@ -34,10 +34,11 @@
 
 #include "minikin/Emoji.h"
 #include "minikin/HbUtils.h"
+#include "minikin/LayoutCache.h"
+#include "minikin/LayoutPieces.h"
 #include "minikin/Macros.h"
 
 #include "BidiUtils.h"
-#include "LayoutCache.h"
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -234,7 +235,8 @@ void Layout::doLayout(const U16StringPiece& textBuf, const Range& range, Bidi bi
 
     for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
         doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, range.getStart(),
-                          startHyphen, endHyphen, nullptr, this, nullptr, nullptr, nullptr);
+                          startHyphen, endHyphen, nullptr, this, nullptr, nullptr, nullptr,
+                          nullptr);
     }
 }
 
@@ -249,8 +251,23 @@ void Layout::doLayoutWithPrecomputedPieces(const U16StringPiece& textBuf, const 
 
     for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
         doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, range.getStart(),
-                          startHyphen, endHyphen, &lpIn, this, nullptr, nullptr, nullptr);
+                          startHyphen, endHyphen, &lpIn, this, nullptr, nullptr, nullptr, nullptr);
     }
+}
+
+std::pair<float, MinikinRect> Layout::getBoundsWithPrecomputedPieces(const U16StringPiece& textBuf,
+                                                                     const Range& range,
+                                                                     Bidi bidiFlags,
+                                                                     const MinikinPaint& paint,
+                                                                     const LayoutPieces& pieces) {
+    MinikinRect rect;
+    float advance = 0;
+    for (const BidiText::RunInfo& runInfo : BidiText(textBuf, range, bidiFlags)) {
+        advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, 0,
+                                     StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, &pieces,
+                                     nullptr, nullptr, nullptr, &rect, nullptr);
+    }
+    return std::make_pair(advance, rect);
 }
 
 float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bidi bidiFlags,
@@ -264,7 +281,7 @@ float Layout::measureText(const U16StringPiece& textBuf, const Range& range, Bid
         MinikinExtent* extentsForRun = extents ? extents + offset : nullptr;
         advance += doLayoutRunCached(textBuf, runInfo.range, runInfo.isRtl, paint, 0, startHyphen,
                                      endHyphen, nullptr, nullptr, advancesForRun, extentsForRun,
-                                     pieces);
+                                     nullptr, pieces);
     }
     return advance;
 }
@@ -273,7 +290,7 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
                                 const MinikinPaint& paint, size_t dstStart,
                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                                 const LayoutPieces* lpIn, Layout* layout, float* advances,
-                                MinikinExtent* extents, LayoutPieces* lpOut) {
+                                MinikinExtent* extents, MinikinRect* bounds, LayoutPieces* lpOut) {
     if (!range.isValid()) {
         return 0.0f;  // ICU failed to retrieve the bidi run?
     }
@@ -297,7 +314,7 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
                                     iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     wordend >= end ? endHyphen : EndHyphenEdit::NO_EDIT, lpIn,
                                     layout, advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr, lpOut);
+                                    extents ? extents + offset : nullptr, bounds, lpOut);
             wordstart = wordend;
         }
     } else {
@@ -315,7 +332,7 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
                                     wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
                                     iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, lpIn, layout,
                                     advances ? advances + offset : nullptr,
-                                    extents ? extents + offset : nullptr, lpOut);
+                                    extents ? extents + offset : nullptr, bounds, lpOut);
             wordend = wordstart;
         }
     }
@@ -324,18 +341,23 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
 
 class LayoutAppendFunctor {
 public:
-    LayoutAppendFunctor(const U16StringPiece& textBuf, const Range& range, HyphenEdit hyphenEdit,
-                        Layout* layout, float* advances, MinikinExtent* extents,
-                        LayoutPieces* pieces, float* totalAdvance, uint32_t outOffset,
-                        float wordSpacing)
+    LayoutAppendFunctor(const U16StringPiece& textBuf, const Range& range,
+                        const MinikinPaint& paint, bool dir, StartHyphenEdit startEdit,
+                        EndHyphenEdit endEdit, Layout* layout, float* advances,
+                        MinikinExtent* extents, LayoutPieces* pieces, float* totalAdvance,
+                        MinikinRect* bounds, uint32_t outOffset, float wordSpacing)
             : mTextBuf(textBuf),
               mRange(range),
-              mHyphenEdit(hyphenEdit),
+              mPaint(paint),
+              mDir(dir),
+              mStartEdit(startEdit),
+              mEndEdit(endEdit),
               mLayout(layout),
               mAdvances(advances),
               mExtents(extents),
               mPieces(pieces),
               mTotalAdvance(totalAdvance),
+              mBounds(bounds),
               mOutOffset(outOffset),
               mWordSpacing(wordSpacing) {}
 
@@ -352,20 +374,27 @@ public:
         if (mExtents) {
             layout.getExtents(mExtents);
         }
+        if (mBounds) {
+            mBounds->join(layout.getBounds());
+        }
         if (mPieces) {
-            mPieces->insert(mTextBuf, mRange, mHyphenEdit, layout);
+            mPieces->insert(mTextBuf, mRange, mPaint, mDir, mStartEdit, mEndEdit, layout);
         }
     }
 
 private:
     const U16StringPiece& mTextBuf;
     const Range& mRange;
-    HyphenEdit mHyphenEdit;
+    const MinikinPaint& mPaint;
+    bool mDir;
+    StartHyphenEdit mStartEdit;
+    EndHyphenEdit mEndEdit;
     Layout* mLayout;
     float* mAdvances;
     MinikinExtent* mExtents;
     LayoutPieces* mPieces;
     float* mTotalAdvance;
+    MinikinRect* mBounds;
     const uint32_t mOutOffset;
     const float mWordSpacing;
 };
@@ -374,22 +403,16 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            bool isRtl, const MinikinPaint& paint, size_t bufStart,
                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
                            const LayoutPieces* lpIn, Layout* layout, float* advances,
-                           MinikinExtent* extents, LayoutPieces* lpOut) {
+                           MinikinExtent* extents, MinikinRect* bounds, LayoutPieces* lpOut) {
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? paint.wordSpacing : 0;
     float totalAdvance;
 
     const U16StringPiece textBuf(buf, bufSize);
     const Range range(start, start + count);
-    HyphenEdit hyphenEdit = packHyphenEdit(startHyphen, endHyphen);
-
-    LayoutAppendFunctor f(textBuf, range, hyphenEdit, layout, advances, extents, lpOut,
-                          &totalAdvance, bufStart, wordSpacing);
-
-    const Layout* layoutInPieces =
-            lpIn == nullptr ? nullptr : lpIn->get(textBuf, range, hyphenEdit);
-
-    if (layoutInPieces != nullptr) {
-        f(*layoutInPieces);
+    LayoutAppendFunctor f(textBuf, range, paint, isRtl, startHyphen, endHyphen, layout, advances,
+                          extents, lpOut, &totalAdvance, bounds, bufStart, wordSpacing);
+    if (lpIn != nullptr) {
+        lpIn->getOrCreate(textBuf, range, paint, isRtl, startHyphen, endHyphen, f);
     } else {
         LayoutCache::getInstance().getOrCreate(textBuf, range, paint, isRtl, startHyphen, endHyphen,
                                                f);
