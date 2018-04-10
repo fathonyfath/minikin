@@ -63,4 +63,22 @@ void MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range
                                           layoutPieces);
 }
 
+MinikinRect MeasuredText::getBounds(const U16StringPiece& textBuf, const Range& range) {
+    MinikinRect rect;
+    float advance = 0.0f;
+    for (const auto& run : runs) {
+        const Range& runRange = run->getRange();
+        if (!Range::intersects(range, runRange)) {
+            continue;
+        }
+        std::pair<float, MinikinRect> next =
+                run->getBounds(textBuf, Range::intersection(runRange, range), layoutPieces);
+        MinikinRect nextRect = next.second;
+        nextRect.offset(advance, 0);
+        rect.join(nextRect);
+        advance += next.first;
+    }
+    return rect;
+}
+
 }  // namespace minikin

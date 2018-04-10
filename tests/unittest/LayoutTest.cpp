@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include "minikin/FontCollection.h"
+#include "minikin/LayoutPieces.h"
 
 #include "FontTestUtils.h"
 #include "UnicodeUtils.h"
@@ -554,12 +555,14 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
     float MARKER1 = 1e+16;
     float MARKER2 = 1e+17;
     auto fc = buildFontCollection("LayoutTestFont.ttf");
+    MinikinPaint paint(fc);
     {
         LayoutPieces pieces;
 
         Layout inLayout = doLayout("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
-        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
+                      StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
         Layout outLayout = doLayoutWithPrecomputedPieces("I", MinikinPaint(fc), pieces);
         EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
@@ -569,7 +572,8 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
 
         Layout inLayout = doLayout("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;
-        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
+                      StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
         Layout outLayout = doLayoutWithPrecomputedPieces("II", MinikinPaint(fc), pieces);
         // The layout pieces are used in word units. Should not be used "I" for "II".
@@ -581,7 +585,8 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
 
         Layout inLayout = doLayout("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;
-        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
+                      StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
         Layout outLayout = doLayoutWithPrecomputedPieces("I I", MinikinPaint(fc), pieces);
         EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
@@ -592,11 +597,13 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
 
         Layout inLayout = doLayout("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
-        pieces.insert(utf8ToUtf16("I"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+        pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
+                      StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
         inLayout = doLayout("V", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER2;  // Modify the advance to make sure this layout is used.
-        pieces.insert(utf8ToUtf16("V"), Range(0, 1), 0 /* hyphen edit */, inLayout);
+        pieces.insert(utf8ToUtf16("V"), Range(0, 1), paint, false /* dir */,
+                      StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
         Layout outLayout = doLayoutWithPrecomputedPieces("I V", MinikinPaint(fc), pieces);
         EXPECT_EQ(MARKER1, outLayout.mAdvances[0]);
