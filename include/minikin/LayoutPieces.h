@@ -41,12 +41,12 @@ struct LayoutPieces {
 
     void insert(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
                 bool dir, StartHyphenEdit startEdit, EndHyphenEdit endEdit, const Layout& layout) {
-        auto result = offsetMap.emplace(
+        auto[iter, inserted] = offsetMap.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(textBuf, range, paint, dir, startEdit, endEdit),
                 std::forward_as_tuple(layout));
-        if (result.second) {
-            const_cast<LayoutCacheKey*>(&result.first->first)->copyText();
+        if (inserted) {
+            const_cast<LayoutCacheKey*>(&iter->first)->copyText();
         }
     }
 

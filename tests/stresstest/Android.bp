@@ -43,6 +43,7 @@ cc_test {
         "MultithreadTest.cpp",
     ],
 
+    cpp_std: "c++17",
     cflags: [
         "-Werror",
         "-Wall",

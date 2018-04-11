@@ -25,6 +25,7 @@ cc_library {
     srcs: [
         "Hyphenator.cpp",
     ],
+    cpp_std: "c++17",
     cflags: ["-Wall", "-Werror"],
     target: {
         android: {
