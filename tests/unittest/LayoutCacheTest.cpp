@@ -18,8 +18,10 @@
 
 #include <gtest/gtest.h>
 
+#include "minikin/LayoutCache.h"
+
 #include "FontTestUtils.h"
-#include "LayoutCache.h"
+#include "LocaleListCache.h"
 #include "UnicodeUtils.h"
 
 namespace minikin {

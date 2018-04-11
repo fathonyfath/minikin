@@ -57,6 +57,12 @@ public:
         std::fill(advances, advances + mRange.getLength(), mWidth);
     }
 
+    virtual std::pair<float, MinikinRect> getBounds(const U16StringPiece& /* text */,
+                                                    const Range& /* range */,
+                                                    const LayoutPieces& /* pieces */) const {
+        return std::make_pair(mWidth, MinikinRect());
+    }
+
     virtual const MinikinPaint* getPaint() const { return &mPaint; }
 
     virtual float measureHyphenPiece(const U16StringPiece&, const Range& range,
