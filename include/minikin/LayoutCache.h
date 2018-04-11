@@ -74,7 +74,6 @@ public:
 
     void doLayout(Layout* layout, const MinikinPaint& paint) const {
         layout->mAdvances.resize(mCount, 0);
-        layout->mExtents.resize(mCount);
         layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, paint, mStartHyphen,
                             mEndHyphen);
     }

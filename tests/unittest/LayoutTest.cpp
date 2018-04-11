@@ -484,6 +484,7 @@ TEST_F(LayoutTest, hyphenationTest) {
 
 TEST_F(LayoutTest, verticalExtentTest) {
     MinikinPaint paint(mCollection);
+    paint.size = 1.0f;  // make 1em = 1px
 
     std::vector<uint16_t> text = utf8ToUtf16("ab");
     Range range(0, text.size());
@@ -491,13 +492,9 @@ TEST_F(LayoutTest, verticalExtentTest) {
     Layout layout;
     layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
                     EndHyphenEdit::NO_EDIT);
-    MinikinExtent extents[text.size()];
-    layout.getExtents(extents);
-    for (size_t i = 0; i < text.size(); i++) {
-        EXPECT_EQ(-10.0f, extents[i].ascent);
-        EXPECT_EQ(20.0f, extents[i].descent);
-        EXPECT_EQ(0.0f, extents[i].line_gap);
-    }
+    MinikinExtent extent = layout.getExtent();
+    EXPECT_EQ(-8.0f, extent.ascent);
+    EXPECT_EQ(2.0f, extent.descent);
 }
 
 TEST_F(LayoutTest, measuredTextTest) {
@@ -518,9 +515,8 @@ TEST_F(LayoutTest, measuredTextTest) {
         std::vector<uint16_t> text = utf8ToUtf16("I");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
-        EXPECT_EQ(1.0f,
-                  Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
+        EXPECT_EQ(1.0f, Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                                            EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
         ASSERT_EQ(1u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
     }
@@ -529,9 +525,8 @@ TEST_F(LayoutTest, measuredTextTest) {
         std::vector<uint16_t> text = utf8ToUtf16("IV");
         std::vector<float> advances(text.size());
         Range range(0, text.size());
-        EXPECT_EQ(6.0f,
-                  Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
+        EXPECT_EQ(6.0f, Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                                            EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
         ASSERT_EQ(2u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);
@@ -543,7 +538,7 @@ TEST_F(LayoutTest, measuredTextTest) {
         Range range(0, text.size());
         EXPECT_EQ(16.0f,
                   Layout::measureText(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr, nullptr));
+                                      EndHyphenEdit::NO_EDIT, advances.data(), nullptr));
         ASSERT_EQ(3u, advances.size());
         EXPECT_EQ(1.0f, advances[0]);
         EXPECT_EQ(5.0f, advances[1]);

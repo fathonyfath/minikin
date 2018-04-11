@@ -71,7 +71,6 @@ public:
     Layout()
             : mGlyphs(),
               mAdvances(),
-              mExtents(),
               mFaces(),
               mAdvance(0),
               mBounds() {
@@ -98,10 +97,14 @@ public:
                                                                         const MinikinPaint& paint,
                                                                         const LayoutPieces& pieces);
 
+    static MinikinExtent getExtentWithPrecomputedPieces(const U16StringPiece& str,
+                                                        const Range& range, Bidi bidiFlags,
+                                                        const MinikinPaint& paint,
+                                                        const LayoutPieces& pieces);
+
     static float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                              const MinikinPaint& paint, StartHyphenEdit startHyphen,
-                             EndHyphenEdit endHyphen, float* advances, MinikinExtent* extents,
-                             LayoutPieces* pieces);
+                             EndHyphenEdit endHyphen, float* advances, LayoutPieces* pieces);
 
     inline const std::vector<float>& advances() const { return mAdvances; }
 
@@ -119,9 +122,7 @@ public:
     // buffer must match the length of the string (count arg to doLayout).
     void getAdvances(float* advances) const;
 
-    // Get extents, copying into caller-provided buffer. The size of this buffer must match the
-    // length of the string (count arg to doLayout).
-    void getExtents(MinikinExtent* extents) const;
+    const MinikinExtent& getExtent() const { return mExtent; }
 
     // The i parameter is an offset within the buf relative to start, it is < count, where
     // start and count are the parameters to doLayout
@@ -138,7 +139,7 @@ public:
 
     uint32_t getMemoryUsage() const {
         return sizeof(LayoutGlyph) * nGlyphs() + sizeof(float) * mAdvances.size() +
-               sizeof(MinikinExtent) * mExtents.size() + sizeof(FakedFont) * mFaces.size() +
+               sizeof(MinikinExtent) + sizeof(FakedFont) * mFaces.size() +
                sizeof(float /* mAdvance */) + sizeof(MinikinRect /* mBounds */);
     }
 
@@ -181,14 +182,13 @@ private:
 
     std::vector<LayoutGlyph> mGlyphs;
 
-    // The following three vectors are defined per code unit, so their length is identical to the
-    // input text.
+    // This vector defined per code unit, so their length is identical to the input text.
     std::vector<float> mAdvances;
-    std::vector<MinikinExtent> mExtents;
 
     std::vector<FakedFont> mFaces;
     float mAdvance;
     MinikinRect mBounds;
+    MinikinExtent mExtent;
 };
 
 }  // namespace minikin

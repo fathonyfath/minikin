@@ -110,14 +110,12 @@ struct MinikinRect {
 struct MinikinExtent {
     float ascent = 0.0;    // negative
     float descent = 0.0;   // positive
-    float line_gap = 0.0;  // positive
 
-    void reset() { ascent = descent = line_gap = 0.0; }
+    void reset() { ascent = descent = 0.0; }
 
     void extendBy(const MinikinExtent& e) {
         ascent = std::min(ascent, e.ascent);
         descent = std::max(descent, e.descent);
-        line_gap = std::max(line_gap, e.line_gap);
     }
 };
 

@@ -8,6 +8,7 @@ filegroup {
         "data/Cherokee.ttf",
         "data/ColorEmojiFont.ttf",
         "data/ColorTextMixedEmojiFont.ttf",
+        "data/CustomExtent.ttf",
         "data/Emoji.ttf",
         "data/Italic.ttf",
         "data/Ja.ttf",
