@@ -7,6 +7,7 @@ cc_library_static {
         "PathUtils.cpp",
         "UnicodeUtils.cpp",
     ],
+    cpp_std: "c++17",
     cflags: ["-Wall", "-Werror"],
     export_include_dirs: ["."],
     shared_libs: ["libxml2"],
