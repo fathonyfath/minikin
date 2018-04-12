@@ -52,6 +52,7 @@ cc_test {
         "GraphemeBreakTests.cpp",
         "GreedyLineBreakerTest.cpp",
         "LayoutCacheTest.cpp",
+        "LayoutCoreTest.cpp",
         "LayoutTest.cpp",
         "LayoutUtilsTest.cpp",
         "LocaleListTest.cpp",

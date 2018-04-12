@@ -26,41 +26,28 @@
 
 namespace minikin {
 
-const float UNTOUCHED_MARKER = 1e+38;
-
-static void expectAdvances(std::vector<float> expected, float* advances, size_t length) {
-    EXPECT_LE(expected.size(), length);
+static void expectAdvances(const std::vector<float>& expected, const std::vector<float>& advances) {
+    EXPECT_LE(expected.size(), advances.size());
     for (size_t i = 0; i < expected.size(); ++i) {
         EXPECT_EQ(expected[i], advances[i])
                 << i << "th element is different. Expected: " << expected[i]
                 << ", Actual: " << advances[i];
     }
-    EXPECT_EQ(UNTOUCHED_MARKER, advances[expected.size()]);
 }
 
-static void resetAdvances(float* advances, size_t length) {
-    for (size_t i = 0; i < length; ++i) {
-        advances[i] = UNTOUCHED_MARKER;
-    }
-}
-
-static Layout doLayout(const std::string& text, const MinikinPaint& paint) {
-    Layout layout;
+static LayoutPiece doLayoutPiece(const std::string& text, const MinikinPaint& paint) {
     auto utf16 = utf8ToUtf16(text);
     Range range(0, utf16.size());
-    layout.doLayout(utf16, range, Bidi::FORCE_LTR, paint, StartHyphenEdit::NO_EDIT,
-                    EndHyphenEdit::NO_EDIT);
-    return layout;
+    return LayoutPiece(utf16, range, false, paint, StartHyphenEdit::NO_EDIT,
+                       EndHyphenEdit::NO_EDIT);
 }
 
 static Layout doLayoutWithPrecomputedPieces(const std::string& text, const MinikinPaint& paint,
                                             const LayoutPieces& pieces) {
-    Layout layout;
     auto utf16 = utf8ToUtf16(text);
     Range range(0, utf16.size());
-    layout.doLayoutWithPrecomputedPieces(utf16, range, Bidi::FORCE_LTR, paint,
-                                         StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, pieces);
-    return layout;
+    return Layout(utf16, range, Bidi::FORCE_LTR, paint, StartHyphenEdit::NO_EDIT,
+                  EndHyphenEdit::NO_EDIT, pieces);
 }
 
 class LayoutTest : public testing::Test {
@@ -80,11 +67,8 @@ TEST_F(LayoutTest, doLayoutTest) {
     MinikinPaint paint(mCollection);
     paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
-    const size_t kMaxAdvanceLength = 32;
-    float advances[kMaxAdvanceLength];
     std::vector<float> expectedValues;
 
-    Layout layout;
     std::vector<uint16_t> text;
 
     // The mock implementation returns 10.0f advance and 0,0-10x10 bounds for all glyph.
@@ -92,81 +76,73 @@ TEST_F(LayoutTest, doLayoutTest) {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(90.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(90.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("three words");
         text = utf8ToUtf16("three words test");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(160.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(160.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(110.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(110.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
 }
 
@@ -174,12 +150,8 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
     MinikinPaint paint(mCollection);
     paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
-    const size_t kMaxAdvanceLength = 32;
-    float advances[kMaxAdvanceLength];
     std::vector<float> expectedValues;
     std::vector<uint16_t> text;
-
-    Layout layout;
 
     paint.wordSpacing = 5.0f;
 
@@ -188,89 +160,78 @@ TEST_F(LayoutTest, doLayoutTest_wordSpacing) {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(95.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(95.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
-        EXPECT_EQ(UNTOUCHED_MARKER, advances[text.size()]);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[3] = 15.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("three words test");
         text = utf8ToUtf16("three words test");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(170.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(170.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[5] = 15.0f;
         expectedValues[11] = 15.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(120.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(120.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[3] = 15.0f;
         expectedValues[4] = 15.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
 }
 
@@ -278,11 +239,8 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
     MinikinPaint paint(mCollection);
     paint.size = 10.0f;  // make 1em = 10px
     MinikinRect rect;
-    const size_t kMaxAdvanceLength = 32;
-    float advances[kMaxAdvanceLength];
     std::vector<float> expectedValues;
 
-    Layout layout;
     std::vector<uint16_t> text;
 
     // Negative word spacing also should work.
@@ -292,86 +250,78 @@ TEST_F(LayoutTest, doLayoutTest_negativeWordSpacing) {
         SCOPED_TRACE("one word");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(70.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(70.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two words");
         text = utf8ToUtf16("two words");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(85.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(85.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[3] = 5.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("three words");
         text = utf8ToUtf16("three word test");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(140.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(140.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[5] = 5.0f;
         expectedValues[10] = 5.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
     {
         SCOPED_TRACE("two spaces");
         text = utf8ToUtf16("two  spaces");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(100.0f, layout.getAdvance());
         layout.getBounds(&rect);
         EXPECT_EQ(0.0f, rect.mLeft);
         EXPECT_EQ(10.0f, rect.mTop);
         EXPECT_EQ(100.0f, rect.mRight);
         EXPECT_EQ(0.0f, rect.mBottom);
-        resetAdvances(advances, kMaxAdvanceLength);
-        layout.getAdvances(advances);
         expectedValues.resize(text.size());
         for (size_t i = 0; i < expectedValues.size(); ++i) {
             expectedValues[i] = 10.0f;
         }
         expectedValues[3] = 5.0f;
         expectedValues[4] = 5.0f;
-        expectAdvances(expectedValues, advances, kMaxAdvanceLength);
+        expectAdvances(expectedValues, layout.getAdvances());
     }
 }
 
@@ -382,13 +332,11 @@ TEST_F(LayoutTest, doLayoutTest_rtlTest) {
     std::vector<uint16_t> text = parseUnicodeString("'a' 'b' U+3042 U+3043 'c' 'd'");
     Range range(0, text.size());
 
-    Layout ltrLayout;
-    ltrLayout.doLayout(text, range, Bidi::FORCE_LTR, paint, StartHyphenEdit::NO_EDIT,
-                       EndHyphenEdit::NO_EDIT);
+    Layout ltrLayout(text, range, Bidi::FORCE_LTR, paint, StartHyphenEdit::NO_EDIT,
+                     EndHyphenEdit::NO_EDIT);
 
-    Layout rtlLayout;
-    rtlLayout.doLayout(text, range, Bidi::FORCE_RTL, paint, StartHyphenEdit::NO_EDIT,
-                       EndHyphenEdit::NO_EDIT);
+    Layout rtlLayout(text, range, Bidi::FORCE_RTL, paint, StartHyphenEdit::NO_EDIT,
+                     EndHyphenEdit::NO_EDIT);
 
     ASSERT_EQ(ltrLayout.nGlyphs(), rtlLayout.nGlyphs());
     ASSERT_EQ(6u, ltrLayout.nGlyphs());
@@ -407,17 +355,14 @@ TEST_F(LayoutTest, singleRunBidiTest) {
     std::vector<uint16_t> text = parseUnicodeString("'1' '2' '3'");
     Range range(0, text.size());
 
-    Layout ltrLayout;
-    ltrLayout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                       EndHyphenEdit::NO_EDIT);
+    Layout ltrLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                     EndHyphenEdit::NO_EDIT);
 
-    Layout rtlLayout;
-    rtlLayout.doLayout(text, range, Bidi::RTL, paint, StartHyphenEdit::NO_EDIT,
-                       EndHyphenEdit::NO_EDIT);
+    Layout rtlLayout(text, range, Bidi::RTL, paint, StartHyphenEdit::NO_EDIT,
+                     EndHyphenEdit::NO_EDIT);
 
-    Layout defaultRtlLayout;
-    defaultRtlLayout.doLayout(text, range, Bidi::DEFAULT_RTL, paint, StartHyphenEdit::NO_EDIT,
-                              EndHyphenEdit::NO_EDIT);
+    Layout defaultRtlLayout(text, range, Bidi::DEFAULT_RTL, paint, StartHyphenEdit::NO_EDIT,
+                            EndHyphenEdit::NO_EDIT);
 
     const size_t nGlyphs = ltrLayout.nGlyphs();
     ASSERT_EQ(3u, nGlyphs);
@@ -436,7 +381,6 @@ TEST_F(LayoutTest, singleRunBidiTest) {
 TEST_F(LayoutTest, hyphenationTest) {
     MinikinPaint paint(mCollection);
     paint.size = 10.0f;  // make 1em = 10px
-    Layout layout;
     std::vector<uint16_t> text;
 
     // The mock implementation returns 10.0f advance for all glyphs.
@@ -444,57 +388,42 @@ TEST_F(LayoutTest, hyphenationTest) {
         SCOPED_TRACE("one word with no hyphen edit");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the end");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::INSERT_HYPHEN);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::INSERT_HYPHEN);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen replacement at the end");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                        EndHyphenEdit::REPLACE_WITH_HYPHEN);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
+                      EndHyphenEdit::REPLACE_WITH_HYPHEN);
         EXPECT_EQ(70.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the start");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
-                        EndHyphenEdit::NO_EDIT);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
+                      EndHyphenEdit::NO_EDIT);
         EXPECT_EQ(80.0f, layout.getAdvance());
     }
     {
         SCOPED_TRACE("one word with hyphen insertion at the both ends");
         text = utf8ToUtf16("oneword");
         Range range(0, text.size());
-        layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
-                        EndHyphenEdit::INSERT_HYPHEN);
+        Layout layout(text, range, Bidi::LTR, paint, StartHyphenEdit::INSERT_HYPHEN,
+                      EndHyphenEdit::INSERT_HYPHEN);
         EXPECT_EQ(90.0f, layout.getAdvance());
     }
-}
-
-TEST_F(LayoutTest, verticalExtentTest) {
-    MinikinPaint paint(mCollection);
-    paint.size = 1.0f;  // make 1em = 1px
-
-    std::vector<uint16_t> text = utf8ToUtf16("ab");
-    Range range(0, text.size());
-
-    Layout layout;
-    layout.doLayout(text, range, Bidi::LTR, paint, StartHyphenEdit::NO_EDIT,
-                    EndHyphenEdit::NO_EDIT);
-    MinikinExtent extent = layout.getExtent();
-    EXPECT_EQ(-8.0f, extent.ascent);
-    EXPECT_EQ(2.0f, extent.descent);
 }
 
 TEST_F(LayoutTest, measuredTextTest) {
@@ -554,7 +483,7 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
     {
         LayoutPieces pieces;
 
-        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        LayoutPiece inLayout = doLayoutPiece("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
         pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
                       StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
@@ -565,7 +494,7 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
     {
         LayoutPieces pieces;
 
-        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        LayoutPiece inLayout = doLayoutPiece("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;
         pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
                       StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
@@ -578,7 +507,7 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
     {
         LayoutPieces pieces;
 
-        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        LayoutPiece inLayout = doLayoutPiece("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;
         pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
                       StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
@@ -590,12 +519,12 @@ TEST_F(LayoutTest, doLayoutWithPrecomputedPiecesTest) {
     {
         LayoutPieces pieces;
 
-        Layout inLayout = doLayout("I", MinikinPaint(fc));
+        LayoutPiece inLayout = doLayoutPiece("I", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER1;  // Modify the advance to make sure this layout is used.
         pieces.insert(utf8ToUtf16("I"), Range(0, 1), paint, false /* dir */,
                       StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);
 
-        inLayout = doLayout("V", MinikinPaint(fc));
+        inLayout = doLayoutPiece("V", MinikinPaint(fc));
         inLayout.mAdvances[0] = MARKER2;  // Modify the advance to make sure this layout is used.
         pieces.insert(utf8ToUtf16("V"), Range(0, 1), paint, false /* dir */,
                       StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, inLayout);

@@ -40,6 +40,10 @@ public:
     // TODO: want to support graded fake bolding
     bool isFakeBold() { return mFakeBold; }
     bool isFakeItalic() { return mFakeItalic; }
+    inline bool operator==(const FontFakery& o) const {
+        return mFakeBold == o.mFakeBold && mFakeItalic == o.mFakeItalic;
+    }
+    inline bool operator!=(const FontFakery& o) const { return !(*this == o); }
 
 private:
     bool mFakeBold;
@@ -47,6 +51,11 @@ private:
 };
 
 struct FakedFont {
+    inline bool operator==(const FakedFont& o) const {
+        return font == o.font && fakery == o.fakery;
+    }
+    inline bool operator!=(const FakedFont& o) const { return !(*this == o); }
+
     // ownership is the enclosing FontCollection
     const Font* font;
     FontFakery fakery;

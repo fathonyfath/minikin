@@ -35,12 +35,12 @@ class LayoutCapture {
 public:
     LayoutCapture() {}
 
-    void operator()(const Layout& layout) { mLayout = &layout; }
+    void operator()(const LayoutPiece& layout) { mLayout = &layout; }
 
-    const Layout* get() const { return mLayout; }
+    const LayoutPiece* get() const { return mLayout; }
 
 private:
-    const Layout* mLayout;
+    const LayoutPiece* mLayout;
 };
 
 TEST(LayoutCacheTest, cacheHitTest) {

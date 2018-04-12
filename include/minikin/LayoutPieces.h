@@ -19,8 +19,8 @@
 
 #include <unordered_map>
 
-#include "minikin/Layout.h"
 #include "minikin/LayoutCache.h"
+#include "minikin/LayoutCore.h"
 
 namespace minikin {
 
@@ -37,10 +37,11 @@ struct LayoutPieces {
         }
     }
 
-    std::unordered_map<LayoutCacheKey, Layout, KeyHasher> offsetMap;
+    std::unordered_map<LayoutCacheKey, LayoutPiece, KeyHasher> offsetMap;
 
     void insert(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                bool dir, StartHyphenEdit startEdit, EndHyphenEdit endEdit, const Layout& layout) {
+                bool dir, StartHyphenEdit startEdit, EndHyphenEdit endEdit,
+                const LayoutPiece& layout) {
         auto[iter, inserted] = offsetMap.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(textBuf, range, paint, dir, startEdit, endEdit),

@@ -17,12 +17,14 @@
 #ifndef MINIKIN_LAYOUT_CACHE_H
 #define MINIKIN_LAYOUT_CACHE_H
 
-#include "minikin/Layout.h"
+#include "minikin/LayoutCore.h"
 
 #include <mutex>
 
 #include <utils/JenkinsHash.h>
 #include <utils/LruCache.h>
+
+#include "minikin/FontCollection.h"
 
 namespace minikin {
 
@@ -72,12 +74,6 @@ public:
         mChars = NULL;
     }
 
-    void doLayout(Layout* layout, const MinikinPaint& paint) const {
-        layout->mAdvances.resize(mCount, 0);
-        layout->doLayoutRun(mChars, mStart, mCount, mNchars, mIsRtl, paint, mStartHyphen,
-                            mEndHyphen);
-    }
-
     uint32_t getMemoryUsage() const { return sizeof(LayoutCacheKey) + sizeof(uint16_t) * mNchars; }
 
 private:
@@ -125,7 +121,7 @@ private:
     }
 };
 
-class LayoutCache : private android::OnEntryRemoved<LayoutCacheKey, Layout*> {
+class LayoutCache : private android::OnEntryRemoved<LayoutCacheKey, LayoutPiece*> {
 public:
     void clear() {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -138,16 +134,14 @@ public:
                      bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, F& f) {
         LayoutCacheKey key(text, range, paint, dir, startHyphen, endHyphen);
         if (paint.skipCache()) {
-            Layout layoutForWord;
-            key.doLayout(&layoutForWord, paint);
-            f(layoutForWord);
+            f(LayoutPiece(text, range, dir, paint, startHyphen, endHyphen));
             return;
         }
 
         mRequestCount++;
         {
             std::lock_guard<std::mutex> lock(mMutex);
-            Layout* layout = mCache.get(key);
+            LayoutPiece* layout = mCache.get(key);
             if (layout != nullptr) {
                 mCacheHitCount++;
                 f(*layout);
@@ -157,8 +151,8 @@ public:
         // Doing text layout takes long time, so releases the mutex during doing layout.
         // Don't care even if we do the same layout in other thred.
         key.copyText();
-        std::unique_ptr<Layout> layout = std::make_unique<Layout>();
-        key.doLayout(layout.get(), paint);
+        std::unique_ptr<LayoutPiece> layout =
+                std::make_unique<LayoutPiece>(text, range, dir, paint, startHyphen, endHyphen);
         f(*layout);
         {
             std::lock_guard<std::mutex> lock(mMutex);
@@ -186,12 +180,12 @@ protected:
 
 private:
     // callback for OnEntryRemoved
-    void operator()(LayoutCacheKey& key, Layout*& value) {
+    void operator()(LayoutCacheKey& key, LayoutPiece*& value) {
         key.freeText();
         delete value;
     }
 
-    android::LruCache<LayoutCacheKey, Layout*> mCache GUARDED_BY(mMutex);
+    android::LruCache<LayoutCacheKey, LayoutPiece*> mCache GUARDED_BY(mMutex);
 
     int32_t mRequestCount;
     int32_t mCacheHitCount;

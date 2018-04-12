@@ -188,9 +188,8 @@ public:
                layoutPieces.getMemoryUsage();
     }
 
-    void buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                     Bidi bidiFlag, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                     Layout* layout);
+    Layout buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
+                       Bidi bidiFlag, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
     MinikinRect getBounds(const U16StringPiece& textBuf, const Range& range) const;
     MinikinExtent getExtent(const U16StringPiece& textBuf, const Range& range) const;
 

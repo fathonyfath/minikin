@@ -55,12 +55,10 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
     }
 }
 
-void MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range,
-                               const MinikinPaint& paint, Bidi bidiFlags,
-                               StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                               Layout* layout) {
-    layout->doLayoutWithPrecomputedPieces(textBuf, range, bidiFlags, paint, startHyphen, endHyphen,
-                                          layoutPieces);
+Layout MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range,
+                                 const MinikinPaint& paint, Bidi bidiFlags,
+                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen) {
+    return Layout(textBuf, range, bidiFlags, paint, startHyphen, endHyphen, layoutPieces);
 }
 
 MinikinRect MeasuredText::getBounds(const U16StringPiece& textBuf, const Range& range) const {

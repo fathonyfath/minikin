@@ -17,6 +17,7 @@
 #ifndef MINIKIN_FONT_H
 #define MINIKIN_FONT_H
 
+#include <ostream>  // for test output
 #include <string>
 
 #include "minikin/FontFamily.h"
@@ -85,10 +86,17 @@ enum MinikinPaintFlags {
 };
 
 struct MinikinRect {
-    float mLeft = 0.0;
-    float mTop = 0.0;
-    float mRight = 0.0;
-    float mBottom = 0.0;
+    MinikinRect() : mLeft(0), mTop(0), mRight(0), mBottom(0) {}
+    MinikinRect(float left, float top, float right, float bottom)
+            : mLeft(left), mTop(top), mRight(right), mBottom(bottom) {}
+    bool operator==(const MinikinRect& o) const {
+        return mLeft == o.mLeft && mTop == o.mTop && mRight == o.mRight && mBottom == o.mBottom;
+    }
+    float mLeft;
+    float mTop;
+    float mRight;
+    float mBottom;
+
     bool isEmpty() const { return mLeft == mRight || mTop == mBottom; }
     void set(const MinikinRect& r) {
         mLeft = r.mLeft;
@@ -103,13 +111,27 @@ struct MinikinRect {
         mBottom += dy;
     }
     void setEmpty() { mLeft = mTop = mRight = mBottom = 0.0; }
-    void join(const MinikinRect& r);
+    void join(const MinikinRect& r) {
+        if (isEmpty()) {
+            set(r);
+        } else if (!r.isEmpty()) {
+            mLeft = std::min(mLeft, r.mLeft);
+            mTop = std::min(mTop, r.mTop);
+            mRight = std::max(mRight, r.mRight);
+            mBottom = std::max(mBottom, r.mBottom);
+        }
+    }
 };
 
 // For holding vertical extents.
 struct MinikinExtent {
-    float ascent = 0.0;    // negative
-    float descent = 0.0;   // positive
+    MinikinExtent() : ascent(0), descent(0) {}
+    MinikinExtent(float ascent, float descent) : ascent(ascent), descent(descent) {}
+    bool operator==(const MinikinExtent& o) const {
+        return ascent == o.ascent && descent == o.descent;
+    }
+    float ascent;   // negative
+    float descent;  // positive
 
     void reset() { ascent = descent = 0.0; }
 
@@ -161,6 +183,15 @@ private:
     const int32_t mUniqueId;
 };
 
+// For gtest output
+inline std::ostream& operator<<(std::ostream& os, const MinikinRect& r) {
+    return os << "(" << r.mLeft << ", " << r.mTop << ")-(" << r.mRight << ", " << r.mBottom << ")";
+}
+
+// For gtest output
+inline std::ostream& operator<<(std::ostream& os, const MinikinExtent& e) {
+    return os << e.ascent << ", " << e.descent;
+}
 }  // namespace minikin
 
 #endif  // MINIKIN_FONT_H
