@@ -39,6 +39,7 @@
 #include "minikin/Macros.h"
 
 #include "BidiUtils.h"
+#include "LayoutSplitter.h"
 #include "LayoutUtils.h"
 #include "LocaleListCache.h"
 #include "MinikinInternal.h"
@@ -121,46 +122,20 @@ float Layout::doLayoutRunCached(const U16StringPiece& textBuf, const Range& rang
     if (!range.isValid()) {
         return 0.0f;  // ICU failed to retrieve the bidi run?
     }
-    const uint16_t* buf = textBuf.data();
-    const uint32_t bufSize = textBuf.size();
-    const uint32_t start = range.getStart();
-    const uint32_t end = range.getEnd();
     float advance = 0;
-    if (!isRtl) {
-        // left to right
-        uint32_t wordstart =
-                start == bufSize ? start : getPrevWordBreakForCache(buf, start + 1, bufSize);
-        uint32_t wordend;
-        for (size_t iter = start; iter < end; iter = wordend) {
-            wordend = getNextWordBreakForCache(buf, iter, bufSize);
-            const uint32_t wordcount = std::min(end, wordend) - iter;
-            const uint32_t offset = iter - start;
-            advance +=
-                    doLayoutWord(buf + wordstart, iter - wordstart, wordcount, wordend - wordstart,
-                                 isRtl, paint, iter - dstStart,
-                                 // Only apply hyphen to the first or last word in the string.
-                                 iter == start ? startHyphen : StartHyphenEdit::NO_EDIT,
-                                 wordend >= end ? endHyphen : EndHyphenEdit::NO_EDIT, lpIn, layout,
-                                 advances ? advances + offset : nullptr, extent, bounds, lpOut);
-            wordstart = wordend;
-        }
-    } else {
-        // right to left
-        uint32_t wordstart;
-        uint32_t wordend = end == 0 ? 0 : getNextWordBreakForCache(buf, end - 1, bufSize);
-        for (size_t iter = end; iter > start; iter = wordstart) {
-            wordstart = getPrevWordBreakForCache(buf, iter, bufSize);
-            uint32_t bufStart = std::max(start, wordstart);
-            const uint32_t offset = bufStart - start;
-            advance += doLayoutWord(buf + wordstart, bufStart - wordstart, iter - bufStart,
-                                    wordend - wordstart, isRtl, paint, bufStart - dstStart,
-                                    // Only apply hyphen to the first (rightmost) or last (leftmost)
-                                    // word in the string.
-                                    wordstart <= start ? startHyphen : StartHyphenEdit::NO_EDIT,
-                                    iter == end ? endHyphen : EndHyphenEdit::NO_EDIT, lpIn, layout,
-                                    advances ? advances + offset : nullptr, extent, bounds, lpOut);
-            wordend = wordstart;
-        }
+    for (const auto[context, piece] : LayoutSplitter(textBuf, range, isRtl)) {
+        // Hyphenation only applies to the start/end of run.
+        const StartHyphenEdit pieceStartHyphen =
+                (piece.getStart() == range.getStart()) ? startHyphen : StartHyphenEdit::NO_EDIT;
+        const EndHyphenEdit pieceEndHyphen =
+                (piece.getEnd() == range.getEnd()) ? endHyphen : EndHyphenEdit::NO_EDIT;
+        float* advancesForRun =
+                advances ? advances + (piece.getStart() - range.getStart()) : nullptr;
+        advance += doLayoutWord(textBuf.data() + context.getStart(),
+                                piece.getStart() - context.getStart(), piece.getLength(),
+                                context.getLength(), isRtl, paint, piece.getStart() - dstStart,
+                                pieceStartHyphen, pieceEndHyphen, lpIn, layout, advancesForRun,
+                                extent, bounds, lpOut);
     }
     return advance;
 }
@@ -232,7 +207,7 @@ float Layout::doLayoutWord(const uint16_t* buf, size_t start, size_t count, size
                            const LayoutPieces* lpIn, Layout* layout, float* advances,
                            MinikinExtent* extents, MinikinRect* bounds, LayoutPieces* lpOut) {
     float wordSpacing = count == 1 && isWordSpace(buf[start]) ? paint.wordSpacing : 0;
-    float totalAdvance;
+    float totalAdvance = 0;
 
     const U16StringPiece textBuf(buf, bufSize);
     const Range range(start, start + count);

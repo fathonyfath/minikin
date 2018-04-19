@@ -53,6 +53,7 @@ cc_test {
         "GreedyLineBreakerTest.cpp",
         "LayoutCacheTest.cpp",
         "LayoutCoreTest.cpp",
+        "LayoutSplitterTest.cpp",
         "LayoutTest.cpp",
         "LayoutUtilsTest.cpp",
         "LocaleListTest.cpp",
