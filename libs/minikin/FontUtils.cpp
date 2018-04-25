@@ -18,6 +18,8 @@
 
 #include <cstdint>
 
+#include <log/log.h>
+
 namespace minikin {
 
 static uint16_t readU16(const uint8_t* data, size_t offset) {
@@ -43,7 +45,7 @@ bool analyzeStyle(const uint8_t* os2_data, size_t os2_size, int* weight, bool* i
     return true;
 }
 
-void analyzeAxes(const uint8_t* fvar_data, size_t fvar_size, std::unordered_set<uint32_t>* axes) {
+bool analyzeAxes(const uint8_t* fvar_data, size_t fvar_size, std::unordered_set<uint32_t>* axes) {
     const size_t kMajorVersionOffset = 0;
     const size_t kMinorVersionOffset = 2;
     const size_t kOffsetToAxesArrayOffset = 4;
@@ -53,7 +55,7 @@ void analyzeAxes(const uint8_t* fvar_data, size_t fvar_size, std::unordered_set<
     axes->clear();
 
     if (fvar_size < kAxisSizeOffset + 2) {
-        return;
+        return false;
     }
     const uint16_t majorVersion = readU16(fvar_data, kMajorVersionOffset);
     const uint16_t minorVersion = readU16(fvar_data, kMinorVersionOffset);
@@ -62,15 +64,19 @@ void analyzeAxes(const uint8_t* fvar_data, size_t fvar_size, std::unordered_set<
     const uint32_t axisSize = readU16(fvar_data, kAxisSizeOffset);
 
     if (majorVersion != 1 || minorVersion != 0 || axisOffset != 0x10 || axisSize != 0x14) {
-        return;  // Unsupported version.
+        return false;  // Unsupported version.
     }
-    if (fvar_size < axisOffset + axisOffset * axisCount) {
-        return;  // Invalid table size.
+    if (fvar_size < axisOffset + axisSize * axisCount) {
+        if (axisOffset > axisSize) {
+            android_errorWriteLog(0x534e4554, "77822336");
+        }
+        return false;  // Invalid table size.
     }
     for (uint32_t i = 0; i < axisCount; ++i) {
         size_t axisRecordOffset = axisOffset + i * axisSize;
         uint32_t tag = readU32(fvar_data, axisRecordOffset);
         axes->insert(tag);
     }
+    return true;
 }
 }  // namespace minikin
