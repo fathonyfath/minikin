@@ -75,6 +75,7 @@ LOCAL_SRC_FILES += \
     FontCollectionItemizeTest.cpp \
     FontFamilyTest.cpp \
     FontLanguageListCacheTest.cpp \
+    FontUtilsTest.cpp \
     HbFontCacheTest.cpp \
     HyphenatorTest.cpp \
     GraphemeBreakTests.cpp \
