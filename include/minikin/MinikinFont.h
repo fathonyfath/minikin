@@ -65,7 +65,7 @@ struct MinikinPaint {
     MinikinPaint(MinikinPaint&&) = default;
     MinikinPaint& operator=(MinikinPaint&&) = default;
 
-    inline bool operator==(const MinikinPaint& paint) {
+    inline bool operator==(const MinikinPaint& paint) const {
         return size == paint.size && scaleX == paint.scaleX && skewX == paint.skewX &&
                letterSpacing == paint.letterSpacing && wordSpacing == paint.wordSpacing &&
                paintFlags == paint.paintFlags && localeListId == paint.localeListId &&

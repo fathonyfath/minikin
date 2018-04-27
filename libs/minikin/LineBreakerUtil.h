@@ -84,14 +84,14 @@ inline void populateHyphenationPoints(
         auto hyphenPart = contextRange.split(i);
         U16StringPiece firstText = textBuf.substr(hyphenPart.first);
         U16StringPiece secondText = textBuf.substr(hyphenPart.second);
-        const float first = run.measureHyphenPiece(firstText, Range(0, firstText.size()),
-                                                   StartHyphenEdit::NO_EDIT /* start hyphen edit */,
-                                                   editForThisLine(hyph) /* end hyphen edit */,
-                                                   nullptr /* advances */, pieces);
-        const float second = run.measureHyphenPiece(secondText, Range(0, secondText.size()),
-                                                    editForNextLine(hyph) /* start hyphen edit */,
-                                                    EndHyphenEdit::NO_EDIT /* end hyphen edit */,
-                                                    nullptr /* advances */, pieces);
+        const float first =
+                run.measureHyphenPiece(firstText, Range(0, firstText.size()),
+                                       StartHyphenEdit::NO_EDIT /* start hyphen edit */,
+                                       editForThisLine(hyph) /* end hyphen edit */, pieces);
+        const float second =
+                run.measureHyphenPiece(secondText, Range(0, secondText.size()),
+                                       editForNextLine(hyph) /* start hyphen edit */,
+                                       EndHyphenEdit::NO_EDIT /* end hyphen edit */, pieces);
 
         out->emplace_back(i, hyph, first, second);
     }

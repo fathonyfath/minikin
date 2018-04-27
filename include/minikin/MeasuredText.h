@@ -45,13 +45,19 @@ public:
     virtual uint32_t getLocaleListId() const = 0;
 
     // Fills the each character's advances, extents and overhangs.
-    virtual void getMetrics(const U16StringPiece& text, float* advances,
-                            LayoutPieces* piece) const = 0;
+    virtual void getMetrics(const U16StringPiece& text, std::vector<float>* advances,
+                            LayoutPieces* pieces) const = 0;
 
     virtual std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
                                                     const LayoutPieces& pieces) const = 0;
     virtual MinikinExtent getExtent(const U16StringPiece& text, const Range& range,
                                     const LayoutPieces& pieces) const = 0;
+
+    virtual void appendLayout(const U16StringPiece& text, const Range& range,
+                              const Range& contextRange, const LayoutPieces& pieces,
+                              const MinikinPaint& paint, uint32_t outOrigin,
+                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                              Layout* outLayout) const = 0;
 
     // Following two methods are only called when the implementation returns true for
     // canHyphenate method.
@@ -64,7 +70,7 @@ public:
     virtual float measureHyphenPiece(const U16StringPiece& /* text */,
                                      const Range& /* hyphenPieceRange */,
                                      StartHyphenEdit /* startHyphen */,
-                                     EndHyphenEdit /* endHyphen */, float* /* advances */,
+                                     EndHyphenEdit /* endHyphen */,
                                      LayoutPieces* /* pieces */) const {
         return 0.0;
     }
@@ -84,34 +90,25 @@ public:
     uint32_t getLocaleListId() const override { return mPaint.localeListId; }
     bool isRtl() const override { return mIsRtl; }
 
-    void getMetrics(const U16StringPiece& text, float* advances,
-                    LayoutPieces* pieces) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        Layout::measureText(text, mRange, bidiFlag, mPaint, StartHyphenEdit::NO_EDIT,
-                            EndHyphenEdit::NO_EDIT, advances, pieces);
-    }
+    void getMetrics(const U16StringPiece& text, std::vector<float>* advances,
+                    LayoutPieces* pieces) const override;
 
     std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
-                                            const LayoutPieces& pieces) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        return Layout::getBoundsWithPrecomputedPieces(text, range, bidiFlag, mPaint, pieces);
-    }
+                                            const LayoutPieces& pieces) const override;
 
     MinikinExtent getExtent(const U16StringPiece& text, const Range& range,
-                            const LayoutPieces& pieces) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        return Layout::getExtentWithPrecomputedPieces(text, range, bidiFlag, mPaint, pieces);
-    }
+                            const LayoutPieces& pieces) const override;
+
+    void appendLayout(const U16StringPiece& text, const Range& range, const Range& contextRange,
+                      const LayoutPieces& pieces, const MinikinPaint& paint, uint32_t outOrigin,
+                      StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                      Layout* outLayout) const override;
 
     const MinikinPaint* getPaint() const override { return &mPaint; }
 
     float measureHyphenPiece(const U16StringPiece& text, const Range& range,
-                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, float* advances,
-                             LayoutPieces* pieces) const override {
-        Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
-        return Layout::measureText(text, range, bidiFlag, mPaint, startHyphen, endHyphen, advances,
-                                   pieces);
-    }
+                             StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                             LayoutPieces* pieces) const override;
 
 private:
     MinikinPaint mPaint;
@@ -127,9 +124,9 @@ public:
     bool canHyphenate() const { return false; }
     uint32_t getLocaleListId() const { return mLocaleListId; }
 
-    void getMetrics(const U16StringPiece& /* unused */, float* advances,
+    void getMetrics(const U16StringPiece& /* text */, std::vector<float>* advances,
                     LayoutPieces* /* pieces */) const override {
-        advances[0] = mWidth;
+        (*advances)[mRange.getStart()] = mWidth;
         // TODO: Get the extents information from the caller.
     }
 
@@ -144,6 +141,12 @@ public:
                             const LayoutPieces& /* pieces */) const override {
         return MinikinExtent();
     }
+
+    void appendLayout(const U16StringPiece& /* text */, const Range& /* range */,
+                      const Range& /* contextRange */, const LayoutPieces& /* pieces */,
+                      const MinikinPaint& /* paint */, uint32_t /* outOrigin */,
+                      StartHyphenEdit /* startHyphen */, EndHyphenEdit /* endHyphen */,
+                      Layout* /* outLayout*/) const override {}
 
 private:
     const float mWidth;
@@ -188,8 +191,9 @@ public:
                layoutPieces.getMemoryUsage();
     }
 
-    Layout buildLayout(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                       Bidi bidiFlag, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
+    Layout buildLayout(const U16StringPiece& textBuf, const Range& range, const Range& contextRange,
+                       const MinikinPaint& paint, StartHyphenEdit startHyphen,
+                       EndHyphenEdit endHyphen);
     MinikinRect getBounds(const U16StringPiece& textBuf, const Range& range) const;
     MinikinExtent getExtent(const U16StringPiece& textBuf, const Range& range) const;
 

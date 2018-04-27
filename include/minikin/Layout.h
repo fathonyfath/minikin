@@ -72,26 +72,14 @@ public:
         doLayout(str, range, bidiFlags, paint, startHyphen, endHyphen);
     }
 
-    Layout(const U16StringPiece& str, const Range& range, Bidi bidiFlags, const MinikinPaint& paint,
-           StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, const LayoutPieces& pieces)
-            : mAdvance(0) {
-        doLayoutWithPrecomputedPieces(str, range, bidiFlags, paint, startHyphen, endHyphen, pieces);
+    Layout(uint32_t count) : mAdvance(0) {
+        mAdvances.resize(count, 0);
+        mGlyphs.reserve(count);
     }
-
-    static std::pair<float, MinikinRect> getBoundsWithPrecomputedPieces(const U16StringPiece& str,
-                                                                        const Range& range,
-                                                                        Bidi bidiFlags,
-                                                                        const MinikinPaint& paint,
-                                                                        const LayoutPieces& pieces);
-
-    static MinikinExtent getExtentWithPrecomputedPieces(const U16StringPiece& str,
-                                                        const Range& range, Bidi bidiFlags,
-                                                        const MinikinPaint& paint,
-                                                        const LayoutPieces& pieces);
 
     static float measureText(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                              const MinikinPaint& paint, StartHyphenEdit startHyphen,
-                             EndHyphenEdit endHyphen, float* advances, LayoutPieces* pieces);
+                             EndHyphenEdit endHyphen, float* advances);
 
     const std::vector<float>& advances() const { return mAdvances; }
 
@@ -123,27 +111,19 @@ private:
     void doLayout(const U16StringPiece& str, const Range& range, Bidi bidiFlags,
                   const MinikinPaint& paint, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen);
 
-    void doLayoutWithPrecomputedPieces(const U16StringPiece& str, const Range& range,
-                                       Bidi bidiFlags, const MinikinPaint& paint,
-                                       StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                       const LayoutPieces& pieces);
-
     // Lay out a single bidi run
     // When layout is not null, layout info will be stored in the object.
     // When advances is not null, measurement results will be stored in the array.
     static float doLayoutRunCached(const U16StringPiece& textBuf, const Range& range, bool isRtl,
                                    const MinikinPaint& paint, size_t dstStart,
                                    StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                                   const LayoutPieces* lpIn, Layout* layout, float* advances,
-                                   MinikinExtent* extents, MinikinRect* bounds,
-                                   LayoutPieces* lpOut);
+                                   Layout* layout, float* advances);
 
     // Lay out a single word
     static float doLayoutWord(const uint16_t* buf, size_t start, size_t count, size_t bufSize,
                               bool isRtl, const MinikinPaint& paint, size_t bufStart,
-                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
-                              const LayoutPieces* lpIn, Layout* layout, float* advances,
-                              MinikinExtent* extents, MinikinRect* bounds, LayoutPieces* lpOut);
+                              StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, Layout* layout,
+                              float* advances);
 
     // Lay out a single bidi run
     void doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t bufSize, bool isRtl,

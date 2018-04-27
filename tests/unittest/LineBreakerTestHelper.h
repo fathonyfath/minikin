@@ -57,8 +57,10 @@ public:
     virtual bool canHyphenate() const override { return true; }
     virtual uint32_t getLocaleListId() const { return mLocaleListId; }
 
-    virtual void getMetrics(const U16StringPiece&, float* advances, LayoutPieces*) const {
-        std::fill(advances, advances + mRange.getLength(), mWidth);
+    virtual void getMetrics(const U16StringPiece&, std::vector<float>* advances,
+                            LayoutPieces*) const {
+        std::fill(advances->begin() + mRange.getStart(), advances->begin() + mRange.getEnd(),
+                  mWidth);
     }
 
     virtual std::pair<float, MinikinRect> getBounds(const U16StringPiece& /* text */,
@@ -75,7 +77,7 @@ public:
     virtual const MinikinPaint* getPaint() const { return &mPaint; }
 
     virtual float measureHyphenPiece(const U16StringPiece&, const Range& range,
-                                     StartHyphenEdit start, EndHyphenEdit end, float*,
+                                     StartHyphenEdit start, EndHyphenEdit end,
                                      LayoutPieces*) const {
         uint32_t extraCharForHyphen = 0;
         if (isInsertion(start)) {
@@ -86,6 +88,10 @@ public:
         }
         return mWidth * (range.getLength() + extraCharForHyphen);
     }
+
+    virtual void appendLayout(const U16StringPiece&, const Range&, const Range&,
+                              const LayoutPieces&, const MinikinPaint&, uint32_t, StartHyphenEdit,
+                              EndHyphenEdit, Layout*) const {}
 
 private:
     MinikinPaint mPaint;

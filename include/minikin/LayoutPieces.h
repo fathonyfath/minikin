@@ -25,39 +25,50 @@
 namespace minikin {
 
 struct LayoutPieces {
+    struct Key {
+        Key(const Range& range, HyphenEdit hyphenEdit) : range(range), hyphenEdit(hyphenEdit) {}
+
+        Range range;
+        HyphenEdit hyphenEdit;
+
+        uint32_t hash() const {
+            uint32_t hash = android::JenkinsHashMix(0, range.getStart());
+            hash = android::JenkinsHashMix(hash, range.getEnd());
+            hash = android::JenkinsHashMix(hash, static_cast<HyphenEdit>(hyphenEdit));
+            return android::JenkinsHashWhiten(hash);
+        }
+
+        bool operator==(const Key& o) const {
+            return range == o.range && hyphenEdit == o.hyphenEdit;
+        }
+
+        uint32_t getMemoryUsage() const { return sizeof(Range) + sizeof(HyphenEdit); }
+    };
+
     struct KeyHasher {
-        std::size_t operator()(const LayoutCacheKey& key) const { return key.hash(); }
+        std::size_t operator()(const Key& key) const { return key.hash(); }
     };
 
     LayoutPieces() {}
+    ~LayoutPieces() {}
 
-    ~LayoutPieces() {
-        for (const auto it : offsetMap) {
-            const_cast<LayoutCacheKey*>(&it.first)->freeText();
-        }
-    }
+    std::unordered_map<Key, LayoutPiece, KeyHasher> offsetMap;
 
-    std::unordered_map<LayoutCacheKey, LayoutPiece, KeyHasher> offsetMap;
-
-    void insert(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                bool dir, StartHyphenEdit startEdit, EndHyphenEdit endEdit,
-                const LayoutPiece& layout) {
-        auto[iter, inserted] = offsetMap.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(textBuf, range, paint, dir, startEdit, endEdit),
-                std::forward_as_tuple(layout));
-        if (inserted) {
-            const_cast<LayoutCacheKey*>(&iter->first)->copyText();
-        }
+    void insert(const Range& range, HyphenEdit edit, const LayoutPiece& layout) {
+        offsetMap.emplace(std::piecewise_construct, std::forward_as_tuple(range, edit),
+                          std::forward_as_tuple(layout));
     }
 
     template <typename F>
-    void getOrCreate(const U16StringPiece& textBuf, const Range& range, const MinikinPaint& paint,
-                     bool dir, StartHyphenEdit startEdit, EndHyphenEdit endEdit, F& f) const {
-        auto it = offsetMap.find(LayoutCacheKey(textBuf, range, paint, dir, startEdit, endEdit));
+    void getOrCreate(const U16StringPiece& textBuf, const Range& range, const Range& context,
+                     const MinikinPaint& paint, bool dir, StartHyphenEdit startEdit,
+                     EndHyphenEdit endEdit, F& f) const {
+        const HyphenEdit edit = packHyphenEdit(startEdit, endEdit);
+        auto it = offsetMap.find(Key(range, edit));
         if (it == offsetMap.end()) {
-            LayoutCache::getInstance().getOrCreate(textBuf, range, paint, dir, startEdit, endEdit,
-                                                   f);
+            LayoutCache::getInstance().getOrCreate(textBuf.substr(context),
+                                                   range - context.getStart(), paint, dir,
+                                                   startEdit, endEdit, f);
         } else {
             f(it->second);
         }

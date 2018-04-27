@@ -19,22 +19,108 @@
 
 #include "minikin/Layout.h"
 
+#include "BidiUtils.h"
+#include "LayoutSplitter.h"
 #include "LayoutUtils.h"
 #include "LineBreakerUtil.h"
 
 namespace minikin {
+
+// Helper class for composing character advances.
+class AdvancesCompositor {
+public:
+    AdvancesCompositor(std::vector<float>* outAdvances, LayoutPieces* outPieces)
+            : mOutAdvances(outAdvances), mOutPieces(outPieces) {}
+
+    void setNextRange(const Range& range) { mRange = range; }
+
+    void operator()(const LayoutPiece& layoutPiece) {
+        const std::vector<float>& advances = layoutPiece.advances();
+        std::copy(advances.begin(), advances.end(), mOutAdvances->begin() + mRange.getStart());
+
+        if (mOutPieces != nullptr) {
+            mOutPieces->insert(mRange, 0 /* no edit */, layoutPiece);
+        }
+    }
+
+private:
+    Range mRange;
+    std::vector<float>* mOutAdvances;
+    LayoutPieces* mOutPieces;
+};
+
+void StyleRun::getMetrics(const U16StringPiece& textBuf, std::vector<float>* advances,
+                          LayoutPieces* pieces) const {
+    AdvancesCompositor compositor(advances, pieces);
+    const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    for (const BidiText::RunInfo info : BidiText(textBuf, mRange, bidiFlag)) {
+        for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
+            compositor.setNextRange(piece);
+            LayoutCache::getInstance().getOrCreate(
+                    textBuf.substr(context), piece - context.getStart(), mPaint, info.isRtl,
+                    StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+        }
+    }
+}
+
+// Helper class for composing total amount of advance
+class TotalAdvanceCompositor {
+public:
+    TotalAdvanceCompositor(LayoutPieces* outPieces) : mTotalAdvance(0), mOutPieces(outPieces) {}
+
+    void setNextContext(const Range& range, HyphenEdit edit) {
+        mRange = range;
+        mEdit = edit;
+    }
+
+    void operator()(const LayoutPiece& layoutPiece) {
+        mTotalAdvance += layoutPiece.advance();
+        if (mOutPieces != nullptr) {
+            mOutPieces->insert(mRange, mEdit, layoutPiece);
+        }
+    }
+
+    float advance() const { return mTotalAdvance; }
+
+private:
+    float mTotalAdvance;
+    Range mRange;
+    HyphenEdit mEdit;
+    LayoutPieces* mOutPieces;
+};
+
+float StyleRun::measureHyphenPiece(const U16StringPiece& textBuf, const Range& range,
+                                   StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                                   LayoutPieces* pieces) const {
+    TotalAdvanceCompositor compositor(pieces);
+    const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
+        for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
+            const StartHyphenEdit startEdit =
+                    piece.getStart() == range.getStart() ? startHyphen : StartHyphenEdit::NO_EDIT;
+            const EndHyphenEdit endEdit =
+                    piece.getEnd() == range.getEnd() ? endHyphen : EndHyphenEdit::NO_EDIT;
+
+            compositor.setNextContext(piece, packHyphenEdit(startEdit, endEdit));
+            LayoutCache::getInstance().getOrCreate(textBuf.substr(context),
+                                                   piece - context.getStart(), mPaint, info.isRtl,
+                                                   startEdit, endEdit, compositor);
+        }
+    }
+    return compositor.advance();
+}
 
 void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenation,
                            bool computeLayout) {
     if (textBuf.size() == 0) {
         return;
     }
+
     LayoutPieces* piecesOut = computeLayout ? &layoutPieces : nullptr;
     CharProcessor proc(textBuf);
     for (const auto& run : runs) {
         const Range& range = run->getRange();
-        const uint32_t runOffset = range.getStart();
-        run->getMetrics(textBuf, widths.data() + runOffset, piecesOut);
+        run->getMetrics(textBuf, &widths, piecesOut);
 
         if (!computeHyphenation || !run->canHyphenate()) {
             continue;
@@ -55,26 +141,148 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
     }
 }
 
-Layout MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range,
-                                 const MinikinPaint& paint, Bidi bidiFlags,
-                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen) {
-    return Layout(textBuf, range, bidiFlags, paint, startHyphen, endHyphen, layoutPieces);
+// Helper class for composing Layout object.
+class LayoutCompositor {
+public:
+    LayoutCompositor(Layout* outLayout, float extraAdvance)
+            : mOutLayout(outLayout), mExtraAdvance(extraAdvance) {}
+
+    void setOutOffset(uint32_t outOffset) { mOutOffset = outOffset; }
+
+    void operator()(const LayoutPiece& layoutPiece) {
+        mOutLayout->appendLayout(layoutPiece, mOutOffset, mExtraAdvance);
+    }
+
+    uint32_t mOutOffset;
+    Layout* mOutLayout;
+    float mExtraAdvance;
+};
+
+void StyleRun::appendLayout(const U16StringPiece& textBuf, const Range& range,
+                            const Range& /* context */, const LayoutPieces& pieces,
+                            const MinikinPaint& paint, uint32_t outOrigin,
+                            StartHyphenEdit startHyphen, EndHyphenEdit endHyphen,
+                            Layout* outLayout) const {
+    float wordSpacing = range.getLength() == 1 && isWordSpace(textBuf[range.getStart()])
+                                ? mPaint.wordSpacing
+                                : 0;
+    bool canUsePrecomputedResult = mPaint == paint;
+
+    LayoutCompositor compositor(outLayout, wordSpacing);
+    const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
+        for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
+            compositor.setOutOffset(piece.getStart() - outOrigin);
+            const StartHyphenEdit startEdit =
+                    range.getStart() == piece.getStart() ? startHyphen : StartHyphenEdit::NO_EDIT;
+            const EndHyphenEdit endEdit =
+                    range.getEnd() == piece.getEnd() ? endHyphen : EndHyphenEdit::NO_EDIT;
+
+            if (canUsePrecomputedResult) {
+                pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl, startEdit, endEdit,
+                                   compositor);
+            } else {
+                LayoutCache::getInstance().getOrCreate(textBuf.substr(context),
+                                                       piece - context.getStart(), paint,
+                                                       info.isRtl, startEdit, endEdit, compositor);
+            }
+        }
+    }
 }
 
-MinikinRect MeasuredText::getBounds(const U16StringPiece& textBuf, const Range& range) const {
-    MinikinRect rect;
-    float advance = 0.0f;
+// Helper class for composing bounding box.
+class BoundsCompositor {
+public:
+    BoundsCompositor() : mAdvance(0) {}
+
+    void operator()(const LayoutPiece& layoutPiece) {
+        MinikinRect tmpBounds = layoutPiece.bounds();
+        tmpBounds.offset(mAdvance, 0);
+        mBounds.join(tmpBounds);
+        mAdvance += layoutPiece.advance();
+    }
+
+    const MinikinRect& bounds() const { return mBounds; }
+    float advance() const { return mAdvance; }
+
+private:
+    float mAdvance;
+    MinikinRect mBounds;
+};
+
+std::pair<float, MinikinRect> StyleRun::getBounds(const U16StringPiece& textBuf, const Range& range,
+                                                  const LayoutPieces& pieces) const {
+    BoundsCompositor compositor;
+    const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
+        for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
+            pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl,
+                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+        }
+    }
+    return std::make_pair(compositor.advance(), compositor.bounds());
+}
+
+// Helper class for composing total extent.
+class ExtentCompositor {
+public:
+    ExtentCompositor() {}
+
+    void operator()(const LayoutPiece& layoutPiece) { mExtent.extendBy(layoutPiece.extent()); }
+
+    const MinikinExtent& extent() const { return mExtent; }
+
+private:
+    MinikinExtent mExtent;
+};
+
+MinikinExtent StyleRun::getExtent(const U16StringPiece& textBuf, const Range& range,
+                                  const LayoutPieces& pieces) const {
+    ExtentCompositor compositor;
+    Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
+        for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
+            pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl,
+                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+        }
+    }
+    return compositor.extent();
+}
+
+Layout MeasuredText::buildLayout(const U16StringPiece& textBuf, const Range& range,
+                                 const Range& contextRange, const MinikinPaint& paint,
+                                 StartHyphenEdit startHyphen, EndHyphenEdit endHyphen) {
+    Layout outLayout(range.getLength());
     for (const auto& run : runs) {
         const Range& runRange = run->getRange();
         if (!Range::intersects(range, runRange)) {
             continue;
         }
-        std::pair<float, MinikinRect> next =
+        const Range targetRange = Range::intersection(runRange, range);
+        StartHyphenEdit startEdit =
+                targetRange.getStart() == range.getStart() ? startHyphen : StartHyphenEdit::NO_EDIT;
+        EndHyphenEdit endEdit =
+                targetRange.getEnd() == range.getEnd() ? endHyphen : EndHyphenEdit::NO_EDIT;
+        run->appendLayout(textBuf, targetRange, contextRange, layoutPieces, paint, range.getStart(),
+                          startEdit, endEdit, &outLayout);
+    }
+    return outLayout;
+}
+
+MinikinRect MeasuredText::getBounds(const U16StringPiece& textBuf, const Range& range) const {
+    MinikinRect rect;
+    float totalAdvance = 0.0f;
+
+    for (const auto& run : runs) {
+        const Range& runRange = run->getRange();
+        if (!Range::intersects(range, runRange)) {
+            continue;
+        }
+        auto[advance, bounds] =
                 run->getBounds(textBuf, Range::intersection(runRange, range), layoutPieces);
-        MinikinRect nextRect = next.second;
-        nextRect.offset(advance, 0);
-        rect.join(nextRect);
-        advance += next.first;
+        bounds.offset(totalAdvance, 0);
+        rect.join(bounds);
+        totalAdvance += advance;
     }
     return rect;
 }
