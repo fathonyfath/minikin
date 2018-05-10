@@ -67,7 +67,7 @@ bool analyzeAxes(const uint8_t* fvar_data, size_t fvar_size, std::unordered_set<
         return false;  // Unsupported version.
     }
     if (fvar_size < axisOffset + axisSize * axisCount) {
-        if (fvar_size < axisOffset + axisOffset * axisCount) {
+        if (axisOffset > axisSize) {
             android_errorWriteLog(0x534e4554, "77822336");
         }
         return false;  // Invalid table size.
