@@ -79,10 +79,9 @@ private:
 
     const std::shared_ptr<FontFamily>& getFamilyForChar(uint32_t ch, uint32_t vs,
                                                         uint32_t localeListId,
-                                                        FontFamily::Variant variant) const;
+                                                        FamilyVariant variant) const;
 
-    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, FontFamily::Variant variant,
-                             uint32_t localeListId,
+    uint32_t calcFamilyScore(uint32_t ch, uint32_t vs, FamilyVariant variant, uint32_t localeListId,
                              const std::shared_ptr<FontFamily>& fontFamily) const;
 
     uint32_t calcCoverageScore(uint32_t ch, uint32_t vs, uint32_t localeListId,
@@ -91,8 +90,7 @@ private:
     static uint32_t calcLocaleMatchingScore(uint32_t userLocaleListId,
                                             const FontFamily& fontFamily);
 
-    static uint32_t calcVariantMatchingScore(FontFamily::Variant variant,
-                                             const FontFamily& fontFamily);
+    static uint32_t calcVariantMatchingScore(FamilyVariant variant, const FontFamily& fontFamily);
 
     // unique id for this font collection (suitable for cache key)
     uint32_t mId;

@@ -25,6 +25,7 @@
 #include <utils/LruCache.h>
 
 #include "minikin/FontCollection.h"
+#include "minikin/MinikinPaint.h"
 
 namespace minikin {
 
@@ -90,7 +91,7 @@ private:
     float mWordSpacing;
     int32_t mPaintFlags;
     uint32_t mLocaleListId;
-    FontFamily::Variant mFamilyVariant;
+    FamilyVariant mFamilyVariant;
     StartHyphenEdit mStartHyphen;
     EndHyphenEdit mEndHyphen;
     bool mIsRtl;

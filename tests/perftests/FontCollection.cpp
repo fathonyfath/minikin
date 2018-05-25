@@ -21,6 +21,7 @@
 #include <benchmark/benchmark.h>
 
 #include "minikin/LocaleList.h"
+#include "minikin/MinikinPaint.h"
 
 #include "FontTestUtils.h"
 #include "MinikinInternal.h"

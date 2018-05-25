@@ -26,6 +26,7 @@
 
 #include "minikin/FontCollection.h"
 #include "minikin/Macros.h"
+#include "minikin/MinikinPaint.h"
 
 #include "FontTestUtils.h"
 #include "MinikinInternal.h"

@@ -23,7 +23,9 @@
 
 #include "minikin/FontFamily.h"
 #include "minikin/Hyphenator.h"
+#include "minikin/MinikinExtent.h"
 #include "minikin/MinikinFont.h"
+#include "minikin/MinikinRect.h"
 #include "minikin/Range.h"
 #include "minikin/U16StringPiece.h"
 

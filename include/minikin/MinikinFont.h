@@ -14,133 +14,24 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_FONT_H
-#define MINIKIN_FONT_H
+#ifndef MINIKIN_MINIKIN_FONT_H
+#define MINIKIN_MINIKIN_FONT_H
 
-#include <ostream>  // for test output
-#include <string>
+#include <cstdint>
+#include <memory>
+#include <vector>
 
-#include "minikin/FontFamily.h"
-#include "minikin/Hyphenator.h"
-
-// An abstraction for platform fonts, allowing Minikin to be used with
-// multiple actual implementations of fonts.
+#include "minikin/FontVariation.h"
 
 namespace minikin {
 
-class FontCollection;
-class MinikinFont;
+class FontFakery;
+struct MinikinExtent;
+struct MinikinPaint;
+struct MinikinRect;
 
-// Possibly move into own .h file?
-// Note: if you add a field here, either add it to LayoutCacheKey or to skipCache()
-struct MinikinPaint {
-    MinikinPaint(const std::shared_ptr<FontCollection>& font)
-            : size(0),
-              scaleX(0),
-              skewX(0),
-              letterSpacing(0),
-              wordSpacing(0),
-              paintFlags(0),
-              localeListId(0),
-              familyVariant(FontFamily::Variant::DEFAULT),
-              fontFeatureSettings(),
-              font(font) {}
-
-    bool skipCache() const { return !fontFeatureSettings.empty(); }
-
-    float size;
-    float scaleX;
-    float skewX;
-    float letterSpacing;
-    float wordSpacing;
-    uint32_t paintFlags;
-    uint32_t localeListId;
-    FontStyle fontStyle;
-    FontFamily::Variant familyVariant;
-    std::string fontFeatureSettings;
-    std::shared_ptr<FontCollection> font;
-
-    void copyFrom(const MinikinPaint& paint) { *this = paint; }
-
-    MinikinPaint(MinikinPaint&&) = default;
-    MinikinPaint& operator=(MinikinPaint&&) = default;
-
-    inline bool operator==(const MinikinPaint& paint) const {
-        return size == paint.size && scaleX == paint.scaleX && skewX == paint.skewX &&
-               letterSpacing == paint.letterSpacing && wordSpacing == paint.wordSpacing &&
-               paintFlags == paint.paintFlags && localeListId == paint.localeListId &&
-               fontStyle == paint.fontStyle && familyVariant == paint.familyVariant &&
-               fontFeatureSettings == paint.fontFeatureSettings && font.get() == paint.font.get();
-    }
-
-private:
-    // Forbid implicit copy and assign. Use copyFrom instead.
-    MinikinPaint(const MinikinPaint&) = default;
-    MinikinPaint& operator=(const MinikinPaint&) = default;
-};
-
-// Only a few flags affect layout, but those that do should have values
-// consistent with Android's paint flags.
-enum MinikinPaintFlags {
-    LinearTextFlag = 0x40,
-};
-
-struct MinikinRect {
-    MinikinRect() : mLeft(0), mTop(0), mRight(0), mBottom(0) {}
-    MinikinRect(float left, float top, float right, float bottom)
-            : mLeft(left), mTop(top), mRight(right), mBottom(bottom) {}
-    bool operator==(const MinikinRect& o) const {
-        return mLeft == o.mLeft && mTop == o.mTop && mRight == o.mRight && mBottom == o.mBottom;
-    }
-    float mLeft;
-    float mTop;
-    float mRight;
-    float mBottom;
-
-    bool isEmpty() const { return mLeft == mRight || mTop == mBottom; }
-    void set(const MinikinRect& r) {
-        mLeft = r.mLeft;
-        mTop = r.mTop;
-        mRight = r.mRight;
-        mBottom = r.mBottom;
-    }
-    void offset(float dx, float dy) {
-        mLeft += dx;
-        mTop += dy;
-        mRight += dx;
-        mBottom += dy;
-    }
-    void setEmpty() { mLeft = mTop = mRight = mBottom = 0.0; }
-    void join(const MinikinRect& r) {
-        if (isEmpty()) {
-            set(r);
-        } else if (!r.isEmpty()) {
-            mLeft = std::min(mLeft, r.mLeft);
-            mTop = std::min(mTop, r.mTop);
-            mRight = std::max(mRight, r.mRight);
-            mBottom = std::max(mBottom, r.mBottom);
-        }
-    }
-};
-
-// For holding vertical extents.
-struct MinikinExtent {
-    MinikinExtent() : ascent(0), descent(0) {}
-    MinikinExtent(float ascent, float descent) : ascent(ascent), descent(descent) {}
-    bool operator==(const MinikinExtent& o) const {
-        return ascent == o.ascent && descent == o.descent;
-    }
-    float ascent;   // negative
-    float descent;  // positive
-
-    void reset() { ascent = descent = 0.0; }
-
-    void extendBy(const MinikinExtent& e) {
-        ascent = std::min(ascent, e.ascent);
-        descent = std::max(descent, e.descent);
-    }
-};
-
+// An abstraction for platform fonts, allowing Minikin to be used with
+// multiple actual implementations of fonts.
 class MinikinFont {
 public:
     explicit MinikinFont(int32_t uniqueId) : mUniqueId(uniqueId) {}
@@ -183,15 +74,6 @@ private:
     const int32_t mUniqueId;
 };
 
-// For gtest output
-inline std::ostream& operator<<(std::ostream& os, const MinikinRect& r) {
-    return os << "(" << r.mLeft << ", " << r.mTop << ")-(" << r.mRight << ", " << r.mBottom << ")";
-}
-
-// For gtest output
-inline std::ostream& operator<<(std::ostream& os, const MinikinExtent& e) {
-    return os << e.ascent << ", " << e.descent;
-}
 }  // namespace minikin
 
-#endif  // MINIKIN_FONT_H
+#endif  // MINIKIN_MINIKIN_FONT_H

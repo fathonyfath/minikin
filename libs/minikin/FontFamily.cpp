@@ -27,6 +27,7 @@
 #include <utils/JenkinsHash.h>
 
 #include "minikin/CmapCoverage.h"
+#include "minikin/FamilyVariant.h"
 #include "minikin/HbUtils.h"
 #include "minikin/MinikinFont.h"
 
@@ -105,12 +106,12 @@ std::unordered_set<AxisTag> Font::getSupportedAxes() const {
 }
 
 FontFamily::FontFamily(std::vector<Font>&& fonts)
-        : FontFamily(Variant::DEFAULT, std::move(fonts)) {}
+        : FontFamily(FamilyVariant::DEFAULT, std::move(fonts)) {}
 
-FontFamily::FontFamily(Variant variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(FamilyVariant variant, std::vector<Font>&& fonts)
         : FontFamily(LocaleListCache::kEmptyListId, variant, std::move(fonts)) {}
 
-FontFamily::FontFamily(uint32_t localeListId, Variant variant, std::vector<Font>&& fonts)
+FontFamily::FontFamily(uint32_t localeListId, FamilyVariant variant, std::vector<Font>&& fonts)
         : mLocaleListId(localeListId),
           mVariant(variant),
           mFonts(std::move(fonts)),

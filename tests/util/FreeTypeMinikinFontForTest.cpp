@@ -29,7 +29,10 @@
 #include <log/log.h>
 #include FT_OUTLINE_H
 
+#include "minikin/MinikinExtent.h"
 #include "minikin/MinikinFont.h"
+#include "minikin/MinikinPaint.h"
+#include "minikin/MinikinRect.h"
 
 namespace minikin {
 namespace {

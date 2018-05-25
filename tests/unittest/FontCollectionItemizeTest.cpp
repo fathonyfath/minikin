@@ -22,6 +22,7 @@
 
 #include "minikin/FontFamily.h"
 #include "minikin/LocaleList.h"
+#include "minikin/MinikinPaint.h"
 
 #include "FontTestUtils.h"
 #include "FreeTypeMinikinFontForTest.h"
@@ -927,8 +928,8 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
                 std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(kNoGlyphFont));
         std::vector<Font> fonts;
         fonts.push_back(Font::Builder(firstFamilyMinikinFont).build());
-        auto firstFamily = std::make_shared<FontFamily>(
-                registerLocaleList("und"), FontFamily::Variant::DEFAULT, std::move(fonts));
+        auto firstFamily = std::make_shared<FontFamily>(registerLocaleList("und"),
+                                                        FamilyVariant::DEFAULT, std::move(fonts));
         families.push_back(firstFamily);
 
         // Prepare font families
@@ -941,9 +942,8 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
                     std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(kJAFont));
             std::vector<Font> fonts;
             fonts.push_back(Font::Builder(minikinFont).build());
-            auto family =
-                    std::make_shared<FontFamily>(registerLocaleList(testCase.fontLocales[i]),
-                                                 FontFamily::Variant::DEFAULT, std::move(fonts));
+            auto family = std::make_shared<FontFamily>(registerLocaleList(testCase.fontLocales[i]),
+                                                       FamilyVariant::DEFAULT, std::move(fonts));
             families.push_back(family);
             fontLocaleIdxMap.insert(std::make_pair(minikinFont.get(), i));
         }

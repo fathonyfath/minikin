@@ -25,6 +25,7 @@
 #include <unicode/unorm2.h>
 
 #include "minikin/Emoji.h"
+#include "minikin/MinikinPaint.h"
 
 #include "Locale.h"
 #include "LocaleListCache.h"
@@ -124,7 +125,7 @@ const uint32_t kFirstFontScore = UINT32_MAX;
 //    base character.
 //  - kFirstFontScore: When the font is the first font family in the collection and it supports the
 //    given character or variation sequence.
-uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, FontFamily::Variant variant,
+uint32_t FontCollection::calcFamilyScore(uint32_t ch, uint32_t vs, FamilyVariant variant,
                                          uint32_t localeListId,
                                          const std::shared_ptr<FontFamily>& fontFamily) const {
     const uint32_t coverageScore = calcCoverageScore(ch, vs, localeListId, fontFamily);
@@ -229,16 +230,16 @@ uint32_t FontCollection::calcLocaleMatchingScore(uint32_t userLocaleListId,
 // Calculates a font score based on variant ("compact" or "elegant") matching.
 //  - Returns 1 if the font doesn't have variant or the variant matches with the text style.
 //  - No score if the font has a variant but it doesn't match with the text style.
-uint32_t FontCollection::calcVariantMatchingScore(FontFamily::Variant variant,
+uint32_t FontCollection::calcVariantMatchingScore(FamilyVariant variant,
                                                   const FontFamily& fontFamily) {
-    const FontFamily::Variant familyVariant = fontFamily.variant();
-    if (familyVariant == FontFamily::Variant::DEFAULT) {
+    const FamilyVariant familyVariant = fontFamily.variant();
+    if (familyVariant == FamilyVariant::DEFAULT) {
         return 1;
     }
     if (familyVariant == variant) {
         return 1;
     }
-    if (variant == FontFamily::Variant::DEFAULT && familyVariant == FontFamily::Variant::COMPACT) {
+    if (variant == FamilyVariant::DEFAULT && familyVariant == FamilyVariant::COMPACT) {
         // If default is requested, prefer compat variation.
         return 1;
     }
@@ -250,8 +251,9 @@ uint32_t FontCollection::calcVariantMatchingScore(FontFamily::Variant variant,
 // 2. Calculate a score for the font family. See comments in calcFamilyScore for the detail.
 // 3. Highest score wins, with ties resolved to the first font.
 // This method never returns nullptr.
-const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(
-        uint32_t ch, uint32_t vs, uint32_t localeListId, FontFamily::Variant variant) const {
+const std::shared_ptr<FontFamily>& FontCollection::getFamilyForChar(uint32_t ch, uint32_t vs,
+                                                                    uint32_t localeListId,
+                                                                    FamilyVariant variant) const {
     if (ch >= mMaxChar) {
         return mFamilies[0];
     }
@@ -370,7 +372,7 @@ constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
 void FontCollection::itemize(const uint16_t* string, size_t string_size, const MinikinPaint& paint,
                              vector<Run>* result) const {
-    const FontFamily::Variant familyVariant = paint.familyVariant;
+    const FamilyVariant familyVariant = paint.familyVariant;
     const FontStyle style = paint.fontStyle;
     const uint32_t localeListId = paint.localeListId;
 
