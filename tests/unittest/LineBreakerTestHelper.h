@@ -33,8 +33,6 @@ public:
 
     float getAt(size_t) const override { return mWidth; }
     float getMin() const override { return mWidth; }
-    float getLeftPaddingAt(size_t) const override { return 0; }
-    float getRightPaddingAt(size_t) const override { return 0; }
 
 private:
     float mWidth;
