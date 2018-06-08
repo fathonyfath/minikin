@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-#include <minikin/MinikinFont.h>
-#include "HbFontCache.h"
-#include "MinikinInternal.h"
+#ifndef MINIKIN_LOCALE_H
+#define MINIKIN_LOCALE_H
+
+#include <string>
 
 namespace minikin {
 
-MinikinFont::~MinikinFont() {
-    android::AutoMutex _l(gMinikinLock);
-    purgeHbFontLocked(this);
-}
+// Looks up a locale list from an internal cache and returns its ID.
+// If the passed locale list is not in the cache, registers it and returns newly assigned ID.
+// TODO: Introduce LocaleId type.
+uint32_t registerLocaleList(const std::string& locales);
 
 }  // namespace minikin
+
+#endif  // MINIKIN_LOCALE_H

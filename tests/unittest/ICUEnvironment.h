@@ -14,41 +14,53 @@
  * limitations under the License.
  */
 
-#ifndef MINIKIN_TEST_ICU_TEST_BASE_H
-#define MINIKIN_TEST_ICU_TEST_BASE_H
+#ifndef MINIKIN_TEST_ICU_ENVIRONMENT_H
+#define MINIKIN_TEST_ICU_ENVIRONMENT_H
 
+// low level file access for mapping ICU data
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+#include <cutils/log.h>
 #include <gtest/gtest.h>
 #include <unicode/uclean.h>
 #include <unicode/udata.h>
 
-// low level file access for mapping ICU data
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-
 namespace minikin {
 
-class ICUTestBase : public testing::Test {
-protected:
+class ICUEnvironment : public testing::Environment {
+public:
+    ICUEnvironment() : testing::Environment(), mData(nullptr), mSize(0) {}
+
+    void* mData;
+    size_t mSize;
+
     virtual void SetUp() override {
         const char* fn = "/system/usr/icu/" U_ICUDATA_NAME ".dat";
         int fd = open(fn, O_RDONLY);
-        ASSERT_NE(-1, fd);
+        LOG_ALWAYS_FATAL_IF(fd == -1);
         struct stat sb;
-        ASSERT_EQ(0, fstat(fd, &sb));
-        void* data = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        LOG_ALWAYS_FATAL_IF(fstat(fd, &sb) != 0);
+
+        mSize = sb.st_size;
+        void* mData = mmap(nullptr, mSize, PROT_READ, MAP_SHARED, fd, 0);
+        close(fd);
 
         UErrorCode errorCode = U_ZERO_ERROR;
-        udata_setCommonData(data, &errorCode);
-        ASSERT_TRUE(U_SUCCESS(errorCode));
+        udata_setCommonData(mData, &errorCode);
+        LOG_ALWAYS_FATAL_IF(U_FAILURE(errorCode));
+
+        errorCode = U_ZERO_ERROR;
         u_init(&errorCode);
-        ASSERT_TRUE(U_SUCCESS(errorCode));
+        LOG_ALWAYS_FATAL_IF(U_FAILURE(errorCode));
     }
 
     virtual void TearDown() override {
         u_cleanup();
+        munmap(mData, mSize);
     }
 };
 
 }  // namespace minikin
-#endif  //  MINIKIN_TEST_ICU_TEST_BASE_H
+#endif  //  MINIKIN_TEST_ICU_ENVIRONMENT_H

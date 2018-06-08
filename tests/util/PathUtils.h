@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <benchmark/benchmark.h>
 
-#include <minikin/FontFamily.h>
-#include "../util/MinikinFontForTest.h"
+#ifndef TEST_UTILS_PATH_UTILS_H
+#define TEST_UTILS_PATH_UTILS_H
+
+#include <string>
 
 namespace minikin {
 
-static void BM_FontFamily_create(benchmark::State& state) {
-    std::shared_ptr<MinikinFontForTest> minikinFont =
-            std::make_shared<MinikinFontForTest>("/system/fonts/NotoSansCJK-Regular.ttc", 0);
+std::string getDirname(const std::string& path);
+std::string getBasename(const std::string& path);
 
-    while (state.KeepRunning()) {
-        std::shared_ptr<FontFamily> family = std::make_shared<FontFamily>(
-                std::vector<Font>({Font(minikinFont, FontStyle())}));
-    }
+// Returns test data directory.
+std::string getTestDataDir();
+
+inline std::string getTestFontPath(const std::string& fontFilePath) {
+    return getTestDataDir() + fontFilePath;
 }
 
-BENCHMARK(BM_FontFamily_create);
-
 }  // namespace minikin
+
+#endif  // TEST_UTILS_PATH_UTILS_H
