@@ -101,6 +101,14 @@ public:
     Font(Font&& o) = default;
     Font& operator=(Font&& o) = default;
 
+    Font& operator=(const Font& o) {
+        mTypeface = o.mTypeface;
+        mStyle = o.mStyle;
+        mBaseFont = HbFontUniquePtr(hb_font_reference(o.mBaseFont.get()));
+        return *this;
+    }
+    Font(const Font& o) { *this = o; }
+
     inline const std::shared_ptr<MinikinFont>& typeface() const { return mTypeface; }
     inline FontStyle style() const { return mStyle; }
     inline const HbFontUniquePtr& baseFont() const { return mBaseFont; }
@@ -118,8 +126,6 @@ private:
     std::shared_ptr<MinikinFont> mTypeface;
     FontStyle mStyle;
     HbFontUniquePtr mBaseFont;
-
-    MINIKIN_PREVENT_COPY_AND_ASSIGN(Font);
 };
 
 }  // namespace minikin
