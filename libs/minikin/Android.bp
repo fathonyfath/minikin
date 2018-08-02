@@ -55,12 +55,8 @@ cc_library {
             ],
             shared_libs: [
                 "libharfbuzz_ng",
-                "libft2",
-                "libz",
                 "libutils",
             ],
-            // TODO: clean up Minikin so it doesn't need the freetype include
-            export_shared_lib_headers: ["libft2"],
 
             sanitize: {
                 misc_undefined: [
