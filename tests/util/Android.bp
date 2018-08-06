@@ -3,7 +3,8 @@ cc_library_static {
     srcs: [
         "FileUtils.cpp",
         "FontTestUtils.cpp",
-        "MinikinFontForTest.cpp",
+        "FreeTypeMinikinFontForTest.cpp",
+        "PathUtils.cpp",
         "UnicodeUtils.cpp",
     ],
     cflags: ["-Wall", "-Werror"],
