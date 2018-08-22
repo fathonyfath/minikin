@@ -24,7 +24,6 @@
 #include <hb-ot.h>
 #include <hb.h>
 #include <log/log.h>
-#include <utils/JenkinsHash.h>
 
 #include "minikin/CmapCoverage.h"
 #include "minikin/FamilyVariant.h"

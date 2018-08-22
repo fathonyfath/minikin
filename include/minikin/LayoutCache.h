@@ -21,10 +21,10 @@
 
 #include <mutex>
 
-#include <utils/JenkinsHash.h>
 #include <utils/LruCache.h>
 
 #include "minikin/FontCollection.h"
+#include "minikin/Hasher.h"
 #include "minikin/MinikinPaint.h"
 
 namespace minikin {
@@ -100,25 +100,23 @@ private:
     android::hash_t mHash;
 
     android::hash_t computeHash() const {
-        uint32_t hash = android::JenkinsHashMix(0, mId);
-        hash = android::JenkinsHashMix(hash, mStart);
-        hash = android::JenkinsHashMix(hash, mCount);
-        hash = android::JenkinsHashMix(hash, android::hash_type(mStyle.identifier()));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mSize));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mScaleX));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mSkewX));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mLetterSpacing));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mWordSpacing));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mPaintFlags));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mLocaleListId));
-        hash = android::JenkinsHashMix(hash,
-                                       android::hash_type(static_cast<uint8_t>(mFamilyVariant)));
-        hash = android::JenkinsHashMix(
-                hash,
-                android::hash_type(static_cast<uint8_t>(packHyphenEdit(mStartHyphen, mEndHyphen))));
-        hash = android::JenkinsHashMix(hash, android::hash_type(mIsRtl));
-        hash = android::JenkinsHashMixShorts(hash, mChars, mNchars);
-        return android::JenkinsHashWhiten(hash);
+        return Hasher()
+                .update(mId)
+                .update(mStart)
+                .update(mCount)
+                .update(mStyle.identifier())
+                .update(mSize)
+                .update(mScaleX)
+                .update(mSkewX)
+                .update(mLetterSpacing)
+                .update(mWordSpacing)
+                .update(mPaintFlags)
+                .update(mLocaleListId)
+                .update(static_cast<uint8_t>(mFamilyVariant))
+                .update(packHyphenEdit(mStartHyphen, mEndHyphen))
+                .update(mIsRtl)
+                .updateShorts(mChars, mNchars)
+                .hash();
     }
 };
 

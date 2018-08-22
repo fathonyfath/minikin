@@ -22,7 +22,6 @@
 #include <vector>
 
 #include <gtest/gtest_prod.h>
-#include <utils/JenkinsHash.h>
 
 #include "minikin/FontCollection.h"
 #include "minikin/LayoutCore.h"

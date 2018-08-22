@@ -32,10 +32,11 @@ struct LayoutPieces {
         HyphenEdit hyphenEdit;
 
         uint32_t hash() const {
-            uint32_t hash = android::JenkinsHashMix(0, range.getStart());
-            hash = android::JenkinsHashMix(hash, range.getEnd());
-            hash = android::JenkinsHashMix(hash, static_cast<HyphenEdit>(hyphenEdit));
-            return android::JenkinsHashWhiten(hash);
+            return Hasher()
+                    .update(range.getStart())
+                    .update(range.getEnd())
+                    .update(hyphenEdit)
+                    .hash();
         }
 
         bool operator==(const Key& o) const {

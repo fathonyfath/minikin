@@ -29,7 +29,6 @@
 #include <log/log.h>
 #include <unicode/ubidi.h>
 #include <unicode/utf16.h>
-#include <utils/JenkinsHash.h>
 #include <utils/LruCache.h>
 
 #include "minikin/Emoji.h"

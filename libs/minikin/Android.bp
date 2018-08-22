@@ -55,7 +55,6 @@ cc_library {
             ],
             shared_libs: [
                 "libharfbuzz_ng",
-                "libutils",
             ],
 
             sanitize: {
@@ -82,7 +81,7 @@ cc_library {
         "liblog",
         "libicuuc",
     ],
-    header_libs: ["libminikin_headers"],
+    header_libs: ["libminikin_headers", "libutils_headers"],
     export_header_lib_headers: ["libminikin_headers"],
     export_shared_lib_headers: ["libicuuc"],
     whole_static_libs: ["libgtest_prod"],
