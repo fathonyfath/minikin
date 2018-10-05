@@ -29,6 +29,7 @@ namespace minikin {
 class TestableLayoutCache : public LayoutCache {
 public:
     TestableLayoutCache(uint32_t maxEntries) : LayoutCache(maxEntries) {}
+    using LayoutCache::getCacheSize;
 };
 
 class LayoutCapture {
@@ -260,7 +261,7 @@ TEST(LayoutCacheTest, cacheOverflowTest) {
                             EndHyphenEdit::NO_EDIT, layout1);
 
     for (char c = 'a'; c <= 'z'; c++) {
-        auto text1 = utf8ToUtf16(std::string(c, 10));
+        auto text1 = utf8ToUtf16(std::string(10, c));
         LayoutCapture layout2;
         layoutCache.getOrCreate(text1, Range(0, text1.size()), paint, false /* LTR */,
                                 StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, layout2);
@@ -270,6 +271,20 @@ TEST(LayoutCacheTest, cacheOverflowTest) {
     layoutCache.getOrCreate(text, range, paint, false /* LTR */, StartHyphenEdit::NO_EDIT,
                             EndHyphenEdit::NO_EDIT, layout3);
     EXPECT_NE(layout1.get(), layout3.get());
+}
+
+TEST(LayoutCacheTest, cacheLengthLimitTest) {
+    auto text = utf8ToUtf16(std::string(130, 'a'));
+    Range range(0, text.size());
+    MinikinPaint paint(buildFontCollection("Ascii.ttf"));
+
+    TestableLayoutCache layoutCache(140);
+
+    LayoutCapture layout;
+    layoutCache.getOrCreate(text, range, paint, false /* LTR */, StartHyphenEdit::NO_EDIT,
+                            EndHyphenEdit::NO_EDIT, layout);
+
+    EXPECT_EQ(layoutCache.getCacheSize(), 0u);
 }
 
 }  // namespace minikin
