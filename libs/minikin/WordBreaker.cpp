@@ -35,18 +35,10 @@ namespace {
 static UBreakIterator* createNewIterator(const Locale& locale) {
     // TODO: handle failure status
     UErrorCode status = U_ZERO_ERROR;
-    const char* localeID;
-
-    if (locale.isUnsupported()) {
-        localeID = uloc_getDefault();
-    } else {
-        localeID = locale.getString().c_str();
-    }
-
-    char buf[ULOC_FULLNAME_CAPACITY] = {};
-    uloc_getName(localeID, buf, ULOC_FULLNAME_CAPACITY, &status);
-
-    return ubrk_open(UBreakIteratorType::UBRK_LINE, buf, nullptr, 0, &status);
+    char localeID[ULOC_FULLNAME_CAPACITY] = {};
+    uloc_forLanguageTag(locale.getString().c_str(), localeID, ULOC_FULLNAME_CAPACITY, nullptr,
+                        &status);
+    return ubrk_open(UBreakIteratorType::UBRK_LINE, localeID, nullptr, 0, &status);
 }
 }  // namespace
 
