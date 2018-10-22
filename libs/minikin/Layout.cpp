@@ -69,23 +69,6 @@ static hb_bool_t harfbuzzGetGlyphHorizontalOrigin(hb_font_t* /* hbFont */, void*
 }
 
 // TODO: Initialize in Zygote if it helps.
-hb_unicode_funcs_t* getUnicodeFunctions() {
-    static hb_unicode_funcs_t* unicodeFunctions = nullptr;
-    static std::once_flag once;
-    std::call_once(once, [&]() {
-        unicodeFunctions = hb_unicode_funcs_create(hb_icu_get_unicode_funcs());
-        /* Disable the function used for compatibility decomposition */
-        hb_unicode_funcs_set_decompose_compatibility_func(
-                unicodeFunctions,
-                [](hb_unicode_funcs_t*, hb_codepoint_t, hb_codepoint_t*, void*) -> unsigned int {
-                    return 0;
-                },
-                nullptr, nullptr);
-    });
-    return unicodeFunctions;
-}
-
-// TODO: Initialize in Zygote if it helps.
 hb_font_funcs_t* getFontFuncs() {
     static hb_font_funcs_t* fontFuncs = nullptr;
     static std::once_flag once;
@@ -187,12 +170,13 @@ static hb_script_t getScriptRun(const uint16_t* chars, size_t len, ssize_t* iter
         return HB_SCRIPT_UNKNOWN;
     }
     uint32_t cp = decodeUtf16(chars, len, iter);
-    hb_script_t current_script = hb_unicode_script(getUnicodeFunctions(), cp);
+    hb_unicode_funcs_t* unicode_func = hb_unicode_funcs_get_default();
+    hb_script_t current_script = hb_unicode_script(unicode_func, cp);
     for (;;) {
         if (size_t(*iter) == len) break;
         const ssize_t prev_iter = *iter;
         cp = decodeUtf16(chars, len, iter);
-        const hb_script_t script = hb_unicode_script(getUnicodeFunctions(), cp);
+        const hb_script_t script = hb_unicode_script(unicode_func, cp);
         if (script != current_script) {
             if (current_script == HB_SCRIPT_INHERITED || current_script == HB_SCRIPT_COMMON) {
                 current_script = script;
@@ -579,7 +563,6 @@ void Layout::doLayoutRun(const uint16_t* buf, size_t start, size_t count, size_t
                          bool isRtl, const MinikinPaint& paint, StartHyphenEdit startHyphen,
                          EndHyphenEdit endHyphen) {
     HbBufferUniquePtr buffer(hb_buffer_create());
-    hb_buffer_set_unicode_funcs(buffer.get(), getUnicodeFunctions());
     std::vector<FontCollection::Run> items;
     paint.font->itemize(buf + start, count, paint, &items);
 
