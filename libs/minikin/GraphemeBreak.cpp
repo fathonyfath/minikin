@@ -125,7 +125,8 @@ bool GraphemeBreak::isGraphemeBreak(const float* advances, const uint16_t* buf, 
 
     // Tailored version of Rule GB11
     // \p{Extended_Pictographic} Extend* ZWJ x \p{Extended_Pictographic}
-    if (p1 == U_GCB_ZWJ && u_hasBinaryProperty(c2, UCHAR_EXTENDED_PICTOGRAPHIC)) {
+    if (offset_back > start && p1 == U_GCB_ZWJ &&
+        u_hasBinaryProperty(c2, UCHAR_EXTENDED_PICTOGRAPHIC)) {
         uint32_t c0 = 0;
         size_t offset_backback = offset_back;
         int32_t p0 = 0;

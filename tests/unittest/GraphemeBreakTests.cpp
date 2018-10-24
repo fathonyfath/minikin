@@ -312,4 +312,9 @@ TEST(GraphemeBreak, offsets) {
     EXPECT_TRUE(GraphemeBreak::isGraphemeBreak(nullptr, string, 2, 3, 5));
 }
 
+TEST(GraphemeBreak, startWithZWJ) {
+    // It used to be looking before the ZWJ char even if it is the start of the text.
+    IsBreak("U+200D | U+1F5E8");  // UB sanitizer will catch if minikin looks the char before ZWJ
+}
+
 }  // namespace minikin
