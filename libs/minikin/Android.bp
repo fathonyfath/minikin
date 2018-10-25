@@ -83,14 +83,14 @@ cc_library {
     },
     shared_libs: [
         "liblog",
-        "libicuuc",
+        "libandroidicu",
     ],
     header_libs: [
         "libbase_headers",
         "libminikin_headers",
     ],
     export_header_lib_headers: ["libminikin_headers"],
-    export_shared_lib_headers: ["libicuuc"],
+    export_shared_lib_headers: ["libandroidicu"],
     whole_static_libs: ["libgtest_prod"],
 
     clang: true,

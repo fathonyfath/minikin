@@ -19,7 +19,6 @@
 #include <cstdio>
 
 #include <gtest/gtest.h>
-#include <unicode/locid.h>
 #include <unicode/uclean.h>
 #include <unicode/udata.h>
 
