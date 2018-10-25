@@ -21,7 +21,6 @@
 #include <algorithm>
 
 #include <log/log.h>
-#include <unicode/unistr.h>
 #include <unicode/unorm2.h>
 
 #include "minikin/Emoji.h"
