@@ -25,7 +25,6 @@
 #include <unicode/unorm2.h>
 
 #include "minikin/Emoji.h"
-#include "minikin/MinikinPaint.h"
 
 #include "Locale.h"
 #include "LocaleListCache.h"
@@ -370,17 +369,18 @@ bool FontCollection::hasVariationSelector(uint32_t baseCodepoint,
 
 constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
-void FontCollection::itemize(const uint16_t* string, size_t string_size, const MinikinPaint& paint,
-                             vector<Run>* result) const {
-    const FamilyVariant familyVariant = paint.familyVariant;
-    const FontStyle style = paint.fontStyle;
-    const uint32_t localeListId = paint.localeListId;
+std::vector<FontCollection::Run> FontCollection::itemize(U16StringPiece text, FontStyle style,
+                                                         uint32_t localeListId,
+                                                         FamilyVariant familyVariant) const {
+    const uint16_t* string = text.data();
+    const uint32_t string_size = text.size();
+    std::vector<Run> result;
 
     const FontFamily* lastFamily = nullptr;
     Run* run = nullptr;
 
     if (string_size == 0) {
-        return;
+        return result;
     }
 
     const uint32_t kEndOfString = 0xFFFFFFFF;
@@ -433,7 +433,7 @@ void FontCollection::itemize(const uint16_t* string, size_t string_size, const M
                     if (run != nullptr) {
                         run->end -= prevChLength;
                         if (run->start == run->end) {
-                            result->pop_back();
+                            result.pop_back();
                         }
                     }
                     start -= prevChLength;
@@ -445,8 +445,8 @@ void FontCollection::itemize(const uint16_t* string, size_t string_size, const M
                     // start to be 0 to include those characters).
                     start = 0;
                 }
-                result->push_back({family->getClosestMatch(style), static_cast<int>(start), 0});
-                run = &result->back();
+                result.push_back({family->getClosestMatch(style), static_cast<int>(start), 0});
+                run = &result.back();
                 lastFamily = family.get();
             }
         }
@@ -459,8 +459,9 @@ void FontCollection::itemize(const uint16_t* string, size_t string_size, const M
     if (lastFamily == nullptr) {
         // No character needed any font support, so it doesn't really matter which font they end up
         // getting displayed in. We put the whole string in one run, using the first font.
-        result->push_back({mFamilies[0]->getClosestMatch(style), 0, static_cast<int>(string_size)});
+        result.push_back({mFamilies[0]->getClosestMatch(style), 0, static_cast<int>(string_size)});
     }
+    return result;
 }
 
 FakedFont FontCollection::baseFontFaked(FontStyle style) {

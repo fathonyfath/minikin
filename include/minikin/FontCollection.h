@@ -23,6 +23,7 @@
 
 #include "minikin/FontFamily.h"
 #include "minikin/MinikinFont.h"
+#include "minikin/U16StringPiece.h"
 
 namespace minikin {
 
@@ -40,8 +41,8 @@ public:
         int end;
     };
 
-    void itemize(const uint16_t* string, size_t string_length, const MinikinPaint& paint,
-                 std::vector<Run>* result) const;
+    std::vector<Run> itemize(U16StringPiece text, FontStyle style, uint32_t localeListId,
+                             FamilyVariant familyVariant) const;
 
     // Returns true if there is a glyph for the code point and variation selector pair.
     // Returns false if no fonts have a glyph for the code point and variation

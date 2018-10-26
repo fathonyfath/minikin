@@ -334,8 +334,8 @@ LayoutPiece::LayoutPiece(const U16StringPiece& textBuf, const Range& range, bool
     mPoints.reserve(count);
 
     HbBufferUniquePtr buffer(hb_buffer_create());
-    std::vector<FontCollection::Run> items;
-    paint.font->itemize(buf + start, count, paint, &items);
+    std::vector<FontCollection::Run> items = paint.font->itemize(
+            textBuf.substr(range), paint.fontStyle, paint.localeListId, paint.familyVariant);
 
     std::vector<hb_feature_t> features;
     // Disable default-on non-required ligature features if letter-spacing
