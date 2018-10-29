@@ -65,6 +65,7 @@ cc_test {
         "OptimalLineBreakerTest.cpp",
         "SparseBitSetTest.cpp",
         "StringPieceTest.cpp",
+        "SystemFontsTest.cpp",
         "TestMain.cpp",
         "UnicodeUtilsTest.cpp",
         "WordBreakerTests.cpp",

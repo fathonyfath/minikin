@@ -45,6 +45,7 @@ cc_library {
         "MinikinInternal.cpp",
         "OptimalLineBreaker.cpp",
         "SparseBitSet.cpp",
+        "SystemFonts.cpp",
         "WordBreaker.cpp",
     ],
     cpp_std: "c++17",
