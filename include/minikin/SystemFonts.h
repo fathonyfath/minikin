@@ -60,10 +60,7 @@ protected:
     }
 
 private:
-    static SystemFonts& getInstance() {  // singleton
-        static SystemFonts systemFonts;
-        return systemFonts;
-    }
+    static SystemFonts& getInstance();
 
     // There is no mutex guard here since registerFallback is designed to be
     // called only in Zygote.

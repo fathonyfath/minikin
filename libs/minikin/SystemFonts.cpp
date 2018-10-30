@@ -20,6 +20,11 @@
 
 namespace minikin {
 
+SystemFonts& SystemFonts::getInstance() {
+    static SystemFonts systemFonts;
+    return systemFonts;
+}
+
 std::shared_ptr<FontCollection> SystemFonts::findFontCollectionInternal(
         const std::string& familyName) const {
     auto it = mSystemFallbacks.find(familyName);
