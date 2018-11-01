@@ -35,7 +35,8 @@ class FontFamily {
 public:
     explicit FontFamily(std::vector<Font>&& fonts);
     FontFamily(FamilyVariant variant, std::vector<Font>&& fonts);
-    FontFamily(uint32_t localeListId, FamilyVariant variant, std::vector<Font>&& fonts);
+    FontFamily(uint32_t localeListId, FamilyVariant variant, std::vector<Font>&& fonts,
+               bool isCustomFallback);
 
     FakedFont getClosestMatch(FontStyle style) const;
 
@@ -48,6 +49,7 @@ public:
     FontStyle getStyle(size_t index) const { return mFonts[index].style(); }
     bool isColorEmojiFamily() const { return mIsColorEmoji; }
     const std::unordered_set<AxisTag>& supportedAxes() const { return mSupportedAxes; }
+    bool isCustomFallback() const { return mIsCustomFallback; }
 
     // Get Unicode coverage.
     const SparseBitSet& getCoverage() const { return mCoverage; }
@@ -72,6 +74,7 @@ private:
     std::vector<Font> mFonts;
     std::unordered_set<AxisTag> mSupportedAxes;
     bool mIsColorEmoji;
+    bool mIsCustomFallback;
 
     SparseBitSet mCoverage;
     std::vector<std::unique_ptr<SparseBitSet>> mCmapFmt14Coverage;

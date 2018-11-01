@@ -109,7 +109,8 @@ std::vector<std::shared_ptr<FontFamily>> getFontFamilies(const std::string& font
             family = std::make_shared<FontFamily>(variant, std::move(fonts));
         } else {
             uint32_t langId = registerLocaleList(std::string((const char*)lang, xmlStrlen(lang)));
-            family = std::make_shared<FontFamily>(langId, variant, std::move(fonts));
+            family = std::make_shared<FontFamily>(langId, variant, std::move(fonts),
+                                                  false /* isCustomFallback */);
         }
         families.push_back(family);
     }
@@ -128,12 +129,13 @@ std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath) {
     return std::make_shared<FontFamily>(std::move(fonts));
 }
 
-std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath, const std::string& lang) {
+std::shared_ptr<FontFamily> buildFontFamily(const std::string& filePath, const std::string& lang,
+                                            bool isCustomFallback) {
     auto font = std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(filePath));
     std::vector<Font> fonts;
     fonts.push_back(Font::Builder(font).build());
     return std::make_shared<FontFamily>(LocaleListCache::getId(lang), FamilyVariant::DEFAULT,
-                                        std::move(fonts));
+                                        std::move(fonts), isCustomFallback);
 }
 
 }  // namespace minikin

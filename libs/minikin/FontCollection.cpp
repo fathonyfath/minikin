@@ -160,7 +160,7 @@ uint32_t FontCollection::calcCoverageScore(uint32_t ch, uint32_t vs, uint32_t lo
         return kUnsupportedFontScore;
     }
 
-    if ((vs == 0 || hasVSGlyph) && mFamilies[0] == fontFamily) {
+    if ((vs == 0 || hasVSGlyph) && (mFamilies[0] == fontFamily || fontFamily->isCustomFallback())) {
         // If the first font family supports the given character or variation sequence, always use
         // it.
         return kFirstFontScore;

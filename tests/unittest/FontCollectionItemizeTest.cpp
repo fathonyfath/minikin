@@ -44,6 +44,7 @@ const char kLatinFont[] = "Regular.ttf";
 const char kLatinItalicFont[] = "Italic.ttf";
 const char kZH_HansFont[] = "ZhHans.ttf";
 const char kZH_HantFont[] = "ZhHant.ttf";
+const char kAsciiFont[] = "Ascii.ttf";
 
 const char kEmojiXmlFile[] = "emoji.xml";
 const char kNoGlyphFont[] = "NoGlyphFont.ttf";
@@ -914,8 +915,9 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
                 std::make_shared<FreeTypeMinikinFontForTest>(getTestFontPath(kNoGlyphFont));
         std::vector<Font> fonts;
         fonts.push_back(Font::Builder(firstFamilyMinikinFont).build());
-        auto firstFamily = std::make_shared<FontFamily>(registerLocaleList("und"),
-                                                        FamilyVariant::DEFAULT, std::move(fonts));
+        auto firstFamily =
+                std::make_shared<FontFamily>(registerLocaleList("und"), FamilyVariant::DEFAULT,
+                                             std::move(fonts), false /* isCustomFallback */);
         families.push_back(firstFamily);
 
         // Prepare font families
@@ -929,7 +931,8 @@ TEST(FontCollectionItemizeTest, itemize_LocaleScore) {
             std::vector<Font> fonts;
             fonts.push_back(Font::Builder(minikinFont).build());
             auto family = std::make_shared<FontFamily>(registerLocaleList(testCase.fontLocales[i]),
-                                                       FamilyVariant::DEFAULT, std::move(fonts));
+                                                       FamilyVariant::DEFAULT, std::move(fonts),
+                                                       false /* isCustomFallback */);
             families.push_back(family);
             fontLocaleIdxMap.insert(std::make_pair(minikinFont.get(), i));
         }
@@ -1583,6 +1586,24 @@ TEST(FontCollectionItemizeTest, colorEmojiSelectionTest) {
     EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
     runs = itemize(collection, "U+23E9", "ja-JP,und-Zsye");
     EXPECT_EQ(colorEmojiFamily->getFont(0), runs[0].fakedFont.font);
+}
+
+TEST(FontCollectionItemizeTest, customFallbackTest) {
+    auto firstFamily = buildFontFamily(kNoGlyphFont);
+    auto customFallbackFamily = buildFontFamily(kAsciiFont, "", true /* isCustomFallback */);
+    auto languageFamily = buildFontFamily(kAsciiFont, "ja-JP");
+
+    std::vector<std::shared_ptr<FontFamily>> families = {firstFamily, customFallbackFamily,
+                                                         languageFamily};
+
+    auto collection = std::make_shared<FontCollection>(families);
+
+    auto runs = itemize(collection, "'a'", "");
+    EXPECT_EQ(customFallbackFamily->getFont(0), runs[0].fakedFont.font);
+    runs = itemize(collection, "'a'", "en-US");
+    EXPECT_EQ(customFallbackFamily->getFont(0), runs[0].fakedFont.font);
+    runs = itemize(collection, "'a'", "ja-JP");
+    EXPECT_EQ(customFallbackFamily->getFont(0), runs[0].fakedFont.font);
 }
 
 }  // namespace minikin
