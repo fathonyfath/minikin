@@ -36,7 +36,7 @@ class LayoutCapture {
 public:
     LayoutCapture() {}
 
-    void operator()(const LayoutPiece& layout) { mLayout = &layout; }
+    void operator()(const LayoutPiece& layout, const MinikinPaint& /* dir */) { mLayout = &layout; }
 
     const LayoutPiece* get() const { return mLayout; }
 
