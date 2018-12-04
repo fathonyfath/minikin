@@ -71,7 +71,6 @@ cc_test {
         "WordBreakerTests.cpp",
     ],
 
-    cpp_std: "c++17",
     cflags: [
         "-Werror",
         "-Wall",

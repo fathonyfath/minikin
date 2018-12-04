@@ -48,7 +48,6 @@ cc_library {
         "SystemFonts.cpp",
         "WordBreaker.cpp",
     ],
-    cpp_std: "c++17",
     cflags: ["-Wall", "-Werror"],
     sanitize: {
         misc_undefined: [
