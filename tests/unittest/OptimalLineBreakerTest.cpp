@@ -1308,5 +1308,473 @@ TEST_F(OptimalLineBreakerTest, ExtentTest) {
     }
 }
 
+TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_SingleChar) {
+    constexpr float CHAR_WIDTH = 10.0;
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    const auto textBuf = utf8ToUtf16("This is an example \u2639 text.");
+
+    // In this test case, assign a replacement run for "U+2639" with 5 times of CHAR_WIDTH.
+    auto doLineBreak = [=](float width) {
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 19), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(19, 21, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+        builder.addCustomRun<ConstantRun>(Range(21, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
+                                          DESCENT);
+
+        std::unique_ptr<MeasuredText> measuredText = builder.build(
+                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        RectangleLineWidth rectangleLineWidth(width);
+        TabStops tabStops(nullptr, 0, 0);
+        return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
+                                BreakStrategy::HighQuality, HyphenationFrequency::None,
+                                false /* justified */);
+    };
+
+    {
+        constexpr float LINE_WIDTH = 100;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an ",   100, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"example ",       70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u2639 text.",  100, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 90;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"This ",   40, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"is an ",  50, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"example ",70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u2639 ", 50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"text.",   50, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 10;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"T",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"h",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"i",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"s ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"i",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"s ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"a",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"n ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"e",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"x",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"a",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"m",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"p",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"l",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"e ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u2639 ",50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"t",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"e",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"x",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"t",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {".",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_MultipleChars) {
+    constexpr float CHAR_WIDTH = 10.0;
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    const auto textBuf = utf8ToUtf16("This is an example text.");
+
+    // In this test case, assign a replacement run for "is an " with 5 times of CHAR_WIDTH.
+    auto doLineBreak = [=](float width) {
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 5), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(5, 11, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+        builder.addCustomRun<ConstantRun>(Range(11, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
+                                          DESCENT);
+
+        std::unique_ptr<MeasuredText> measuredText = builder.build(
+                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        RectangleLineWidth rectangleLineWidth(width);
+        TabStops tabStops(nullptr, 0, 0);
+        return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
+                                BreakStrategy::HighQuality, HyphenationFrequency::None,
+                                false /* justified */);
+    };
+
+    {
+        constexpr float LINE_WIDTH = 100;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"This is an ",   100, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"example ",       70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"text.",          50, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 90;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"This ",   40, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"is an ",  50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"example ",70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"text.",   50, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 10;
+        // "is an" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"T",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"h",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"i",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"s ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"is an ", 50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"e",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"x",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"a",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"m",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"p",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"l",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"e ",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"t",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"e",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"x",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"t",      10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {".",     10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_CJK) {
+    constexpr float CHAR_WIDTH = 10.0;
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    // Example string: "Today is a sunny day." in Japanese.
+    const auto textBuf = utf8ToUtf16("\u672C\u65E5\u306F\u6674\u5929\u306A\u308A");
+
+    // In this test case, assign a replacement run for "\u6674\u5929" with 5 times of CHAR_WIDTH.
+    auto doLineBreak = [=](float width) {
+        MeasuredTextBuilder builder;
+        builder.addCustomRun<ConstantRun>(Range(0, 3), "ja-JP", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(3, 5, 5 * CHAR_WIDTH, LocaleListCache::getId("ja-JP"));
+        builder.addCustomRun<ConstantRun>(Range(5, textBuf.size()), "ja-JP", CHAR_WIDTH, ASCENT,
+                                          DESCENT);
+
+        std::unique_ptr<MeasuredText> measuredText = builder.build(
+                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        RectangleLineWidth rectangleLineWidth(width);
+        TabStops tabStops(nullptr, 0, 0);
+        return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
+                                BreakStrategy::HighQuality, HyphenationFrequency::None,
+                                false /* justified */);
+    };
+
+    {
+        constexpr float LINE_WIDTH = 100;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F\u6674\u5929\u306A\u308A",
+                  100, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 90;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F\u6674\u5929\u306A",
+                  90, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u308A",
+                  10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 80;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F\u6674\u5929",
+                  80, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u306A\u308A",
+                  20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 70;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F", 30, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u6674\u5929\u306A\u308A", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 60;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F", 30, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u6674\u5929\u306A", 60, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u308A",             10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 50;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F", 30, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u6674\u5929",       50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u306A\u308A",       20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 40;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C\u65E5\u306F", 30, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u6674\u5929",       50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u306A\u308A",       20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 10;
+        // "\u6674\u5929" is a single replacement span. Do not break.
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"\u672C",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u65E5",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u306F",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u6674\u5929", 50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u306A",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u308A",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
+
+// http://b/119657685
+// Following test case is for verifying that the ReplacementSpan should not be broken into multiple
+// pieces. The actual break point is not a part of expectation. For example, it would be good to
+// break the starting offset of the ReplacementSpan for some case.
+TEST_F(OptimalLineBreakerTest, testReplacementSpan_GraphemeLineBreakWithMultipleRepalcementSpans) {
+    constexpr float CHAR_WIDTH = 10.0;
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+
+    const auto textBuf = utf8ToUtf16("ab de\u00A0\u00A0fg ij\u00A0\u00A0kl no\u00A0\u00A0pq st");
+
+    auto doLineBreak = [=](float width) {
+        MeasuredTextBuilder builder;
+        builder.addReplacementRun(0, 5, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+        builder.addCustomRun<ConstantRun>(Range(5, 7), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(7, 12, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+        builder.addCustomRun<ConstantRun>(Range(12, 14), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(14, 19, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+        builder.addCustomRun<ConstantRun>(Range(19, 21), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
+        builder.addReplacementRun(21, 26, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
+
+        std::unique_ptr<MeasuredText> measuredText = builder.build(
+                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        RectangleLineWidth rectangleLineWidth(width);
+        TabStops tabStops(nullptr, 0, 0);
+        return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
+                                BreakStrategy::HighQuality, HyphenationFrequency::None,
+                                false /* justified */);
+    };
+
+    {
+        constexpr float LINE_WIDTH = 1000;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de\u00A0\u00A0fg ij\u00A0\u00A0kl no\u00A0\u00A0pq st",
+                  260, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 250;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de\u00A0\u00A0fg ij\u00A0\u00A0kl no",
+                  190, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0pq st",
+                  70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 180;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de\u00A0\u00A0fg ij", 120, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0kl no\u00A0\u00A0pq st",
+                  140, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 130;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de\u00A0\u00A0fg ij", 120, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0kl no",       70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0pq st",       70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 110;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de",             50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u00A0\u00A0fg ij", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0kl no", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0pq st", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 60;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de\u00A0",  60, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0fg ij",  60, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0",       10, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0kl no",  60, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u00A0\u00A0", 20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"pq st",        50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+    {
+        constexpr float LINE_WIDTH = 50;
+        // clang-format off
+        std::vector<LineBreakExpectation> expect = {
+                {"ab de",        50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u00A0\u00A0", 20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"fg ij",        50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u00A0\u00A0", 20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"kl no",        50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+                {"\u00A0\u00A0", 20, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"pq st",        50, NO_START_HYPHEN, NO_END_HYPHEN,      0,       0},
+        };
+        // clang-format on
+        const auto actual = doLineBreak(LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
 }  // namespace
 }  // namespace minikin
