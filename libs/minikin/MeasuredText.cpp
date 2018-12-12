@@ -122,7 +122,7 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
         const Range& range = run->getRange();
         run->getMetrics(textBuf, &widths, piecesOut);
 
-        if (!computeHyphenation || !run->canHyphenate()) {
+        if (!computeHyphenation || !run->canBreak()) {
             continue;
         }
 

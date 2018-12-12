@@ -148,13 +148,20 @@ struct CharProcessor {
     // The user of CharProcessor must call updateLocaleIfNecessary with valid locale at least one
     // time before feeding characters.
     void updateLocaleIfNecessary(const Run& run) {
-        // Update locale if necessary.
-        uint32_t newLocaleListId = run.getLocaleListId();
-        if (localeListId != newLocaleListId) {
-            Locale locale = getEffectiveLocale(newLocaleListId);
-            nextWordBreak = breaker.followingWithLocale(locale, run.getRange().getStart());
-            hyphenator = HyphenatorMap::lookup(locale);
-            localeListId = newLocaleListId;
+        if (!run.canBreak()) {
+            // If current run can not be broken into pices, use the end offset for the next
+            // candidate.
+            localeListId = LocaleListCache::kInvalidListId;
+            nextWordBreak = run.getRange().getEnd();
+        } else {
+            // Update locale if necessary.
+            uint32_t newLocaleListId = run.getLocaleListId();
+            if (localeListId != newLocaleListId) {
+                Locale locale = getEffectiveLocale(newLocaleListId);
+                nextWordBreak = breaker.followingWithLocale(locale, run.getRange().getStart());
+                hyphenator = HyphenatorMap::lookup(locale);
+                localeListId = newLocaleListId;
+            }
         }
     }
 

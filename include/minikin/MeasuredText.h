@@ -38,8 +38,8 @@ public:
     // Returns true if this run is RTL. Otherwise returns false.
     virtual bool isRtl() const = 0;
 
-    // Returns true if this run is a target of hyphenation. Otherwise return false.
-    virtual bool canHyphenate() const = 0;
+    // Returns true if this run can be broken into multiple pieces for line breaking.
+    virtual bool canBreak() const = 0;
 
     // Returns the locale list ID for this run.
     virtual uint32_t getLocaleListId() const = 0;
@@ -60,10 +60,10 @@ public:
                               Layout* outLayout) const = 0;
 
     // Following two methods are only called when the implementation returns true for
-    // canHyphenate method.
+    // canBreak method.
 
     // Returns the paint pointer used for this run.
-    // Returns null if canHyphenate has not returned true.
+    // Returns null if canBreak has not returned true.
     virtual const MinikinPaint* getPaint() const { return nullptr; }
 
     // Measures the hyphenation piece and fills each character's advances and overhangs.
@@ -86,7 +86,7 @@ public:
     StyleRun(const Range& range, MinikinPaint&& paint, bool isRtl)
             : Run(range), mPaint(std::move(paint)), mIsRtl(isRtl) {}
 
-    bool canHyphenate() const override { return true; }
+    bool canBreak() const override { return true; }
     uint32_t getLocaleListId() const override { return mPaint.localeListId; }
     bool isRtl() const override { return mIsRtl; }
 
@@ -121,7 +121,7 @@ public:
             : Run(range), mWidth(width), mLocaleListId(localeListId) {}
 
     bool isRtl() const { return false; }
-    bool canHyphenate() const { return false; }
+    bool canBreak() const { return false; }
     uint32_t getLocaleListId() const { return mLocaleListId; }
 
     void getMetrics(const U16StringPiece& /* text */, std::vector<float>* advances,

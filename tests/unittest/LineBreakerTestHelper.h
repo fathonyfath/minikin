@@ -52,7 +52,7 @@ public:
     }
 
     virtual bool isRtl() const override { return false; }
-    virtual bool canHyphenate() const override { return true; }
+    virtual bool canBreak() const override { return true; }
     virtual uint32_t getLocaleListId() const { return mLocaleListId; }
 
     virtual void getMetrics(const U16StringPiece&, std::vector<float>* advances,

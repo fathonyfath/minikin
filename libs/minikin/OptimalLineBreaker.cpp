@@ -221,7 +221,7 @@ OptimizeContext populateCandidates(const U16StringPiece& textBuf, const Measured
 
         // Compute penalty parameters.
         float hyphenPenalty = 0.0f;
-        if (run->canHyphenate()) {
+        if (run->canBreak()) {
             auto penalties = computePenalties(*run, lineWidth, frequency, isJustified);
             hyphenPenalty = penalties.first;
             result.linePenalty = std::max(penalties.second, result.linePenalty);
