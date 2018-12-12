@@ -1262,7 +1262,7 @@ TEST(FontCollectionItemizeTest, itemize_LocaleAndCoverage) {
 
     auto collection = buildFontCollectionFromXml(kItemizeFontXml);
 
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         SCOPED_TRACE("Test for \"" + testCase.testString + "\" with locales " +
                      testCase.requestedLocales);
 
