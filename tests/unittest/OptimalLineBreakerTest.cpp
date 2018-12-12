@@ -1331,8 +1331,9 @@ TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_SingleChar) {
         builder.addCustomRun<ConstantRun>(Range(21, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
@@ -1423,8 +1424,9 @@ TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_MultipleChars) {
         builder.addCustomRun<ConstantRun>(Range(11, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
@@ -1511,8 +1513,9 @@ TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_CJK) {
         builder.addCustomRun<ConstantRun>(Range(5, textBuf.size()), "ja-JP", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,
@@ -1667,8 +1670,9 @@ TEST_F(OptimalLineBreakerTest, testReplacementSpan_GraphemeLineBreakWithMultiple
         builder.addCustomRun<ConstantRun>(Range(19, 21), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
         builder.addReplacementRun(21, 26, 5 * CHAR_WIDTH, LocaleListCache::getId("en-US"));
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineOptimal(textBuf, *measuredText, rectangleLineWidth,

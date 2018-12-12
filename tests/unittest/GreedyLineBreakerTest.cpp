@@ -1035,8 +1035,9 @@ TEST_F(GreedyLineBreakerTest, testReplacementSpanNotBreakTest_SingleChar) {
         builder.addCustomRun<ConstantRun>(Range(20, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
@@ -1129,8 +1130,9 @@ TEST_F(GreedyLineBreakerTest, testReplacementSpanNotBreakTest_MultipleChars) {
         builder.addCustomRun<ConstantRun>(Range(11, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
@@ -1216,8 +1218,9 @@ TEST_F(GreedyLineBreakerTest, testReplacementSpanNotBreakTest_CJK) {
         builder.addCustomRun<ConstantRun>(Range(5, textBuf.size()), "ja-JP", CHAR_WIDTH, ASCENT,
                                           DESCENT);
 
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, false /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, false /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         RectangleLineWidth rectangleLineWidth(width);
         TabStops tabStops(nullptr, 0, 0);
         return breakLineGreedy(textBuf, *measuredText, rectangleLineWidth, tabStops, DO_HYPHEN);
