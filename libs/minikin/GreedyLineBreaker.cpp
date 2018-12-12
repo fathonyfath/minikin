@@ -329,18 +329,13 @@ void GreedyLineBreaker::process() {
     for (const auto& run : mMeasuredText.runs) {
         const Range range = run->getRange();
 
-        if (run->canBreak()) {
-            // Update locale if necessary.
-            uint32_t newLocaleListId = run->getLocaleListId();
-            if (localeListId != newLocaleListId) {
-                Locale locale = getEffectiveLocale(newLocaleListId);
-                nextWordBoundaryOffset = wordBreaker.followingWithLocale(locale, range.getStart());
-                mHyphenator = HyphenatorMap::lookup(locale);
-                localeListId = newLocaleListId;
-            }
-        } else {
-            localeListId = LocaleListCache::kInvalidListId;
-            nextWordBoundaryOffset = range.getEnd();
+        // Update locale if necessary.
+        uint32_t newLocaleListId = run->getLocaleListId();
+        if (localeListId != newLocaleListId) {
+            Locale locale = getEffectiveLocale(newLocaleListId);
+            nextWordBoundaryOffset = wordBreaker.followingWithLocale(locale, range.getStart());
+            mHyphenator = HyphenatorMap::lookup(locale);
+            localeListId = newLocaleListId;
         }
 
         for (uint32_t i = range.getStart(); i < range.getEnd(); ++i) {
@@ -348,10 +343,10 @@ void GreedyLineBreaker::process() {
 
             if ((i + 1) == nextWordBoundaryOffset) {
                 // Only process line break at word boundary and the run can break into some pieces.
-                processLineBreak(i + 1, &wordBreaker, run->canBreak());
-                if (run->canBreak()) {
-                    nextWordBoundaryOffset = wordBreaker.next();
+                if (run->canBreak() || nextWordBoundaryOffset == range.getEnd()) {
+                    processLineBreak(i + 1, &wordBreaker, run->canBreak());
                 }
+                nextWordBoundaryOffset = wordBreaker.next();
             }
         }
     }
