@@ -81,8 +81,9 @@ protected:
         paint.size = 10.0f;  // Make 1em=1px
         paint.localeListId = LocaleListCache::getId(lang);
         builder.addStyleRun(0, textBuffer.size(), std::move(paint), false);
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuffer, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuffer, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         return doLineBreak(textBuffer, *measuredText, strategy, frequency, lineWidth);
     }
 
@@ -941,8 +942,9 @@ TEST_F(OptimalLineBreakerTest, testZeroWidthCharacter) {
         MeasuredTextBuilder builder;
         builder.addCustomRun<ConstantRun>(Range(0, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
 
         const auto actual =
                 doLineBreak(textBuf, *measuredText, HIGH_QUALITY, NORMAL_HYPHENATION, LINE_WIDTH);
@@ -959,8 +961,9 @@ TEST_F(OptimalLineBreakerTest, testZeroWidthCharacter) {
         MeasuredTextBuilder builder;
         builder.addCustomRun<ConstantRun>(Range(0, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
 
         const auto actual =
                 doLineBreak(textBuf, *measuredText, HIGH_QUALITY, NORMAL_HYPHENATION, LINE_WIDTH);
@@ -989,8 +992,9 @@ TEST_F(OptimalLineBreakerTest, testLocaleSwitchTest) {
         builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
         builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "en-US", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
 
         const auto actual =
                 doLineBreak(textBuf, *measuredText, HIGH_QUALITY, NORMAL_HYPHENATION, LINE_WIDTH);
@@ -1007,8 +1011,9 @@ TEST_F(OptimalLineBreakerTest, testLocaleSwitchTest) {
         builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
         builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measuredText = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measuredText =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
         const auto actual =
                 doLineBreak(textBuf, *measuredText, HIGH_QUALITY, NORMAL_HYPHENATION, LINE_WIDTH);
         EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
@@ -1104,8 +1109,9 @@ TEST_F(OptimalLineBreakerTest, testLocaleSwitch_InEmailOrUrl) {
         builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
         builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measured = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measured =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
 
         // clang-format off
         std::vector<LineBreakExpectation> expect = {
@@ -1146,8 +1152,9 @@ TEST_F(OptimalLineBreakerTest, testLocaleSwitch_InEmailOrUrl) {
         builder.addCustomRun<ConstantRun>(Range(0, 18), "en-US", CHAR_WIDTH, ASCENT, DESCENT);
         builder.addCustomRun<ConstantRun>(Range(18, textBuf.size()), "fr-FR", CHAR_WIDTH, ASCENT,
                                           DESCENT);
-        std::unique_ptr<MeasuredText> measured = builder.build(
-                textBuf, true /* compute hyphenation */, false /* compute full layout */);
+        std::unique_ptr<MeasuredText> measured =
+                builder.build(textBuf, true /* compute hyphenation */,
+                              false /* compute full layout */, nullptr /* no hint */);
 
         // clang-format off
         std::vector<LineBreakExpectation> expect = {

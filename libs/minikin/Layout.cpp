@@ -104,7 +104,7 @@ public:
               mOutOffset(outOffset),
               mWordSpacing(wordSpacing) {}
 
-    void operator()(const LayoutPiece& layoutPiece) {
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& /* paint */) {
         if (mLayout) {
             mLayout->appendLayout(layoutPiece, mOutOffset, mWordSpacing);
         }

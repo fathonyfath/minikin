@@ -45,7 +45,8 @@ TEST(MeasuredTextTest, RunTests) {
     std::vector<uint16_t> text(CHAR_COUNT, 'a');
 
     std::unique_ptr<MeasuredText> measuredText =
-            builder.build(text, true /* compute hyphenation */, false /* compute full layout */);
+            builder.build(text, true /* compute hyphenation */, false /* compute full layout */,
+                          nullptr /* no hint */);
 
     ASSERT_TRUE(measuredText);
 
@@ -64,7 +65,8 @@ TEST(MeasuredTextTest, getBoundsTest) {
     MinikinPaint paint(font);
     paint.size = 10.0f;
     builder.addStyleRun(0, text.size(), std::move(paint), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     EXPECT_EQ(MinikinRect(0.0f, 0.0f, 0.0f, 0.0f), mt->getBounds(text, Range(0, 0)));
     EXPECT_EQ(MinikinRect(0.0f, 10.0f, 10.0f, 0.0f), mt->getBounds(text, Range(0, 1)));
@@ -85,7 +87,8 @@ TEST(MeasuredTextTest, getBoundsTest_multiStyle) {
     MinikinPaint paint2(font);
     paint2.size = 20.0f;
     builder.addStyleRun(helloLength, text.size(), std::move(paint2), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     EXPECT_EQ(MinikinRect(0.0f, 0.0f, 0.0f, 0.0f), mt->getBounds(text, Range(0, 0)));
     EXPECT_EQ(MinikinRect(0.0f, 10.0f, 10.0f, 0.0f), mt->getBounds(text, Range(0, 1)));
@@ -105,7 +108,8 @@ TEST(MeasuredTextTest, getExtentTest) {
     MinikinPaint paint(font);
     paint.size = 10.0f;
     builder.addStyleRun(0, text.size(), std::move(paint), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     EXPECT_EQ(MinikinExtent(0.0f, 0.0f), mt->getExtent(text, Range(0, 0)));
     EXPECT_EQ(MinikinExtent(-80.0f, 20.0f), mt->getExtent(text, Range(0, 1)));
@@ -126,7 +130,8 @@ TEST(MeasuredTextTest, getExtentTest_multiStyle) {
     MinikinPaint paint2(font);
     paint2.size = 20.0f;
     builder.addStyleRun(helloLength, text.size(), std::move(paint2), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     EXPECT_EQ(MinikinExtent(0.0f, 0.0f), mt->getExtent(text, Range(0, 0)));
     EXPECT_EQ(MinikinExtent(-80.0f, 20.0f), mt->getExtent(text, Range(0, 1)));
@@ -147,7 +152,8 @@ TEST(MeasuredTextTest, buildLayoutTest) {
     MinikinPaint paint(font);
     paint.size = 10.0f;
     builder.addStyleRun(0, text.size(), std::move(paint), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     MinikinPaint samePaint(font);
     samePaint.size = 10.0f;
@@ -220,7 +226,8 @@ TEST(MeasuredTextTest, buildLayoutTest_multiStyle) {
     MinikinPaint paint2(font);
     paint2.size = 20.0f;
     builder.addStyleRun(helloLength, text.size(), std::move(paint2), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     MinikinPaint samePaint(font);
     samePaint.size = 10.0f;
@@ -292,7 +299,8 @@ TEST(MeasuredTextTest, buildLayoutTest_differentPaint) {
     MinikinPaint paint(font);
     paint.size = 10.0f;
     builder.addStyleRun(0, text.size(), std::move(paint), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     MinikinPaint differentPaint(font);
     differentPaint.size = 20.0f;
@@ -365,7 +373,8 @@ TEST(MeasuredTextTest, buildLayoutTest_multiStyle_differentPaint) {
     MinikinPaint paint2(font);
     paint2.size = 20.0f;
     builder.addStyleRun(helloLength, text.size(), std::move(paint2), false /* is RTL */);
-    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */);
+    auto mt = builder.build(text, true /* hyphenation */, true /* full layout */,
+                            nullptr /* no hint */);
 
     MinikinPaint differentPaint(font);
     differentPaint.size = 30.0f;

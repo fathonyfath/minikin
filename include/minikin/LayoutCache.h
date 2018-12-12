@@ -133,7 +133,7 @@ public:
                      bool dir, StartHyphenEdit startHyphen, EndHyphenEdit endHyphen, F& f) {
         LayoutCacheKey key(text, range, paint, dir, startHyphen, endHyphen);
         if (paint.skipCache() || range.getLength() >= LENGTH_LIMIT_CACHE) {
-            f(LayoutPiece(text, range, dir, paint, startHyphen, endHyphen));
+            f(LayoutPiece(text, range, dir, paint, startHyphen, endHyphen), paint);
             return;
         }
         mRequestCount++;
@@ -142,7 +142,7 @@ public:
             LayoutPiece* layout = mCache.get(key);
             if (layout != nullptr) {
                 mCacheHitCount++;
-                f(*layout);
+                f(*layout, paint);
                 return;
             }
         }
@@ -151,7 +151,7 @@ public:
         key.copyText();
         std::unique_ptr<LayoutPiece> layout =
                 std::make_unique<LayoutPiece>(text, range, dir, paint, startHyphen, endHyphen);
-        f(*layout);
+        f(*layout, paint);
         {
             std::lock_guard<std::mutex> lock(mMutex);
             mCache.put(key, layout.release());

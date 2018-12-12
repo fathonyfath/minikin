@@ -32,33 +32,45 @@ public:
     AdvancesCompositor(std::vector<float>* outAdvances, LayoutPieces* outPieces)
             : mOutAdvances(outAdvances), mOutPieces(outPieces) {}
 
-    void setNextRange(const Range& range) { mRange = range; }
+    void setNextRange(const Range& range, bool dir) {
+        mRange = range;
+        mDir = dir;
+    }
 
-    void operator()(const LayoutPiece& layoutPiece) {
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& paint) {
         const std::vector<float>& advances = layoutPiece.advances();
         std::copy(advances.begin(), advances.end(), mOutAdvances->begin() + mRange.getStart());
 
         if (mOutPieces != nullptr) {
-            mOutPieces->insert(mRange, 0 /* no edit */, layoutPiece);
+            mOutPieces->insert(mRange, 0 /* no edit */, layoutPiece, mDir, paint);
         }
     }
 
 private:
     Range mRange;
+    bool mDir;
     std::vector<float>* mOutAdvances;
     LayoutPieces* mOutPieces;
 };
 
 void StyleRun::getMetrics(const U16StringPiece& textBuf, std::vector<float>* advances,
-                          LayoutPieces* pieces) const {
-    AdvancesCompositor compositor(advances, pieces);
+                          LayoutPieces* precomputed, LayoutPieces* outPieces) const {
+    AdvancesCompositor compositor(advances, outPieces);
     const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    const uint32_t paintId =
+            (precomputed == nullptr) ? LayoutPieces::kNoPaintId : precomputed->findPaintId(mPaint);
     for (const BidiText::RunInfo info : BidiText(textBuf, mRange, bidiFlag)) {
         for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
-            compositor.setNextRange(piece);
-            LayoutCache::getInstance().getOrCreate(
-                    textBuf.substr(context), piece - context.getStart(), mPaint, info.isRtl,
-                    StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+            compositor.setNextRange(piece, info.isRtl);
+            if (paintId == LayoutPieces::kNoPaintId) {
+                LayoutCache::getInstance().getOrCreate(
+                        textBuf.substr(context), piece - context.getStart(), mPaint, info.isRtl,
+                        StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+            } else {
+                precomputed->getOrCreate(textBuf, piece, context, mPaint, info.isRtl,
+                                         StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, paintId,
+                                         compositor);
+            }
         }
     }
 }
@@ -68,15 +80,16 @@ class TotalAdvanceCompositor {
 public:
     TotalAdvanceCompositor(LayoutPieces* outPieces) : mTotalAdvance(0), mOutPieces(outPieces) {}
 
-    void setNextContext(const Range& range, HyphenEdit edit) {
+    void setNextContext(const Range& range, HyphenEdit edit, bool dir) {
         mRange = range;
         mEdit = edit;
+        mDir = dir;
     }
 
-    void operator()(const LayoutPiece& layoutPiece) {
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& paint) {
         mTotalAdvance += layoutPiece.advance();
         if (mOutPieces != nullptr) {
-            mOutPieces->insert(mRange, mEdit, layoutPiece);
+            mOutPieces->insert(mRange, mEdit, layoutPiece, mDir, paint);
         }
     }
 
@@ -86,6 +99,7 @@ private:
     float mTotalAdvance;
     Range mRange;
     HyphenEdit mEdit;
+    bool mDir;
     LayoutPieces* mOutPieces;
 };
 
@@ -101,7 +115,7 @@ float StyleRun::measureHyphenPiece(const U16StringPiece& textBuf, const Range& r
             const EndHyphenEdit endEdit =
                     piece.getEnd() == range.getEnd() ? endHyphen : EndHyphenEdit::NO_EDIT;
 
-            compositor.setNextContext(piece, packHyphenEdit(startEdit, endEdit));
+            compositor.setNextContext(piece, packHyphenEdit(startEdit, endEdit), info.isRtl);
             LayoutCache::getInstance().getOrCreate(textBuf.substr(context),
                                                    piece - context.getStart(), mPaint, info.isRtl,
                                                    startEdit, endEdit, compositor);
@@ -111,7 +125,7 @@ float StyleRun::measureHyphenPiece(const U16StringPiece& textBuf, const Range& r
 }
 
 void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenation,
-                           bool computeLayout) {
+                           bool computeLayout, MeasuredText* hint) {
     if (textBuf.size() == 0) {
         return;
     }
@@ -120,7 +134,7 @@ void MeasuredText::measure(const U16StringPiece& textBuf, bool computeHyphenatio
     CharProcessor proc(textBuf);
     for (const auto& run : runs) {
         const Range& range = run->getRange();
-        run->getMetrics(textBuf, &widths, piecesOut);
+        run->getMetrics(textBuf, &widths, hint ? &hint->layoutPieces : nullptr, piecesOut);
 
         if (!computeHyphenation || !run->canBreak()) {
             continue;
@@ -149,7 +163,7 @@ public:
 
     void setOutOffset(uint32_t outOffset) { mOutOffset = outOffset; }
 
-    void operator()(const LayoutPiece& layoutPiece) {
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& /* paint */) {
         mOutLayout->appendLayout(layoutPiece, mOutOffset, mExtraAdvance);
     }
 
@@ -170,6 +184,7 @@ void StyleRun::appendLayout(const U16StringPiece& textBuf, const Range& range,
 
     LayoutCompositor compositor(outLayout, wordSpacing);
     const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    const uint32_t paintId = pieces.findPaintId(mPaint);
     for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
         for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
             compositor.setOutOffset(piece.getStart() - outOrigin);
@@ -180,7 +195,7 @@ void StyleRun::appendLayout(const U16StringPiece& textBuf, const Range& range,
 
             if (canUsePrecomputedResult) {
                 pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl, startEdit, endEdit,
-                                   compositor);
+                                   paintId, compositor);
             } else {
                 LayoutCache::getInstance().getOrCreate(textBuf.substr(context),
                                                        piece - context.getStart(), paint,
@@ -195,7 +210,7 @@ class BoundsCompositor {
 public:
     BoundsCompositor() : mAdvance(0) {}
 
-    void operator()(const LayoutPiece& layoutPiece) {
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& /* paint */) {
         MinikinRect tmpBounds = layoutPiece.bounds();
         tmpBounds.offset(mAdvance, 0);
         mBounds.join(tmpBounds);
@@ -214,10 +229,12 @@ std::pair<float, MinikinRect> StyleRun::getBounds(const U16StringPiece& textBuf,
                                                   const LayoutPieces& pieces) const {
     BoundsCompositor compositor;
     const Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    const uint32_t paintId = pieces.findPaintId(mPaint);
     for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
         for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
             pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl,
-                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, paintId,
+                               compositor);
         }
     }
     return std::make_pair(compositor.advance(), compositor.bounds());
@@ -228,7 +245,9 @@ class ExtentCompositor {
 public:
     ExtentCompositor() {}
 
-    void operator()(const LayoutPiece& layoutPiece) { mExtent.extendBy(layoutPiece.extent()); }
+    void operator()(const LayoutPiece& layoutPiece, const MinikinPaint& /* paint */) {
+        mExtent.extendBy(layoutPiece.extent());
+    }
 
     const MinikinExtent& extent() const { return mExtent; }
 
@@ -240,10 +259,12 @@ MinikinExtent StyleRun::getExtent(const U16StringPiece& textBuf, const Range& ra
                                   const LayoutPieces& pieces) const {
     ExtentCompositor compositor;
     Bidi bidiFlag = mIsRtl ? Bidi::FORCE_RTL : Bidi::FORCE_LTR;
+    const uint32_t paintId = pieces.findPaintId(mPaint);
     for (const BidiText::RunInfo info : BidiText(textBuf, range, bidiFlag)) {
         for (const auto[context, piece] : LayoutSplitter(textBuf, info.range, info.isRtl)) {
             pieces.getOrCreate(textBuf, piece, context, mPaint, info.isRtl,
-                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, compositor);
+                               StartHyphenEdit::NO_EDIT, EndHyphenEdit::NO_EDIT, paintId,
+                               compositor);
         }
     }
     return compositor.extent();

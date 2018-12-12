@@ -55,7 +55,7 @@ public:
     virtual bool canBreak() const override { return true; }
     virtual uint32_t getLocaleListId() const { return mLocaleListId; }
 
-    virtual void getMetrics(const U16StringPiece&, std::vector<float>* advances,
+    virtual void getMetrics(const U16StringPiece&, std::vector<float>* advances, LayoutPieces*,
                             LayoutPieces*) const {
         std::fill(advances->begin() + mRange.getStart(), advances->begin() + mRange.getEnd(),
                   mWidth);

@@ -46,7 +46,7 @@ public:
 
     // Fills the each character's advances, extents and overhangs.
     virtual void getMetrics(const U16StringPiece& text, std::vector<float>* advances,
-                            LayoutPieces* pieces) const = 0;
+                            LayoutPieces* precomputed, LayoutPieces* outPieces) const = 0;
 
     virtual std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
                                                     const LayoutPieces& pieces) const = 0;
@@ -91,7 +91,7 @@ public:
     bool isRtl() const override { return mIsRtl; }
 
     void getMetrics(const U16StringPiece& text, std::vector<float>* advances,
-                    LayoutPieces* pieces) const override;
+                    LayoutPieces* precomputed, LayoutPieces* outPieces) const override;
 
     std::pair<float, MinikinRect> getBounds(const U16StringPiece& text, const Range& range,
                                             const LayoutPieces& pieces) const override;
@@ -125,7 +125,7 @@ public:
     uint32_t getLocaleListId() const { return mLocaleListId; }
 
     void getMetrics(const U16StringPiece& /* text */, std::vector<float>* advances,
-                    LayoutPieces* /* pieces */) const override {
+                    LayoutPieces* /* precomputed */, LayoutPieces* /* outPieces */) const override {
         (*advances)[mRange.getStart()] = mWidth;
         // TODO: Get the extents information from the caller.
     }
@@ -205,13 +205,14 @@ public:
 private:
     friend class MeasuredTextBuilder;
 
-    void measure(const U16StringPiece& textBuf, bool computeHyphenation, bool computeLayout);
+    void measure(const U16StringPiece& textBuf, bool computeHyphenation, bool computeLayout,
+                 MeasuredText* hint);
 
     // Use MeasuredTextBuilder instead.
     MeasuredText(const U16StringPiece& textBuf, std::vector<std::unique_ptr<Run>>&& runs,
-                 bool computeHyphenation, bool computeLayout)
+                 bool computeHyphenation, bool computeLayout, MeasuredText* hint)
             : widths(textBuf.size()), runs(std::move(runs)) {
-        measure(textBuf, computeHyphenation, computeLayout);
+        measure(textBuf, computeHyphenation, computeLayout, hint);
     }
 };
 
@@ -234,10 +235,10 @@ public:
     }
 
     std::unique_ptr<MeasuredText> build(const U16StringPiece& textBuf, bool computeHyphenation,
-                                        bool computeLayout) {
+                                        bool computeLayout, MeasuredText* hint) {
         // Unable to use make_unique here since make_unique is not a friend of MeasuredText.
-        return std::unique_ptr<MeasuredText>(
-                new MeasuredText(textBuf, std::move(mRuns), computeHyphenation, computeLayout));
+        return std::unique_ptr<MeasuredText>(new MeasuredText(
+                textBuf, std::move(mRuns), computeHyphenation, computeLayout, hint));
     }
 
     MINIKIN_PREVENT_COPY_ASSIGN_AND_MOVE(MeasuredTextBuilder);

@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include <string>
+
 #include "minikin/Macros.h"
 
 namespace minikin {
@@ -43,6 +45,23 @@ public:
         }
         if (length & 1) {
             update(data[i]);
+        }
+        return *this;
+    }
+
+    inline Hasher& updateString(const std::string& str) {
+        uint32_t size = str.size();
+        update(size);
+        uint32_t i;
+        for (i = 0; i < (size & -4); i += 4) {
+            update((uint32_t)str[i] | ((uint32_t)str[i + 1] << 8) | (uint32_t)(str[i + 2] << 16) |
+                   (uint32_t)(str[i + 3] << 24));
+        }
+        if (size & 3) {
+            uint32_t data = str[i];
+            data |= ((size & 3) > 1) ? (str[i + 1] << 8) : 0;
+            data |= ((size & 3) > 2) ? (str[i + 2] << 16) : 0;
+            update(data);
         }
         return *this;
     }

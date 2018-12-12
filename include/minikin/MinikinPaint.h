@@ -21,7 +21,9 @@
 #include <string>
 
 #include "minikin/FamilyVariant.h"
+#include "minikin/FontCollection.h"
 #include "minikin/FontFamily.h"
+#include "minikin/Hasher.h"
 
 namespace minikin {
 
@@ -64,6 +66,9 @@ struct MinikinPaint {
 
     void copyFrom(const MinikinPaint& paint) { *this = paint; }
 
+    MinikinPaint(const MinikinPaint&) = default;
+    MinikinPaint& operator=(const MinikinPaint&) = default;
+
     MinikinPaint(MinikinPaint&&) = default;
     MinikinPaint& operator=(MinikinPaint&&) = default;
 
@@ -75,10 +80,21 @@ struct MinikinPaint {
                fontFeatureSettings == paint.fontFeatureSettings && font.get() == paint.font.get();
     }
 
-private:
-    // Forbid implicit copy and assign. Use copyFrom instead.
-    MinikinPaint(const MinikinPaint&) = default;
-    MinikinPaint& operator=(const MinikinPaint&) = default;
+    uint32_t hash() const {
+        return Hasher()
+                .update(size)
+                .update(scaleX)
+                .update(skewX)
+                .update(letterSpacing)
+                .update(wordSpacing)
+                .update(paintFlags)
+                .update(localeListId)
+                .update(fontStyle.identifier())
+                .update(static_cast<uint8_t>(familyVariant))
+                .updateString(fontFeatureSettings)
+                .update(font->getId())
+                .hash();
+    }
 };
 
 }  // namespace minikin
