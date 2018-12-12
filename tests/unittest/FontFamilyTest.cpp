@@ -251,7 +251,7 @@ TEST(LocaleTest, ScriptMatchTest) {
             {"zh-Hanb", "Kore", NOT_SUPPORTED},
     };
 
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         hb_script_t script = hb_script_from_iso15924_tag(
                 HB_TAG(testCase.requestedScript[0], testCase.requestedScript[1],
                        testCase.requestedScript[2], testCase.requestedScript[3]));
@@ -370,7 +370,7 @@ TEST(LocaleListTest, subtagEmojiTest) {
             "de-Latn-DE-1901-u-em-emoji",
     };
 
-    for (auto subtagEmojiString : subtagEmojiStrings) {
+    for (const auto& subtagEmojiString : subtagEmojiStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmojiString + "\"");
         Locale subtagEmoji = createLocale(subtagEmojiString);
         EXPECT_EQ(EmojiStyle::EMOJI, subtagEmoji.getEmojiStyle());
@@ -397,7 +397,7 @@ TEST(LocaleListTest, subtagTextTest) {
             "de-Latn-DE-1901-u-em-text",
     };
 
-    for (auto subtagTextString : subtagTextStrings) {
+    for (const auto& subtagTextString : subtagTextStrings) {
         SCOPED_TRACE("Test for \"" + subtagTextString + "\"");
         Locale subtagText = createLocale(subtagTextString);
         EXPECT_EQ(EmojiStyle::TEXT, subtagText.getEmojiStyle());
@@ -425,7 +425,7 @@ TEST(LocaleListTest, subtagDefaultTest) {
             "de-Latn-DE-1901-u-em-default",
     };
 
-    for (auto subtagDefaultString : subtagDefaultStrings) {
+    for (const auto& subtagDefaultString : subtagDefaultStrings) {
         SCOPED_TRACE("Test for \"" + subtagDefaultString + "\"");
         Locale subtagDefault = createLocale(subtagDefaultString);
         EXPECT_EQ(EmojiStyle::DEFAULT, subtagDefault.getEmojiStyle());
@@ -444,7 +444,7 @@ TEST(LocaleListTest, subtagEmptyTest) {
             "de-Latn-DE-1901",
     };
 
-    for (auto subtagEmptyString : subtagEmptyStrings) {
+    for (const auto& subtagEmptyString : subtagEmptyStrings) {
         SCOPED_TRACE("Test for \"" + subtagEmptyString + "\"");
         Locale subtagEmpty = createLocale(subtagEmptyString);
         EXPECT_EQ(EmojiStyle::EMPTY, subtagEmpty.getEmojiStyle());
@@ -556,7 +556,7 @@ TEST_F(FontFamilyTest, hasVSTableTest) {
             {"Italic.ttf", false}, {"Bold.ttf", false},  {"BoldItalic.ttf", false},
     };
 
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         SCOPED_TRACE(testCase.hasVSTable ? "Font " + testCase.fontPath +
                                                    " should have a variation sequence table."
                                          : "Font " + testCase.fontPath +
