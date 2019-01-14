@@ -41,10 +41,10 @@ public:
         update(length);
         uint32_t i;
         for (i = 0; i < (length & -2); i += 2) {
-            update(data[i] | (data[i + 1] << 16));
+            update((uint32_t)data[i] | ((uint32_t)data[i + 1] << 16));
         }
         if (length & 1) {
-            update(data[i]);
+            update((uint32_t)data[i]);
         }
         return *this;
     }
@@ -54,13 +54,13 @@ public:
         update(size);
         uint32_t i;
         for (i = 0; i < (size & -4); i += 4) {
-            update((uint32_t)str[i] | ((uint32_t)str[i + 1] << 8) | (uint32_t)(str[i + 2] << 16) |
-                   (uint32_t)(str[i + 3] << 24));
+            update((uint32_t)str[i] | ((uint32_t)str[i + 1] << 8) | ((uint32_t)str[i + 2] << 16) |
+                   ((uint32_t)str[i + 3] << 24));
         }
         if (size & 3) {
             uint32_t data = str[i];
-            data |= ((size & 3) > 1) ? (str[i + 1] << 8) : 0;
-            data |= ((size & 3) > 2) ? (str[i + 2] << 16) : 0;
+            data |= ((size & 3) > 1) ? ((uint32_t)str[i + 1] << 8) : 0;
+            data |= ((size & 3) > 2) ? ((uint32_t)str[i + 2] << 16) : 0;
             update(data);
         }
         return *this;
