@@ -426,7 +426,7 @@ LayoutPiece::LayoutPiece(const U16StringPiece& textBuf, const Range& range, bool
 
             if (paint.letterSpacing != 0.0 && isScriptOkForLetterspacing(script)) {
                 letterSpace = paint.letterSpacing * size * scaleX;
-                if ((paint.paintFlags & LinearTextFlag) == 0) {
+                if ((paint.fontFlags & LinearMetrics_Flag) == 0) {
                     letterSpace = round(letterSpace);
                     letterSpaceHalfLeft = floor(letterSpace * 0.5);
                 } else {
@@ -488,7 +488,7 @@ LayoutPiece::LayoutPiece(const U16StringPiece& textBuf, const Range& range, bool
                 mGlyphIds.push_back(glyph_ix);
                 mPoints.emplace_back(x + xoff, y + yoff);
                 float xAdvance = HBFixedToFloat(positions[i].x_advance);
-                if ((paint.paintFlags & LinearTextFlag) == 0) {
+                if ((paint.fontFlags & LinearMetrics_Flag) == 0) {
                     xAdvance = roundf(xAdvance);
                 }
                 MinikinRect glyphBounds;
