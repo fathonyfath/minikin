@@ -82,4 +82,13 @@ cc_library {
     whole_static_libs: ["libgtest_prod"],
 
     clang: true,
+
+    target: {
+        windows: {
+            enabled: true,
+            cppflags: [
+                "-Wno-thread-safety",
+            ],
+        },
+    },
 }

@@ -27,6 +27,10 @@
 #include "minikin/Hasher.h"
 #include "minikin/MinikinPaint.h"
 
+#ifdef _WIN32
+#include <io.h>
+#endif
+
 namespace minikin {
 const uint32_t LENGTH_LIMIT_CACHE = 128;
 // Layout cache datatypes
@@ -160,10 +164,23 @@ public:
 
     void dumpStats(int fd) {
         std::lock_guard<std::mutex> lock(mMutex);
+#ifdef _WIN32
+        float ratio = (mRequestCount == 0) ? 0 : mCacheHitCount / (float)mRequestCount;
+        int count = _scprintf(
+                "\nLayout Cache Info:\n  Usage: %zd/%zd entries\n  Hit ratio: %d/%d (%f)\n",
+                mCache.size(), kMaxEntries, mCacheHitCount, mRequestCount, ratio);
+        int size = count + 1;
+        char* buffer = new char[size];
+        sprintf_s(buffer, size,
+                  "\nLayout Cache Info:\n  Usage: %zd/%zd entries\n  Hit ratio: %d/%d (%f)\n",
+                  mCache.size(), kMaxEntries, mCacheHitCount, mRequestCount, ratio);
+        _write(fd, buffer, sizeof(buffer));
+#else
         dprintf(fd, "\nLayout Cache Info:\n");
         dprintf(fd, "  Usage: %zd/%zd entries\n", mCache.size(), kMaxEntries);
         float ratio = (mRequestCount == 0) ? 0 : mCacheHitCount / (float)mRequestCount;
         dprintf(fd, "  Hit ratio: %d/%d (%f)\n", mCacheHitCount, mRequestCount, ratio);
+#endif
     }
 
     static LayoutCache& getInstance() {
