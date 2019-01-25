@@ -29,10 +29,19 @@ namespace minikin {
 
 class FontCollection;
 
-// Only a few flags affect layout, but those that do should have values
-// consistent with Android's paint flags.
-enum MinikinPaintFlags {
-    LinearTextFlag = 0x40,
+// These describe what is stored in MinikinPaint.fontFlags.
+enum MinikinFontFlags {
+    Embolden_Shift = 0,
+    LinearMetrics_Shift = 1,
+    Subpixel_Shift = 2,
+    EmbeddedBitmaps_Shift = 3,
+    ForceAutoHinting_Shift = 4,
+
+    Embolden_Flag = 1 << Embolden_Shift,
+    LinearMetrics_Flag = 1 << LinearMetrics_Shift,
+    Subpixel_Flag = 1 << Subpixel_Shift,
+    EmbeddedBitmaps_Flag = 1 << EmbeddedBitmaps_Shift,
+    ForceAutoHinting_Flag = 1 << ForceAutoHinting_Shift,
 };
 
 // Possibly move into own .h file?
@@ -44,7 +53,7 @@ struct MinikinPaint {
               skewX(0),
               letterSpacing(0),
               wordSpacing(0),
-              paintFlags(0),
+              fontFlags(0),
               localeListId(0),
               familyVariant(FamilyVariant::DEFAULT),
               fontFeatureSettings(),
@@ -57,7 +66,7 @@ struct MinikinPaint {
     float skewX;
     float letterSpacing;
     float wordSpacing;
-    uint32_t paintFlags;
+    uint32_t fontFlags;
     uint32_t localeListId;
     FontStyle fontStyle;
     FamilyVariant familyVariant;
@@ -75,7 +84,7 @@ struct MinikinPaint {
     inline bool operator==(const MinikinPaint& paint) const {
         return size == paint.size && scaleX == paint.scaleX && skewX == paint.skewX &&
                letterSpacing == paint.letterSpacing && wordSpacing == paint.wordSpacing &&
-               paintFlags == paint.paintFlags && localeListId == paint.localeListId &&
+               fontFlags == paint.fontFlags && localeListId == paint.localeListId &&
                fontStyle == paint.fontStyle && familyVariant == paint.familyVariant &&
                fontFeatureSettings == paint.fontFeatureSettings && font.get() == paint.font.get();
     }
@@ -87,7 +96,7 @@ struct MinikinPaint {
                 .update(skewX)
                 .update(letterSpacing)
                 .update(wordSpacing)
-                .update(paintFlags)
+                .update(fontFlags)
                 .update(localeListId)
                 .update(fontStyle.identifier())
                 .update(static_cast<uint8_t>(familyVariant))

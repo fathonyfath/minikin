@@ -49,7 +49,7 @@ public:
               mSkewX(paint.skewX),
               mLetterSpacing(paint.letterSpacing),
               mWordSpacing(paint.wordSpacing),
-              mPaintFlags(paint.paintFlags),
+              mFontFlags(paint.fontFlags),
               mLocaleListId(paint.localeListId),
               mFamilyVariant(paint.familyVariant),
               mStartHyphen(startHyphen),
@@ -61,7 +61,7 @@ public:
         return mId == o.mId && mStart == o.mStart && mCount == o.mCount && mStyle == o.mStyle &&
                mSize == o.mSize && mScaleX == o.mScaleX && mSkewX == o.mSkewX &&
                mLetterSpacing == o.mLetterSpacing && mWordSpacing == o.mWordSpacing &&
-               mPaintFlags == o.mPaintFlags && mLocaleListId == o.mLocaleListId &&
+               mFontFlags == o.mFontFlags && mLocaleListId == o.mLocaleListId &&
                mFamilyVariant == o.mFamilyVariant && mStartHyphen == o.mStartHyphen &&
                mEndHyphen == o.mEndHyphen && mIsRtl == o.mIsRtl && mNchars == o.mNchars &&
                !memcmp(mChars, o.mChars, mNchars * sizeof(uint16_t));
@@ -93,7 +93,7 @@ private:
     float mSkewX;
     float mLetterSpacing;
     float mWordSpacing;
-    int32_t mPaintFlags;
+    int32_t mFontFlags;
     uint32_t mLocaleListId;
     FamilyVariant mFamilyVariant;
     StartHyphenEdit mStartHyphen;
@@ -114,7 +114,7 @@ private:
                 .update(mSkewX)
                 .update(mLetterSpacing)
                 .update(mWordSpacing)
-                .update(mPaintFlags)
+                .update(mFontFlags)
                 .update(mLocaleListId)
                 .update(static_cast<uint8_t>(mFamilyVariant))
                 .update(packHyphenEdit(mStartHyphen, mEndHyphen))
