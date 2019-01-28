@@ -1540,5 +1540,25 @@ TEST_F(GreedyLineBreakerTest, testReplacementSpanNotBreakTest_with_punctuation) 
                                                    << toString(textBuf, actual);
     }
 }
+
+TEST_F(GreedyLineBreakerTest, testControllCharAfterSpace) {
+    constexpr bool NO_HYPHEN = false;  // No hyphenation in this test case.
+    const std::vector<uint16_t> textBuf = utf8ToUtf16("example \u2066example");
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+    {
+        constexpr float LINE_WIDTH = 90;
+        std::vector<LineBreakExpectation> expect = {
+                {"example ", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u2066example", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+
+        const auto actual = doLineBreak(textBuf, NO_HYPHEN, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
 }  // namespace
 }  // namespace minikin

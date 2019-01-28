@@ -1977,5 +1977,33 @@ TEST_F(OptimalLineBreakerTest, testReplacementSpanNotBreakTest_with_punctuation)
                                                    << toString(textBuf, actual);
     }
 }
+
+TEST_F(OptimalLineBreakerTest, testControllCharAfterSpace) {
+    constexpr BreakStrategy HIGH_QUALITY = BreakStrategy::HighQuality;
+    constexpr BreakStrategy BALANCED = BreakStrategy::Balanced;
+    constexpr HyphenationFrequency NO_HYPHENATION = HyphenationFrequency::None;
+    const std::vector<uint16_t> textBuf = utf8ToUtf16("example \u2066example");
+
+    constexpr StartHyphenEdit NO_START_HYPHEN = StartHyphenEdit::NO_EDIT;
+    constexpr EndHyphenEdit NO_END_HYPHEN = EndHyphenEdit::NO_EDIT;
+    {
+        constexpr float LINE_WIDTH = 90;
+        // Note that HarfBuzz assigns 0px for control characters regardless of glyph existence in
+        // the font.
+        std::vector<LineBreakExpectation> expect = {
+                {"example ", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+                {"\u2066example", 70, NO_START_HYPHEN, NO_END_HYPHEN, ASCENT, DESCENT},
+        };
+
+        auto actual = doLineBreak(textBuf, HIGH_QUALITY, NO_HYPHENATION, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+        actual = doLineBreak(textBuf, BALANCED, NO_HYPHENATION, LINE_WIDTH);
+        EXPECT_TRUE(sameLineBreak(expect, actual)) << toString(expect) << std::endl
+                                                   << " vs " << std::endl
+                                                   << toString(textBuf, actual);
+    }
+}
 }  // namespace
 }  // namespace minikin

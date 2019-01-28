@@ -255,7 +255,8 @@ OptimizeContext populateCandidates(const U16StringPiece& textBuf, const Measured
                               proc, hyphenPenalty, isRtl, &result);
 
             // We skip breaks for zero-width characters inside replacement spans.
-            if (nextCharOffset == range.getEnd() || measured.widths[nextCharOffset] > 0) {
+            if (run->getPaint() != nullptr || nextCharOffset == range.getEnd() ||
+                measured.widths[nextCharOffset] > 0) {
                 const float penalty = hyphenPenalty * proc.wordBreakPenalty();
                 result.pushWordBreak(nextCharOffset, proc.sumOfCharWidths, proc.effectiveWidth,
                                      penalty, proc.rawSpaceCount, proc.effectiveSpaceCount, isRtl);
