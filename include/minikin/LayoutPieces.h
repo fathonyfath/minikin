@@ -65,7 +65,7 @@ struct LayoutPieces {
         std::size_t operator()(const MinikinPaint& paint) const { return paint.hash(); }
     };
 
-    LayoutPieces() {}
+    LayoutPieces() : nextPaintId(0) {}
     ~LayoutPieces() {}
 
     uint32_t nextPaintId;
