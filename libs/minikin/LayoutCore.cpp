@@ -64,6 +64,33 @@ static hb_position_t harfbuzzGetGlyphHorizontalAdvance(hb_font_t* /* hbFont */, 
     return 256 * advance + 0.5;
 }
 
+static void harfbuzzGetGlyphHorizontalAdvances(hb_font_t* /* hbFont */, void* fontData,
+                                               unsigned int count,
+                                               const hb_codepoint_t* first_glyph,
+                                               unsigned glyph_stride, hb_position_t* first_advance,
+                                               unsigned advance_stride, void* /* userData */) {
+    SkiaArguments* args = reinterpret_cast<SkiaArguments*>(fontData);
+    std::vector<uint16_t> glyphVec(count);
+    std::vector<float> advVec(count);
+
+    const hb_codepoint_t* glyph = first_glyph;
+    for (uint32_t i = 0; i < count; ++i) {
+        glyphVec[i] = *glyph;
+        glyph = reinterpret_cast<const hb_codepoint_t*>(reinterpret_cast<const uint8_t*>(glyph) +
+                                                        glyph_stride);
+    }
+
+    args->font->GetHorizontalAdvances(glyphVec.data(), count, *args->paint, args->fakery,
+                                      advVec.data());
+
+    hb_position_t* advances = first_advance;
+    for (uint32_t i = 0; i < count; ++i) {
+        *advances = HBFloatToFixed(advVec[i]);
+        advances = reinterpret_cast<hb_position_t*>(reinterpret_cast<uint8_t*>(advances) +
+                                                    advance_stride);
+    }
+}
+
 static hb_bool_t harfbuzzGetGlyphHorizontalOrigin(hb_font_t* /* hbFont */, void* /* fontData */,
                                                   hb_codepoint_t /* glyph */,
                                                   hb_position_t* /* x */, hb_position_t* /* y */,
@@ -80,6 +107,8 @@ hb_font_funcs_t* getFontFuncs() {
         // Override the h_advance function since we can't use HarfBuzz's implemenation. It may
         // return the wrong value if the font uses hinting aggressively.
         hb_font_funcs_set_glyph_h_advance_func(fontFuncs, harfbuzzGetGlyphHorizontalAdvance, 0, 0);
+        hb_font_funcs_set_glyph_h_advances_func(fontFuncs, harfbuzzGetGlyphHorizontalAdvances, 0,
+                                                0);
         hb_font_funcs_set_glyph_h_origin_func(fontFuncs, harfbuzzGetGlyphHorizontalOrigin, 0, 0);
         hb_font_funcs_make_immutable(fontFuncs);
     });
@@ -105,14 +134,6 @@ hb_font_funcs_t* getFontFuncsForEmoji() {
 static bool isColorBitmapFont(const HbFontUniquePtr& font) {
     HbBlob cbdt(font, HB_TAG('C', 'B', 'D', 'T'));
     return cbdt;
-}
-
-static float HBFixedToFloat(hb_position_t v) {
-    return scalbnf(v, -8);
-}
-
-static hb_position_t HBFloatToFixed(float v) {
-    return scalbnf(v, +8);
 }
 
 static hb_codepoint_t decodeUtf16(const uint16_t* chars, size_t len, ssize_t* iter) {

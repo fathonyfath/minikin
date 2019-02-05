@@ -40,6 +40,13 @@ public:
 
     virtual float GetHorizontalAdvance(uint32_t glyph_id, const MinikinPaint& paint,
                                        const FontFakery& fakery) const = 0;
+    virtual void GetHorizontalAdvances(uint16_t* glyph_ids, uint32_t count,
+                                       const MinikinPaint& paint, const FontFakery& fakery,
+                                       float* outAdvances) const {
+        for (uint32_t i = 0; i < count; ++i) {
+            outAdvances[i] = GetHorizontalAdvance(glyph_ids[i], paint, fakery);
+        }
+    }
 
     virtual void GetBounds(MinikinRect* bounds, uint32_t glyph_id, const MinikinPaint& paint,
                            const FontFakery& fakery) const = 0;
