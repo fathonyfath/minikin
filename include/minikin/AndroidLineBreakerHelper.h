@@ -85,8 +85,8 @@ public:
                                   float firstWidth, int32_t firstWidthLineCount, float restWidth,
                                   int32_t indentsOffset,
                                   // Tab stop arguments
-                                  const int32_t* tabStops, int32_t tabStopSize,
-                                  int32_t defaultTabStopWidth) const {
+                                  const float* tabStops, int32_t tabStopSize,
+                                  float defaultTabStopWidth) const {
         AndroidLineWidth lineWidth(firstWidth, firstWidthLineCount, restWidth, mIndents,
                                    indentsOffset);
         return breakIntoLines(textBuf, mStrategy, mFrequency, mIsJustified, measuredText, lineWidth,

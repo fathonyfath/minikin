@@ -53,7 +53,7 @@ class WordBreaker;
 class TabStops {
 public:
     // Caller must free stops. stops can be nullprt.
-    TabStops(const int32_t* stops, size_t nStops, int32_t tabWidth)
+    TabStops(const float* stops, size_t nStops, float tabWidth)
             : mStops(stops), mStopsSize(nStops), mTabWidth(tabWidth) {}
 
     float nextTab(float widthSoFar) const {
@@ -66,9 +66,9 @@ public:
     }
 
 private:
-    const int32_t* mStops;
+    const float* mStops;
     size_t mStopsSize;
-    int32_t mTabWidth;
+    float mTabWidth;
 };
 
 // Implement this for the additional information during line breaking.
