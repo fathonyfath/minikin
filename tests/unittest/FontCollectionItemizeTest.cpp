@@ -65,8 +65,21 @@ std::vector<FontCollection::Run> itemize(const std::shared_ptr<FontCollection>& 
 
     ParseUnicode(buf, BUF_SIZE, str, &len, NULL);
     const uint32_t localeListId = registerLocaleList(localeList);
-    return collection->itemize(U16StringPiece(buf, len), style, localeListId,
-                               FamilyVariant::DEFAULT);
+    auto result = collection->itemize(U16StringPiece(buf, len), style, localeListId,
+                                      FamilyVariant::DEFAULT);
+
+    // Check the same result has returned by calling with maxRun.
+    for (uint32_t runMax = 1; runMax <= result.size(); runMax++) {
+        auto resultWithRunMax = collection->itemize(U16StringPiece(buf, len), style, localeListId,
+                                                    FamilyVariant::DEFAULT, runMax);
+        EXPECT_EQ(runMax, resultWithRunMax.size());
+        for (uint32_t i = 0; i < runMax; ++i) {
+            EXPECT_EQ(result[i].start, resultWithRunMax[i].start);
+            EXPECT_EQ(result[i].end, resultWithRunMax[i].end);
+            EXPECT_EQ(result[i].fakedFont, resultWithRunMax[i].fakedFont);
+        }
+    }
+    return result;
 }
 
 // Overloaded version for default font style.

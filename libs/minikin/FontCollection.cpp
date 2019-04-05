@@ -370,7 +370,8 @@ constexpr uint32_t REPLACEMENT_CHARACTER = 0xFFFD;
 
 std::vector<FontCollection::Run> FontCollection::itemize(U16StringPiece text, FontStyle style,
                                                          uint32_t localeListId,
-                                                         FamilyVariant familyVariant) const {
+                                                         FamilyVariant familyVariant,
+                                                         uint32_t runMax) const {
     const uint16_t* string = text.data();
     const uint32_t string_size = text.size();
     std::vector<Run> result;
@@ -453,12 +454,26 @@ std::vector<FontCollection::Run> FontCollection::itemize(U16StringPiece text, Fo
         if (run != nullptr) {
             run->end = nextUtf16Pos;  // exclusive
         }
+
+        // Stop searching the remaining characters if the result length gets runMax + 2.
+        // When result.size gets runMax + 2 here, the run between [0, runMax) was finalized.
+        // If the result.size() equals to runMax, the run may be still expanding.
+        // if the result.size() equals to runMax + 2, the last run may be removed and the last run
+        // may be exntended the previous run with above workaround.
+        if (result.size() >= 2 && runMax == result.size() - 2) {
+            break;
+        }
     } while (nextCh != kEndOfString);
 
     if (lastFamily == nullptr) {
         // No character needed any font support, so it doesn't really matter which font they end up
         // getting displayed in. We put the whole string in one run, using the first font.
         result.push_back({mFamilies[0]->getClosestMatch(style), 0, static_cast<int>(string_size)});
+    }
+
+    if (result.size() > runMax) {
+        // The itemization has terminated since it reaches the runMax. Remove last unfinalized runs.
+        result.resize(runMax);
     }
     return result;
 }
