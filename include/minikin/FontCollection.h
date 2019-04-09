@@ -41,8 +41,15 @@ public:
         int end;
     };
 
+    // Perform the itemization until given max runs.
     std::vector<Run> itemize(U16StringPiece text, FontStyle style, uint32_t localeListId,
-                             FamilyVariant familyVariant) const;
+                             FamilyVariant familyVariant, uint32_t runMax) const;
+
+    // Perform the itemization until end of the text.
+    std::vector<Run> itemize(U16StringPiece text, FontStyle style, uint32_t localeListId,
+                             FamilyVariant familyVariant) const {
+        return itemize(text, style, localeListId, familyVariant, text.size());
+    }
 
     // Returns true if there is a glyph for the code point and variation selector pair.
     // Returns false if no fonts have a glyph for the code point and variation
