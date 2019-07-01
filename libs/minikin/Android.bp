@@ -52,13 +52,17 @@ cc_library {
                 "WordBreaker.cpp",
             ],
             shared_libs: [
+                "libandroidicu",
                 "libharfbuzz_ng",
                 "libft2",
                 "libz",
                 "libutils",
             ],
-            // TODO: clean up Minikin so it doesn't need the freetype include
-            export_shared_lib_headers: ["libft2"],
+            export_shared_lib_headers: [
+                "libandroidicu",
+                // TODO: clean up Minikin so it doesn't need the freetype include
+                "libft2",
+            ],
 
             sanitize: {
                 misc_undefined: [
@@ -67,6 +71,16 @@ cc_library {
                     //"unsigned-integer-overflow",
                 ],
             },
+        },
+        host: {
+            shared_libs: [
+                "libicui18n",
+                "libicuuc",
+            ],
+            export_shared_lib_headers: [
+                "libicui18n",
+                "libicuuc",
+            ],
         },
     },
     cppflags: [
@@ -83,14 +97,12 @@ cc_library {
     },
     shared_libs: [
         "liblog",
-        "libandroidicu",
     ],
     header_libs: [
         "libbase_headers",
         "libminikin_headers",
     ],
     export_header_lib_headers: ["libminikin_headers"],
-    export_shared_lib_headers: ["libandroidicu"],
     whole_static_libs: ["libgtest_prod"],
 
     clang: true,
