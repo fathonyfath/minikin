@@ -256,17 +256,17 @@ TEST(GraphemeBreak, emojiModifiers) {
     EXPECT_FALSE(IsBreakWithAdvances(ligated2_2, "U+1F918 | U+1F3FF"));
     EXPECT_FALSE(IsBreakWithAdvances(ligated2_2, "U+1F933 | U+1F3FF"));
     // Reptition of the tests above, with the knowledge that they are not ligated.
-    // const float unligated1_2[] = {1.0, 1.0, 0.0};
-    // const float unligated2_2[] = {1.0, 0.0, 1.0, 0.0};
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated1_2, "U+261D | U+1F3FB"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated1_2, "U+270C | U+1F3FB"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FB"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FC"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FD"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FE"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FF"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F918 | U+1F3FF"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F933 | U+1F3FF"));
+    const float unligated1_2[] = {1.0, 1.0, 0.0};
+    const float unligated2_2[] = {1.0, 0.0, 1.0, 0.0};
+    EXPECT_TRUE(IsBreakWithAdvances(unligated1_2, "U+261D | U+1F3FB"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated1_2, "U+270C | U+1F3FB"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FB"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FC"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FD"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FE"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F466 | U+1F3FF"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F918 | U+1F3FF"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated2_2, "U+1F933 | U+1F3FF"));
 
     // adding extend characters between emoji base and modifier doesn't affect grapheme cluster
     EXPECT_FALSE(IsBreak("U+270C U+FE0E | U+1F3FB"));  // victory hand + text style + modifier
@@ -276,15 +276,9 @@ TEST(GraphemeBreak, emojiModifiers) {
     EXPECT_FALSE(IsBreakWithAdvances(ligated1_1_2, "U+270C U+FE0E | U+1F3FB"));
     EXPECT_FALSE(IsBreakWithAdvances(ligated1_1_2, "U+270C U+FE0F | U+1F3FB"));
     // Reptition of the first two tests, with the knowledge that they are not ligated.
-    // const float unligated1_1_2[] = {1.0, 0.0, 1.0, 0.0};
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated1_1_2, "U+270C U+FE0E | U+1F3FB"));
-    // EXPECT_TRUE(IsBreakWithAdvances(unligated1_1_2, "U+270C U+FE0F | U+1F3FB"));
-
-    // heart is not an emoji base
-    // EXPECT_TRUE(IsBreak("U+2764 | U+1F3FB"));         // heart + modifier
-    // EXPECT_TRUE(IsBreak("U+2764 U+FE0E | U+1F3FB"));  // heart + emoji style + modifier
-    // EXPECT_TRUE(IsBreak("U+2764 U+FE0F | U+1F3FB"));  // heart + emoji style + modifier
-    // EXPECT_TRUE(IsBreak("U+1F3FB | U+1F3FB"));        // modifier + modifier
+    const float unligated1_1_2[] = {1.0, 0.0, 1.0, 0.0};
+    EXPECT_TRUE(IsBreakWithAdvances(unligated1_1_2, "U+270C U+FE0E | U+1F3FB"));
+    EXPECT_TRUE(IsBreakWithAdvances(unligated1_1_2, "U+270C U+FE0F | U+1F3FB"));
 
     // rat is not an emoji modifer
     EXPECT_TRUE(IsBreak("U+1F466 | U+1F400"));  // boy + rat
@@ -316,6 +310,11 @@ TEST(GraphemeBreak, offsets) {
     EXPECT_FALSE(GraphemeBreak::isGraphemeBreak(nullptr, string, 2, 3, 3));
     EXPECT_TRUE(GraphemeBreak::isGraphemeBreak(nullptr, string, 2, 3, 4));
     EXPECT_TRUE(GraphemeBreak::isGraphemeBreak(nullptr, string, 2, 3, 5));
+}
+
+TEST(GraphemeBreak, startWithZWJ) {
+    // It used to be looking before the ZWJ char even if it is the start of the text.
+    IsBreak("U+200D | U+1F5E8");  // UB sanitizer will catch if minikin looks the char before ZWJ
 }
 
 }  // namespace minikin
