@@ -18,6 +18,7 @@
 
 #include "LocaleListCache.h"
 
+#include <cstring>
 #include <unordered_set>
 
 #include <log/log.h>
@@ -49,24 +50,20 @@ static size_t toLanguageTag(char* output, size_t outSize, const StringPiece& loc
         return 0;
     }
 
+    char likelyChars[ULOC_FULLNAME_CAPACITY];
     // Preserve "" and "_****" since uloc_addLikelySubtags changes "" to "en_Latn_US".
     if (outLength == 0 || (outLength == 5 && output[0] == '_')) {
-        if (output[0] == '_') {
-            output[0] = '-';
+        size_t len = outLength < ULOC_FULLNAME_CAPACITY ? outLength : ULOC_FULLNAME_CAPACITY;
+        strncpy(likelyChars, output, len);
+    } else {
+        uErr = U_ZERO_ERROR;
+        uloc_addLikelySubtags(output, likelyChars, ULOC_FULLNAME_CAPACITY, &uErr);
+        if (U_FAILURE(uErr)) {
+            // unable to build a proper locale identifier
+            ALOGD("uloc_addLikelySubtags(\"%s\") failed: %s", output, u_errorName(uErr));
+            output[0] = '\0';
+            return 0;
         }
-        std::string buf(output, outLength);
-        outLength = (size_t)snprintf(output, outSize, "und%s", buf.c_str());
-        return outLength;
-    }
-
-    char likelyChars[ULOC_FULLNAME_CAPACITY];
-    uErr = U_ZERO_ERROR;
-    uloc_addLikelySubtags(output, likelyChars, ULOC_FULLNAME_CAPACITY, &uErr);
-    if (U_FAILURE(uErr)) {
-        // unable to build a proper locale identifier
-        ALOGD("uloc_addLikelySubtags(\"%s\") failed: %s", output, u_errorName(uErr));
-        output[0] = '\0';
-        return 0;
     }
 
     uErr = U_ZERO_ERROR;
