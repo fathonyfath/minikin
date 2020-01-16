@@ -58,12 +58,6 @@ cc_library {
             "unsigned-integer-overflow",
             "bounds",
         ],
-        diag: {
-            misc_undefined: ["bounds"],
-            no_recover: [
-                "bounds",
-            ],
-        },
     },
     cppflags: [
         "-Werror",
