@@ -17,48 +17,21 @@
 #ifndef MINIKIN_TEST_ICU_ENVIRONMENT_H
 #define MINIKIN_TEST_ICU_ENVIRONMENT_H
 
-// low level file access for mapping ICU data
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-
-#include <cutils/log.h>
+#include <aicu/AIcu.h>
 #include <gtest/gtest.h>
-#include <unicode/uclean.h>
-#include <unicode/udata.h>
 
 namespace minikin {
 
 class ICUEnvironment : public testing::Environment {
 public:
-    ICUEnvironment() : testing::Environment(), mData(nullptr), mSize(0) {}
-
-    void* mData;
-    size_t mSize;
+    ICUEnvironment() : testing::Environment() {}
 
     virtual void SetUp() override {
-        const char* fn = "/apex/com.android.i18n/etc/icu/" U_ICUDATA_NAME ".dat";
-        int fd = open(fn, O_RDONLY);
-        LOG_ALWAYS_FATAL_IF(fd == -1);
-        struct stat sb;
-        LOG_ALWAYS_FATAL_IF(fstat(fd, &sb) != 0);
-
-        mSize = sb.st_size;
-        void* mData = mmap(nullptr, mSize, PROT_READ, MAP_SHARED, fd, 0);
-        close(fd);
-
-        UErrorCode errorCode = U_ZERO_ERROR;
-        udata_setCommonData(mData, &errorCode);
-        LOG_ALWAYS_FATAL_IF(U_FAILURE(errorCode));
-
-        errorCode = U_ZERO_ERROR;
-        u_init(&errorCode);
-        LOG_ALWAYS_FATAL_IF(U_FAILURE(errorCode));
+        AIcu_register();
     }
 
     virtual void TearDown() override {
-        u_cleanup();
-        munmap(mData, mSize);
+        AIcu_deregister();
     }
 };
 
