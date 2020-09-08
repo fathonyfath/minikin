@@ -48,11 +48,15 @@ cc_library {
         "SystemFonts.cpp",
         "WordBreaker.cpp",
     ],
-    cflags: ["-Wall", "-Werror"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
             "unsigned-integer-overflow",
+            "bounds",
         ],
     },
     cppflags: [
