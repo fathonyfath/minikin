@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
-#include <aicu/AIcu.h>
 #include <benchmark/benchmark.h>
 
 int main(int argc, char** argv) {
-    AIcu_register();
-
     benchmark::Initialize(&argc, argv);
     benchmark::RunSpecifiedBenchmarks();
 
-    AIcu_deregister();
     return 0;
 }
