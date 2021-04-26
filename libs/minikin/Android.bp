@@ -85,7 +85,6 @@ cc_library {
         "libutils_headers",
     ],
     export_header_lib_headers: ["libminikin_headers"],
-    whole_static_libs: ["libgtest_prod"],
 
     clang: true,
 
