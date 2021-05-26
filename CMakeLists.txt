@@ -39,6 +39,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 set(BUILD_ICU ON CACHE BOOL "Enable compilation of ICU" FORCE)
 set(ICU_BUILD_VERSION "69.1" CACHE STRING "ICU version to build" FORCE)
+set(ICU_STATIC ON CACHE BOOL "" FORCE)
 
 add_subdirectory(vendor/icu-cmake)
 target_link_libraries(${PROJECT_NAME} icu)
