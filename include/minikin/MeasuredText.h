@@ -120,9 +120,9 @@ public:
     ReplacementRun(const Range& range, float width, uint32_t localeListId)
             : Run(range), mWidth(width), mLocaleListId(localeListId) {}
 
-    bool isRtl() const { return false; }
-    bool canBreak() const { return false; }
-    uint32_t getLocaleListId() const { return mLocaleListId; }
+    bool isRtl() const override { return false; }
+    bool canBreak() const override { return false; }
+    uint32_t getLocaleListId() const override { return mLocaleListId; }
 
     void getMetrics(const U16StringPiece& /* text */, std::vector<float>* advances,
                     LayoutPieces* /* precomputed */, LayoutPieces* /* outPieces */) const override {
