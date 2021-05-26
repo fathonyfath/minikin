@@ -55,3 +55,12 @@ target_link_libraries(${PROJECT_NAME} utils)
 
 add_subdirectory(vendor/log)
 target_link_libraries(${PROJECT_NAME} log)
+
+add_executable(minikin-app main.cc)
+target_link_libraries(minikin-app minikin::minikin)
+
+option(WITH_ZLIB "Freetype: Enable zlib " OFF)
+option(WITH_BZip2 "Freetype: Enable bzip2 " OFF)
+option(WITH_HarfBuzz "Freetype: Enable harfbuzz" OFF)
+option(WITH_PNG "Freetype: Build with PNG" OFF)
+add_subdirectory(vendor/freetype)
