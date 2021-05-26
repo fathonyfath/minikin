@@ -1,0 +1,9 @@
+[submodule "vendor/icu-cmake"]
+	path = vendor/icu-cmake
+	url = https://github.com/viaduck/icu-cmake.git
+[submodule "vendor/googletest"]
+	path = vendor/googletest
+	url = https://github.com/google/googletest.git
+[submodule "vendor/harfbuzz"]
+	path = vendor/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
